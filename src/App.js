@@ -1,6 +1,34 @@
 import React, { useState } from "react";
 import axios from "axios";
 
+const NAVY = "#1e3a5f";
+const MINT = "#3eb489";
+
+const SECTION_LABELS = [
+  "HPI/Care History",
+  "Clinical Summary",
+  "POC",
+  "Requested Visits",
+  "Determination and Rationale",
+  "Approved Visits",
+];
+
+function parseReview(text) {
+  const escaped = SECTION_LABELS.map((l) =>
+    l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+  const pattern = new RegExp(
+    `(${escaped.join("|")}):\\s*([\\s\\S]*?)(?=(?:${escaped.join("|")}):|\s*$)`,
+    "g"
+  );
+  const sections = [];
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    sections.push({ label: match[1], content: match[2].trim() });
+  }
+  return sections.length > 0 ? sections : null;
+}
+
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.NEXT_PUBLIC_API_BASE ||
@@ -18,6 +46,7 @@ function App() {
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const buildFormData = () => {
     const formData = new FormData();
@@ -241,12 +270,56 @@ function App() {
         </div>
       )}
 
-      {review && (
-        <div className="mt-6 whitespace-pre-wrap border p-4 bg-gray-50">
-          <h2 className="text-xl font-semibold mb-2">Generated Review</h2>
-          {review}
-        </div>
-      )}
+      {review && (() => {
+        const sections = parseReview(review);
+        return (
+          <div className="mt-6 border rounded-lg overflow-hidden shadow">
+            {/* Card header */}
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ backgroundColor: NAVY }}
+            >
+              <h2 className="text-white font-semibold text-base">Generated Review</h2>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(review);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                style={{ color: copied ? MINT : "white", border: `1px solid ${copied ? MINT : "white"}` }}
+                className="text-sm px-3 py-1 rounded transition-colors duration-200"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+
+            {/* Sections */}
+            {sections ? (
+              <div className="bg-gray-50">
+                {sections.map((sec, i) => (
+                  <div
+                    key={sec.label}
+                    className="px-4 py-3"
+                    style={i < sections.length - 1 ? { borderBottom: "2px solid #e5e7eb" } : {}}
+                  >
+                    <span
+                      className="font-bold"
+                      style={{ color: NAVY, fontSize: "15px" }}
+                    >
+                      {sec.label}:
+                    </span>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{sec.content}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-3 bg-gray-50 whitespace-pre-wrap text-sm text-gray-800">
+                {review}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
