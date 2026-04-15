@@ -22,8 +22,7 @@ function App() {
   const buildFormData = () => {
     const formData = new FormData();
 
-    // REQUIRED: backend expects this upload field name
-    formData.append("file", file);
+    formData.append("document", file);
 
     // IMPORTANT: send fields as multipart form fields (not query params)
     formData.append("reviewType", reviewType);
@@ -63,8 +62,7 @@ function App() {
 
       const response = await axios.post(
         `${API_BASE}/api/generate-review`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       setReview(response.data.review || "");
@@ -91,12 +89,11 @@ function App() {
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("document", file);
 
       const res = await axios.post(
         `${API_BASE}/api/preview-metrics`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        formData
       );
 
       setMetrics(res.data.metrics);
