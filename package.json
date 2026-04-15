@@ -22,10 +22,6 @@
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35"
   },
-  "overrides": {
-    "ajv": "^8.0.0",
-    "ajv-keywords": "^5.0.0"
-  },
   "browserslist": {
     "production": [
       ">0.2%",
