@@ -20,6 +20,11 @@
     "ajv-formats": "^2.1.1",
     "ajv-keywords": "^5.1.0"
   },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35"
+  },
   "overrides": {
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
