@@ -66,44 +66,6 @@ function parseReview(reviewText) {
   });
 }
 
-// --- parseGates --------------------------------------------------------------
-// Converts the backend's ruling.sopSummary into an array of gate pill objects.
-function parseGates(ruling) {
-  if (!ruling) return [];
-  const summary = ruling.sopSummary;
-  if (!summary) return [];
-
-  // If already an array of { gate, passed, label } objects -- use directly
-  if (Array.isArray(summary)) {
-    return summary.map((g, i) => ({
-      id: g.gate || `G${i + 1}`,
-      passed: g.passed !== false,
-      label: g.label || g.gate || `Gate ${i + 1}`,
-    }));
-  }
-
-  // If it's a string, try to parse lines like "G1: No overlap -- PASS"
-  if (typeof summary === "string") {
-    return summary
-      .split(/\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line, i) => {
-        const passed = /pass|PASS|approved/i.test(line);
-        const gateMatch = line.match(/G(\d+)/i);
-        const id = gateMatch ? `G${gateMatch[1]}` : `G${i + 1}`;
-        // Strip leading gate id and status word for the short label
-        const label = line
-          .replace(/^G\d+\s*[:--]\s*/i, "")
-          .replace(/\s*[--]\s*(pass|fail|approved|denied|pend)/i, "")
-          .trim();
-        return { id, passed, label: label || line };
-      });
-  }
-
-  return [];
-}
-
 // --- Spinner -----------------------------------------------------------------
 function Spinner() {
   return (
@@ -135,48 +97,6 @@ function Spinner() {
         Generating review — this may take up to 30 seconds...
       </span>
       <style>{`@keyframes rn-spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-// --- GatePills ---------------------------------------------------------------
-function GatePills({ gates }) {
-  if (!gates || gates.length === 0) return null;
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 8,
-        padding: "14px 20px",
-        borderBottom: "1px solid #e5e7eb",
-        background: "#f8fafc",
-      }}
-    >
-      {gates.map(({ id, passed, label }) => (
-        <span
-          key={id}
-          title={label}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "4px 10px",
-            borderRadius: 999,
-            fontSize: 12,
-            fontWeight: 600,
-            background: passed ? "#dcfce7" : "#fef3c7",
-            color: passed ? "#166534" : "#92400e",
-            border: `1px solid ${passed ? "#86efac" : "#fcd34d"}`,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <span>{passed ? "PASS" : "FAIL"}</span>
-          <span>
-            {id}: {label}
-          </span>
-        </span>
-      ))}
     </div>
   );
 }
@@ -288,7 +208,6 @@ function App() {
   };
 
   const sections = review ? parseReview(review) : null;
-  const gates    = ruling  ? parseGates(ruling)   : [];
 
   // -- shared style tokens ----------------------------------------------------
   const card = {
@@ -576,9 +495,6 @@ function App() {
                 {copied ? "Copied!" : "Copy to Clipboard"}
               </button>
             </div>
-
-            {/* Gate pills row */}
-            {gates.length > 0 && <GatePills gates={gates} />}
 
             {/* Review sections */}
             {sections.map(({ label: secLabel, content }, idx) => (
