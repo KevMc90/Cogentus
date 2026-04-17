@@ -370,7 +370,7 @@ function App() {
                 RapidNote
               </h1>
               <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-                Prior Authorization Review Generator
+                AI-Assisted Prior Authorization Review
               </p>
             </div>
           </div>
