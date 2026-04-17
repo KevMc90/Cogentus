@@ -225,7 +225,7 @@ function ReviewSection({ label, content, isLast }) {
 function App() {
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
-  const [careHistory, setCareHistory]         = useState("");
+  const [priorNote, setPriorNote]             = useState("");
   const [requestedVisits, setRequestedVisits] = useState("");
   const [poc, setPoc]                         = useState("");
   const [file, setFile]                       = useState(null);
@@ -240,9 +240,11 @@ function App() {
     fd.append("document", file);                                          // must match upload.single("document")
     fd.append("reviewType", reviewType);
     fd.append("hpi", hpi.trim());
-    fd.append("careHistory", careHistory.trim());
     fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
     fd.append("poc", poc.trim());
+    if (reviewType === "subsequent") {
+      fd.append("priorNote", priorNote.trim());
+    }
     return fd;
   };
 
@@ -402,27 +404,15 @@ function App() {
             </select>
           </div>
 
-          {/* HPI */}
+          {/* HPI / Care History */}
           <div style={fieldWrap}>
-            {label("History of Present Illness (HPI)")}
+            {label('HPI / Care History')}
             <textarea
               value={hpi}
               onChange={(e) => setHpi(e.target.value)}
-              placeholder="Describe the patient's current condition, onset, symptom progression, prior treatmentsâ¦"
-              rows={5}
-              style={{ ...inputBase, resize: "vertical", lineHeight: 1.6 }}
-            />
-          </div>
-
-          {/* Care History */}
-          <div style={fieldWrap}>
-            {label("Care History (prior visits / progress)")}
-            <textarea
-              value={careHistory}
-              onChange={(e) => setCareHistory(e.target.value)}
-              placeholder="Summarize prior visit frequency, patient response, functional improvements or lack thereofâ¦"
+              placeholder='e.g. 57 YO M, dx M25.561 R shoulder partial supraspinatus tear, fall injury 2/2026. IE 4/7/2026. 8v prev approved at 2x/wk x 4wks (PD for frequency). Initial request.'
               rows={4}
-              style={{ ...inputBase, resize: "vertical", lineHeight: 1.6 }}
+              style={{ ...inputBase, resize: 'vertical', lineHeight: 1.6 }}
             />
           </div>
 
@@ -457,6 +447,20 @@ function App() {
               />
             </div>
           </div>
+
+          {/* Prior Review Note — SUB only */}
+          {reviewType === 'subsequent' && (
+            <div style={fieldWrap}>
+              {label('Prior Review Note (paste previous determination here)')}
+              <textarea
+                value={priorNote}
+                onChange={(e) => setPriorNote(e.target.value)}
+                placeholder='Paste the prior reviewer note here — RapidNote will use it to compare against the current documentation.'
+                rows={5}
+                style={{ ...inputBase, resize: 'vertical', lineHeight: 1.6 }}
+              />
+            </div>
+          )}
 
           {/* PDF Upload */}
           <div style={fieldWrap}>
