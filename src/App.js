@@ -147,7 +147,6 @@ function App() {
   const [hpi, setHpi]                         = useState("");
   const [priorNote, setPriorNote]             = useState("");
   const [requestedVisits, setRequestedVisits] = useState("");
-  const [poc, setPoc]                         = useState("");
   const [file, setFile]                       = useState(null);
   const [review, setReview]                   = useState("");
   const [ruling, setRuling]                   = useState(null);
@@ -161,7 +160,6 @@ function App() {
     fd.append("reviewType", reviewType);
     fd.append("hpi", hpi.trim());
     fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
-    fd.append("poc", poc.trim());
     if (reviewType === "subsequent") {
       fd.append("priorNote", priorNote.trim());
     }
@@ -176,7 +174,6 @@ function App() {
 
     if (!file) { setError("A supporting PDF is required."); return; }
     if (!requestedVisits) { setError("Requested Visits is required."); return; }
-    if (!poc.trim()) { setError("Plan of Care is required (e.g. 2x/week x 4 weeks)."); return; }
 
     setLoading(true);
     try {
@@ -335,36 +332,17 @@ function App() {
             />
           </div>
 
-          {/* Requested Visits + Plan of Care -- 2-col on desktop */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 16,
-              marginBottom: 18,
-            }}
-          >
-            <div>
-              {label("Requested Visits")}
-              <input
-                type="number"
-                min="0"
-                value={requestedVisits}
-                onChange={(e) => setRequestedVisits(e.target.value)}
-                placeholder="e.g. 12"
-                style={inputBase}
-              />
-            </div>
-            <div>
-              {label("Plan of Care (e.g. 2x/week x 4 weeks)")}
-              <input
-                type="text"
-                value={poc}
-                onChange={(e) => setPoc(e.target.value)}
-                placeholder="e.g. 2x/week x 6 weeks"
-                style={inputBase}
-              />
-            </div>
+          {/* Requested Visits */}
+          <div style={fieldWrap}>
+            {label("Requested Visits")}
+            <input
+              type="number"
+              min="0"
+              value={requestedVisits}
+              onChange={(e) => setRequestedVisits(e.target.value)}
+              placeholder="e.g. 12"
+              style={inputBase}
+            />
           </div>
 
           {/* Prior Review Note — SUB only */}
