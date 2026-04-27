@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 const API_BASE =
@@ -28,7 +28,29 @@ const SECTION_STYLES = {
   },
 };
 
-// --- parseReview ------------------------------------------------------------
+// Determination badge colours
+function detColor(label) {
+  if (!label) return { bg: "#f3f4f6", text: "#374151" };
+  const l = label.toLowerCase();
+  if (l.startsWith("approved"))        return { bg: "#dcfce7", text: "#15803d" };
+  if (l.startsWith("partial denial"))  return { bg: "#fef3c7", text: "#92400e" };
+  if (l.startsWith("full denial"))     return { bg: "#fee2e2", text: "#991b1b" };
+  if (l.startsWith("pend"))            return { bg: "#f3f4f6", text: "#374151" };
+  return { bg: "#f3f4f6", text: "#374151" };
+}
+
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${mm}/${dd}/${yyyy} ${hh}:${min}`;
+}
+
+// --- parseReview ------------------------------------------------------------
 function parseReview(reviewText) {
   if (!reviewText) return null;
 
@@ -66,7 +88,7 @@ function parseReview(reviewText) {
   });
 }
 
-// --- Spinner -----------------------------------------------------------------
+// --- Spinner -----------------------------------------------------------------
 function Spinner() {
   return (
     <div
@@ -101,7 +123,7 @@ function Spinner() {
   );
 }
 
-// --- ReviewSection -----------------------------------------------------------
+// --- ReviewSection -----------------------------------------------------------
 function ReviewSection({ label, content, isLast }) {
   const extra = SECTION_STYLES[label] || {};
   return (
@@ -141,7 +163,277 @@ function ReviewSection({ label, content, isLast }) {
   );
 }
 
-// --- App ---------------------------------------------------------------------
+// --- HistoryRow --------------------------------------------------------------
+function HistoryRow({ row, isExpanded, onToggle }) {
+  const [rowCopied, setRowCopied] = useState(false);
+  const badge = detColor(row.determination_label);
+
+  const copyRowReview = () => {
+    const text = [
+      `HPI/Care History:\n${row.hpi || "—"}`,
+      `Clinical Summary:\n${row.clinical_summary || "—"}`,
+      `POC: ${row.poc || "Not specified"}`,
+      `Requested Visits: ${row.requested_visits ?? "—"}`,
+      `Determination and Rationale:\n${row.determination_line || "—"}`,
+      `Approved Visits: ${row.approved_visits ?? "—"}`,
+    ].join("\n\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setRowCopied(true);
+      setTimeout(() => setRowCopied(false), 2500);
+    });
+  };
+
+  return (
+    <div
+      style={{
+        borderBottom: "1px solid #e5e7eb",
+        background: isExpanded ? "#f8fafc" : "#fff",
+      }}
+    >
+      {/* Summary row — clickable */}
+      <div
+        onClick={onToggle}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "140px 80px 90px 1fr 80px",
+          gap: 12,
+          padding: "11px 20px",
+          alignItems: "center",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <span style={{ fontSize: 13, color: "#4b5563" }}>
+          {formatDateTime(row.created_at)}
+        </span>
+        <span style={{ fontSize: 13, color: "#374151", textTransform: "capitalize" }}>
+          {row.review_type === "subsequent" ? "SUB" : "IE"}
+        </span>
+        <span style={{ fontSize: 13, fontFamily: "monospace", color: "#1e3a5f", fontWeight: 600 }}>
+          {row.primary_diagnosis || "—"}
+        </span>
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 9px",
+            borderRadius: 99,
+            fontSize: 12,
+            fontWeight: 700,
+            background: badge.bg,
+            color: badge.text,
+            width: "fit-content",
+          }}
+        >
+          {row.determination_label || "—"}
+        </span>
+        <span style={{ fontSize: 13, color: "#374151", textAlign: "right" }}>
+          {row.approved_visits ?? "—"} visits
+        </span>
+      </div>
+
+      {/* Expanded detail */}
+      {isExpanded && (
+        <div
+          style={{
+            borderTop: "1px solid #e5e7eb",
+            padding: "16px 20px",
+            background: "#fff",
+          }}
+        >
+          {/* Copy button */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+            <button
+              onClick={copyRowReview}
+              style={{
+                background: rowCopied ? "#22c55e" : "#1e3a5f",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+            >
+              {rowCopied ? "Copied!" : "Copy to Clipboard"}
+            </button>
+          </div>
+
+          {/* Detail fields */}
+          {[
+            { heading: "HPI/Care History", value: row.hpi },
+            { heading: "Clinical Summary",  value: row.clinical_summary },
+            { heading: "POC",               value: row.poc },
+            { heading: "Determination and Rationale", value: row.determination_line },
+          ].map(({ heading, value }) => (
+            <div key={heading} style={{ marginBottom: 14 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#1e3a5f",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: 4,
+                }}
+              >
+                {heading}
+              </div>
+              <div
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: "#1f2937",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {value || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>—</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- ReviewHistory -----------------------------------------------------------
+function ReviewHistory({ refreshTrigger }) {
+  const [reviews, setReviews]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+
+  const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await axios.get(`${API_BASE}/api/reviews`);
+      setReviews(res.data.reviews || []);
+    } catch (err) {
+      setError("Could not load review history.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchReviews(); }, [fetchReviews, refreshTrigger]);
+
+  const card = {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    marginBottom: 20,
+    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    overflow: "hidden",
+  };
+
+  return (
+    <div style={card}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 20px",
+          background: "#1e3a5f",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#fff",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          Review History
+        </span>
+        <button
+          onClick={fetchReviews}
+          style={{
+            background: "rgba(255,255,255,0.12)",
+            border: "1px solid rgba(255,255,255,0.25)",
+            borderRadius: 6,
+            padding: "5px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Column headers */}
+      {reviews.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "140px 80px 90px 1fr 80px",
+            gap: 12,
+            padding: "8px 20px",
+            background: "#f8fafc",
+            borderBottom: "1px solid #e5e7eb",
+          }}
+        >
+          {["Date / Time", "Type", "Dx Code", "Determination", "Approved"].map((h) => (
+            <span
+              key={h}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Body */}
+      {loading ? (
+        <div style={{ padding: "24px 20px", color: "#6b7280", fontSize: 14 }}>
+          Loading...
+        </div>
+      ) : error ? (
+        <div style={{ padding: "24px 20px", color: "#991b1b", fontSize: 14 }}>
+          {error}
+        </div>
+      ) : reviews.length === 0 ? (
+        <div
+          style={{
+            padding: "32px 20px",
+            textAlign: "center",
+            color: "#9ca3af",
+            fontSize: 14,
+            fontStyle: "italic",
+          }}
+        >
+          No reviews generated yet
+        </div>
+      ) : (
+        reviews.map((row) => (
+          <HistoryRow
+            key={row.id}
+            row={row}
+            isExpanded={expandedId === row.id}
+            onToggle={() => setExpandedId(expandedId === row.id ? null : row.id)}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+// --- App ---------------------------------------------------------------------
 function App() {
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
@@ -153,10 +445,11 @@ function App() {
   const [error, setError]                     = useState("");
   const [loading, setLoading]                 = useState(false);
   const [copied, setCopied]                   = useState(false);
+  const [historyRefresh, setHistoryRefresh]   = useState(0);
 
   const buildFormData = () => {
     const fd = new FormData();
-    fd.append("document", file);                                          // must match upload.single("document")
+    fd.append("document", file);
     fd.append("reviewType", reviewType);
     fd.append("hpi", hpi.trim());
     fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
@@ -184,6 +477,7 @@ function App() {
       );
       setReview(res.data.review || "");
       setRuling(res.data.ruling || null);
+      setHistoryRefresh((n) => n + 1); // trigger history reload
     } catch (err) {
       const msg = err?.response?.data?.error;
       setError(msg || `Error generating review: ${err.message}`);
@@ -206,7 +500,7 @@ function App() {
 
   const sections = review ? parseReview(review) : null;
 
-  // -- shared style tokens ----------------------------------------------------
+  // -- shared style tokens ----------------------------------------------------
   const card = {
     background: "#fff",
     border: "1px solid #e5e7eb",
@@ -256,7 +550,7 @@ function App() {
     >
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
 
-        {/* -- Page header -- */}
+        {/* -- Page header -- */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
@@ -292,7 +586,7 @@ function App() {
           </div>
         </div>
 
-        {/* -- Input card -- */}
+        {/* -- Input card -- */}
         <div style={{ ...card, padding: "24px 28px" }}>
           <h2
             style={{
@@ -426,10 +720,10 @@ function App() {
           </button>
         </div>
 
-        {/* -- Spinner -- */}
+        {/* -- Spinner -- */}
         {loading && <Spinner />}
 
-        {/* -- Output card -- */}
+        {/* -- Output card -- */}
         {sections && !loading && (
           <div style={card}>
 
@@ -485,6 +779,10 @@ function App() {
             ))}
           </div>
         )}
+
+        {/* -- Review History -- */}
+        <ReviewHistory refreshTrigger={historyRefresh} />
+
       </div>
     </div>
   );
