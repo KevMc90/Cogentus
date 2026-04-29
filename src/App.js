@@ -579,6 +579,9 @@ function App() {
               >
                 Cogentus
               </h1>
+              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+                Clinical Review
+              </p>
             </div>
           </div>
         </div>
