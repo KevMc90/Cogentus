@@ -565,7 +565,7 @@ function App() {
                 flexShrink: 0,
               }}
             >
-              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>R</span>
+              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>C</span>
             </div>
             <div>
               <h1
@@ -579,9 +579,6 @@ function App() {
               >
                 Cogentus
               </h1>
-              <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-                Clinical Determinations, Made Cogent
-              </p>
             </div>
           </div>
         </div>
