@@ -577,10 +577,10 @@ function App() {
                   letterSpacing: "-0.01em",
                 }}
               >
-                RapidNote
+                Cogentus
               </h1>
               <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-                AI-Assisted Prior Authorization Review
+                Clinical Determinations, Made Cogent
               </p>
             </div>
           </div>
@@ -646,7 +646,7 @@ function App() {
               <textarea
                 value={priorNote}
                 onChange={(e) => setPriorNote(e.target.value)}
-                placeholder='Paste the prior reviewer note here — RapidNote will use it to compare against the current documentation.'
+                placeholder='Paste the prior reviewer note here — Cogentus will use it to compare against the current documentation.'
                 rows={5}
                 style={{ ...inputBase, resize: 'vertical', lineHeight: 1.6 }}
               />
