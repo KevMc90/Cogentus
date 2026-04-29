@@ -42,10 +42,10 @@ function detColor(label) {
 function formatDateTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
+  const mm  = String(d.getMonth() + 1).padStart(2, "0");
+  const dd  = String(d.getDate()).padStart(2, "0");
   const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
+  const hh  = String(d.getHours()).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
   return `${mm}/${dd}/${yyyy} ${hh}:${min}`;
 }
@@ -88,7 +88,7 @@ function parseReview(reviewText) {
   });
 }
 
-// --- Spinner -----------------------------------------------------------------
+// --- Spinner ----------------------------------------------------------------
 function Spinner() {
   return (
     <div
@@ -123,7 +123,7 @@ function Spinner() {
   );
 }
 
-// --- ReviewSection -----------------------------------------------------------
+// --- ReviewSection ----------------------------------------------------------
 function ReviewSection({ label, content, isLast }) {
   const extra = SECTION_STYLES[label] || {};
   return (
@@ -163,7 +163,7 @@ function ReviewSection({ label, content, isLast }) {
   );
 }
 
-// --- HistoryRow --------------------------------------------------------------
+// --- HistoryRow -------------------------------------------------------------
 function HistoryRow({ row, isExpanded, onToggle }) {
   const [rowCopied, setRowCopied] = useState(false);
   const badge = detColor(row.determination_label);
@@ -190,7 +190,6 @@ function HistoryRow({ row, isExpanded, onToggle }) {
         background: isExpanded ? "#f8fafc" : "#fff",
       }}
     >
-      {/* Summary row — clickable */}
       <div
         onClick={onToggle}
         style={{
@@ -231,7 +230,6 @@ function HistoryRow({ row, isExpanded, onToggle }) {
         </span>
       </div>
 
-      {/* Expanded detail */}
       {isExpanded && (
         <div
           style={{
@@ -240,7 +238,6 @@ function HistoryRow({ row, isExpanded, onToggle }) {
             background: "#fff",
           }}
         >
-          {/* Copy button */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
             <button
               onClick={copyRowReview}
@@ -260,11 +257,10 @@ function HistoryRow({ row, isExpanded, onToggle }) {
             </button>
           </div>
 
-          {/* Detail fields */}
           {[
-            { heading: "HPI/Care History", value: row.hpi },
-            { heading: "Clinical Summary",  value: row.clinical_summary },
-            { heading: "POC",               value: row.poc },
+            { heading: "HPI/Care History",           value: row.hpi },
+            { heading: "Clinical Summary",            value: row.clinical_summary },
+            { heading: "POC",                         value: row.poc },
             { heading: "Determination and Rationale", value: row.determination_line },
           ].map(({ heading, value }) => (
             <div key={heading} style={{ marginBottom: 14 }}>
@@ -280,14 +276,7 @@ function HistoryRow({ row, isExpanded, onToggle }) {
               >
                 {heading}
               </div>
-              <div
-                style={{
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                  color: "#1f2937",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+              <div style={{ fontSize: 14, lineHeight: 1.7, color: "#1f2937", whiteSpace: "pre-wrap" }}>
                 {value || <span style={{ color: "#9ca3af", fontStyle: "italic" }}>—</span>}
               </div>
             </div>
@@ -298,25 +287,31 @@ function HistoryRow({ row, isExpanded, onToggle }) {
   );
 }
 
-// --- ReviewHistory -----------------------------------------------------------
-function ReviewHistory({ refreshTrigger }) {
-  const [reviews, setReviews]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState("");
+// --- ReviewHistory ----------------------------------------------------------
+function ReviewHistory({ refreshTrigger, token, onAuthError }) {
+  const [reviews, setReviews]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
   const [expandedId, setExpandedId] = useState(null);
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.get(`${API_BASE}/api/reviews`);
+      const res = await axios.get(`${API_BASE}/api/reviews`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setReviews(res.data.reviews || []);
     } catch (err) {
-      setError("Could not load review history.");
+      if (err?.response?.status === 401) {
+        onAuthError();
+      } else {
+        setError("Could not load review history.");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token, onAuthError]);
 
   useEffect(() => { fetchReviews(); }, [fetchReviews, refreshTrigger]);
 
@@ -331,7 +326,6 @@ function ReviewHistory({ refreshTrigger }) {
 
   return (
     <div style={card}>
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -341,15 +335,7 @@ function ReviewHistory({ refreshTrigger }) {
           background: "#1e3a5f",
         }}
       >
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: "#fff",
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-          }}
-        >
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
           Review History
         </span>
         <button
@@ -369,7 +355,6 @@ function ReviewHistory({ refreshTrigger }) {
         </button>
       </div>
 
-      {/* Column headers */}
       {reviews.length > 0 && (
         <div
           style={{
@@ -384,13 +369,7 @@ function ReviewHistory({ refreshTrigger }) {
           {["Date / Time", "Type", "Dx Code", "Determination", "Approved"].map((h) => (
             <span
               key={h}
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
+              style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}
             >
               {h}
             </span>
@@ -398,25 +377,12 @@ function ReviewHistory({ refreshTrigger }) {
         </div>
       )}
 
-      {/* Body */}
       {loading ? (
-        <div style={{ padding: "24px 20px", color: "#6b7280", fontSize: 14 }}>
-          Loading...
-        </div>
+        <div style={{ padding: "24px 20px", color: "#6b7280", fontSize: 14 }}>Loading...</div>
       ) : error ? (
-        <div style={{ padding: "24px 20px", color: "#991b1b", fontSize: 14 }}>
-          {error}
-        </div>
+        <div style={{ padding: "24px 20px", color: "#991b1b", fontSize: 14 }}>{error}</div>
       ) : reviews.length === 0 ? (
-        <div
-          style={{
-            padding: "32px 20px",
-            textAlign: "center",
-            color: "#9ca3af",
-            fontSize: 14,
-            fontStyle: "italic",
-          }}
-        >
+        <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 14, fontStyle: "italic" }}>
           No reviews generated yet
         </div>
       ) : (
@@ -433,8 +399,269 @@ function ReviewHistory({ refreshTrigger }) {
   );
 }
 
-// --- App ---------------------------------------------------------------------
+// --- AuthPage ---------------------------------------------------------------
+function AuthPage({ onAuthSuccess }) {
+  const [view, setView]           = useState("login"); // "login" | "register"
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [fullName, setFullName]   = useState("");
+  const [error, setError]         = useState("");
+  const [loading, setLoading]     = useState(false);
+
+  const inputBase = {
+    width: "100%",
+    border: "1px solid #d1d5db",
+    borderRadius: 7,
+    padding: "10px 12px",
+    fontSize: 14,
+    color: "#111827",
+    background: "#f9fafb",
+    outline: "none",
+    boxSizing: "border-box",
+    fontFamily: "inherit",
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password });
+      onAuthSuccess(res.data.token, res.data.user);
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        setError("Invalid email or password.");
+      } else if (!err?.response) {
+        setError("Connection error. Please try again.");
+      } else {
+        setError(err?.response?.data?.error || "Login failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPw) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/api/auth/register`, {
+        email,
+        password,
+        full_name: fullName,
+      });
+      onAuthSuccess(res.data.token, res.data.user);
+    } catch (err) {
+      if (err?.response?.status === 409) {
+        setError("An account with this email already exists.");
+      } else if (!err?.response) {
+        setError("Connection error. Please try again.");
+      } else {
+        setError(err?.response?.data?.error || "Registration failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f3f4f6",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      }}
+    >
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              background: "#1e3a5f",
+              borderRadius: 12,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 12,
+            }}
+          >
+            <span style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}>C</span>
+          </div>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#1e3a5f", letterSpacing: "-0.01em" }}>
+            Cogentus
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>Clinical Review</p>
+        </div>
+
+        {/* Card */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: "32px 28px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          <h2 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 700, color: "#111827" }}>
+            {view === "login" ? "Sign in to your account" : "Create your account"}
+          </h2>
+
+          <form onSubmit={view === "login" ? handleLogin : handleRegister}>
+            {view === "register" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Jane Smith"
+                  style={inputBase}
+                  autoComplete="name"
+                />
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                style={inputBase}
+                autoComplete="email"
+              />
+            </div>
+
+            <div style={{ marginBottom: view === "register" ? 16 : 24 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={view === "register" ? "At least 8 characters" : "••••••••"}
+                required
+                style={inputBase}
+                autoComplete={view === "login" ? "current-password" : "new-password"}
+              />
+            </div>
+
+            {view === "register" && (
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  style={inputBase}
+                  autoComplete="new-password"
+                />
+              </div>
+            )}
+
+            {error && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fca5a5",
+                  borderRadius: 7,
+                  padding: "10px 14px",
+                  color: "#991b1b",
+                  fontSize: 13,
+                  marginBottom: 16,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: "100%",
+                background: loading ? "#93c5fd" : "#1e3a5f",
+                color: "#fff",
+                border: "none",
+                borderRadius: 7,
+                padding: "11px",
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: loading ? "not-allowed" : "pointer",
+                transition: "background 0.2s",
+              }}
+            >
+              {loading ? "Please wait..." : view === "login" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: 20, textAlign: "center", fontSize: 13, color: "#6b7280" }}>
+            {view === "login" ? (
+              <>
+                Don't have an account?{" "}
+                <button
+                  onClick={() => { setView("register"); setError(""); }}
+                  style={{ background: "none", border: "none", color: "#1e3a5f", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13 }}
+                >
+                  Register
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => { setView("login"); setError(""); }}
+                  style={{ background: "none", border: "none", color: "#1e3a5f", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: 13 }}
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- App --------------------------------------------------------------------
 function App() {
+  // Auth state — initialised from localStorage
+  const [token, setToken] = useState(() => localStorage.getItem("cogentus_token") || "");
+  const [user, setUser]   = useState(() => {
+    try { return JSON.parse(localStorage.getItem("cogentus_user") || "null"); }
+    catch { return null; }
+  });
+
+  // Review form state
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
   const [priorNote, setPriorNote]             = useState("");
@@ -446,6 +673,34 @@ function App() {
   const [loading, setLoading]                 = useState(false);
   const [copied, setCopied]                   = useState(false);
   const [historyRefresh, setHistoryRefresh]   = useState(0);
+
+  const handleAuthSuccess = (tok, userData) => {
+    localStorage.setItem("cogentus_token", tok);
+    localStorage.setItem("cogentus_user", JSON.stringify(userData));
+    setToken(tok);
+    setUser(userData);
+  };
+
+  const handleAuthError = useCallback(() => {
+    localStorage.removeItem("cogentus_token");
+    localStorage.removeItem("cogentus_user");
+    setToken("");
+    setUser(null);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("cogentus_token");
+    localStorage.removeItem("cogentus_user");
+    setToken("");
+    setUser(null);
+  };
+
+  // Show auth page when not logged in
+  if (!token || !user) {
+    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  const authHeaders = { Authorization: `Bearer ${token}` };
 
   const buildFormData = () => {
     const fd = new FormData();
@@ -465,7 +720,7 @@ function App() {
     setRuling(null);
     setCopied(false);
 
-    if (!file) { setError("A supporting PDF is required."); return; }
+    if (!file)            { setError("A supporting PDF is required."); return; }
     if (!requestedVisits) { setError("Requested Visits is required."); return; }
 
     setLoading(true);
@@ -473,14 +728,18 @@ function App() {
       const res = await axios.post(
         `${API_BASE}/api/generate-review`,
         buildFormData(),
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data", ...authHeaders } }
       );
       setReview(res.data.review || "");
       setRuling(res.data.ruling || null);
-      setHistoryRefresh((n) => n + 1); // trigger history reload
+      setHistoryRefresh((n) => n + 1);
     } catch (err) {
-      const msg = err?.response?.data?.error;
-      setError(msg || `Error generating review: ${err.message}`);
+      if (err?.response?.status === 401) {
+        handleAuthError();
+      } else {
+        const msg = err?.response?.data?.error;
+        setError(msg || `Error generating review: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -500,7 +759,7 @@ function App() {
 
   const sections = review ? parseReview(review) : null;
 
-  // -- shared style tokens ----------------------------------------------------
+  // Shared style tokens
   const card = {
     background: "#fff",
     border: "1px solid #e5e7eb",
@@ -510,7 +769,7 @@ function App() {
     overflow: "hidden",
   };
   const fieldWrap = { marginBottom: 18 };
-  const label = (text) => (
+  const labelEl = (text) => (
     <label
       style={{
         display: "block",
@@ -544,14 +803,13 @@ function App() {
         minHeight: "100vh",
         background: "#f3f4f6",
         padding: "32px 16px 60px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
       }}
     >
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
 
         {/* -- Page header -- */}
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
@@ -579,10 +837,30 @@ function App() {
               >
                 Cogentus
               </h1>
-              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-                Clinical Review
-              </p>
+              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>Clinical Review</p>
             </div>
+          </div>
+
+          {/* Reviewer info + logout */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 13, color: "#4b5563" }}>
+              {user.name || user.email}
+            </span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "none",
+                border: "1px solid #d1d5db",
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                cursor: "pointer",
+              }}
+            >
+              Log out
+            </button>
           </div>
         </div>
 
@@ -603,7 +881,7 @@ function App() {
 
           {/* Review Type */}
           <div style={fieldWrap}>
-            {label("Review Type")}
+            {labelEl("Review Type")}
             <select
               value={reviewType}
               onChange={(e) => setReviewType(e.target.value)}
@@ -616,19 +894,19 @@ function App() {
 
           {/* HPI / Care History */}
           <div style={fieldWrap}>
-            {label('HPI / Care History')}
+            {labelEl("HPI / Care History")}
             <textarea
               value={hpi}
               onChange={(e) => setHpi(e.target.value)}
-              placeholder='e.g. 57 YO M, dx M25.561 R shoulder partial supraspinatus tear, fall injury 2/2026. IE 4/7/2026. 8v prev approved at 2x/wk x 4wks (PD for frequency). Initial request.'
+              placeholder="e.g. 57 YO M, dx M25.561 R shoulder partial supraspinatus tear, fall injury 2/2026. IE 4/7/2026. 8v prev approved at 2x/wk x 4wks (PD for frequency). Initial request."
               rows={4}
-              style={{ ...inputBase, resize: 'vertical', lineHeight: 1.6 }}
+              style={{ ...inputBase, resize: "vertical", lineHeight: 1.6 }}
             />
           </div>
 
           {/* Requested Visits */}
           <div style={fieldWrap}>
-            {label("Requested Visits")}
+            {labelEl("Requested Visits")}
             <input
               type="number"
               min="0"
@@ -640,22 +918,22 @@ function App() {
           </div>
 
           {/* Prior Review Note — SUB only */}
-          {reviewType === 'subsequent' && (
+          {reviewType === "subsequent" && (
             <div style={fieldWrap}>
-              {label('Prior Review Note (paste previous determination here)')}
+              {labelEl("Prior Review Note (paste previous determination here)")}
               <textarea
                 value={priorNote}
                 onChange={(e) => setPriorNote(e.target.value)}
-                placeholder='Paste the prior reviewer note here — Cogentus will use it to compare against the current documentation.'
+                placeholder="Paste the prior reviewer note here — Cogentus will use it to compare against the current documentation."
                 rows={5}
-                style={{ ...inputBase, resize: 'vertical', lineHeight: 1.6 }}
+                style={{ ...inputBase, resize: "vertical", lineHeight: 1.6 }}
               />
             </div>
           )}
 
           {/* PDF Upload */}
           <div style={fieldWrap}>
-            {label("Supporting Document (PDF) *")}
+            {labelEl("Supporting Document (PDF) *")}
             <label
               style={{
                 display: "flex",
@@ -670,9 +948,7 @@ function App() {
                 color: file ? "#1e3a5f" : "#6b7280",
               }}
             >
-              <span>
-                {file ? file.name : "Click to upload PDF..."}
-              </span>
+              <span>{file ? file.name : "Click to upload PDF..."}</span>
               <input
                 type="file"
                 accept="application/pdf"
@@ -726,8 +1002,6 @@ function App() {
         {/* -- Output card -- */}
         {sections && !loading && (
           <div style={card}>
-
-            {/* Navy header bar */}
             <div
               style={{
                 display: "flex",
@@ -737,19 +1011,9 @@ function App() {
                 background: "#1e3a5f",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "#fff",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Generated Review
-                </span>
-              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                Generated Review
+              </span>
               <button
                 onClick={handleCopy}
                 style={{
@@ -768,7 +1032,6 @@ function App() {
               </button>
             </div>
 
-            {/* Review sections */}
             {sections.map(({ label: secLabel, content }, idx) => (
               <ReviewSection
                 key={secLabel}
@@ -781,7 +1044,11 @@ function App() {
         )}
 
         {/* -- Review History -- */}
-        <ReviewHistory refreshTrigger={historyRefresh} />
+        <ReviewHistory
+          refreshTrigger={historyRefresh}
+          token={token}
+          onAuthError={handleAuthError}
+        />
 
       </div>
     </div>
