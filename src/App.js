@@ -4,7 +4,7 @@ import axios from "axios";
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  "https://rapidnote-backend.onrender.com";
+  "https://cogentus-backend.onrender.com";
 
 // Section definitions -- order matters for display
 const SECTION_KEYS = [
