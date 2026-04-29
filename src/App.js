@@ -652,6 +652,198 @@ function AuthPage({ onAuthSuccess }) {
   );
 }
 
+// --- DocumentSummary --------------------------------------------------------
+function DocumentSummary({ summary }) {
+  const [open, setOpen] = useState(false);
+  if (!summary) return null;
+
+  const hasWarnings = summary.warnings && summary.warnings.length > 0;
+
+  return (
+    <div
+      style={{
+        borderBottom: "1px solid #e5e7eb",
+        background: "#f8fafc",
+      }}
+    >
+      {/* Header / toggle */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "12px 24px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {/* Info icon */}
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            background: "#6b7280",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          i
+        </span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", flex: 1 }}>
+          Document Summary — {summary.totalSelected} of {summary.totalSubmitted} submitted{" "}
+          {summary.totalSubmitted === 1 ? "document" : "documents"} used
+          {hasWarnings && (
+            <span
+              style={{
+                marginLeft: 10,
+                padding: "1px 8px",
+                borderRadius: 99,
+                background: "#fef3c7",
+                color: "#92400e",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {summary.warnings.length} {summary.warnings.length === 1 ? "warning" : "warnings"}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: 12, color: "#9ca3af" }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "0 24px 16px" }}>
+          {/* Warnings */}
+          {hasWarnings && (
+            <div
+              style={{
+                background: "#fffbeb",
+                border: "1px solid #f59e0b",
+                borderRadius: 6,
+                padding: "10px 14px",
+                marginBottom: 14,
+              }}
+            >
+              {summary.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: 13, color: "#92400e", lineHeight: 1.5 }}>
+                  {i > 0 && <br />}⚠ {w}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Documents used */}
+          {summary.selectedDocuments.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 6,
+                }}
+              >
+                Used in this determination
+              </div>
+              {summary.selectedDocuments.map((d, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "6px 0",
+                    borderBottom: i < summary.selectedDocuments.length - 1 ? "1px solid #e5e7eb" : "none",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#22c55e",
+                      flexShrink: 0,
+                      marginTop: 5,
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                      {d.filename}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      {d.documentType}{d.documentDate ? ` — ${d.documentDate}` : ""}
+                      {d.notes ? ` · ${d.notes}` : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Documents skipped */}
+          {summary.skippedDocuments.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 6,
+                }}
+              >
+                Not used
+              </div>
+              {summary.skippedDocuments.map((d, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    padding: "6px 0",
+                    borderBottom: i < summary.skippedDocuments.length - 1 ? "1px solid #e5e7eb" : "none",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "#d1d5db",
+                      flexShrink: 0,
+                      marginTop: 5,
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{d.filename}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                      {d.documentType}{d.notes ? ` · ${d.notes}` : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -666,9 +858,10 @@ function App() {
   const [hpi, setHpi]                         = useState("");
   const [priorNote, setPriorNote]             = useState("");
   const [requestedVisits, setRequestedVisits] = useState("");
-  const [file, setFile]                       = useState(null);
+  const [files, setFiles]                     = useState([]);
   const [review, setReview]                   = useState("");
   const [ruling, setRuling]                   = useState(null);
+  const [documentSummary, setDocumentSummary] = useState(null);
   const [error, setError]                     = useState("");
   const [loading, setLoading]                 = useState(false);
   const [copied, setCopied]                   = useState(false);
@@ -704,7 +897,7 @@ function App() {
 
   const buildFormData = () => {
     const fd = new FormData();
-    fd.append("document", file);
+    files.forEach(f => fd.append("pdfs", f));
     fd.append("reviewType", reviewType);
     fd.append("hpi", hpi.trim());
     fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
@@ -718,10 +911,11 @@ function App() {
     setError("");
     setReview("");
     setRuling(null);
+    setDocumentSummary(null);
     setCopied(false);
 
-    if (!file)            { setError("A supporting PDF is required."); return; }
-    if (!requestedVisits) { setError("Requested Visits is required."); return; }
+    if (files.length === 0) { setError("At least one supporting PDF is required."); return; }
+    if (!requestedVisits)   { setError("Requested Visits is required."); return; }
 
     setLoading(true);
     try {
@@ -732,6 +926,7 @@ function App() {
       );
       setReview(res.data.review || "");
       setRuling(res.data.ruling || null);
+      setDocumentSummary(res.data.documentSummary || null);
       setHistoryRefresh((n) => n + 1);
     } catch (err) {
       if (err?.response?.status === 401) {
@@ -931,9 +1126,9 @@ function App() {
             </div>
           )}
 
-          {/* PDF Upload */}
+          {/* PDF Upload — multi-file */}
           <div style={fieldWrap}>
-            {labelEl("Supporting Document (PDF) *")}
+            {labelEl("Supporting Documents (PDF) — up to 10 files *")}
             <label
               style={{
                 display: "flex",
@@ -945,17 +1140,51 @@ function App() {
                 cursor: "pointer",
                 background: "#f9fafb",
                 fontSize: 14,
-                color: file ? "#1e3a5f" : "#6b7280",
+                color: files.length > 0 ? "#1e3a5f" : "#6b7280",
               }}
             >
-              <span>{file ? file.name : "Click to upload PDF..."}</span>
+              <span>
+                {files.length === 0
+                  ? "Click to upload PDF(s)..."
+                  : files.length === 1
+                  ? files[0].name
+                  : `${files.length} files selected`}
+              </span>
               <input
                 type="file"
                 accept="application/pdf"
-                onChange={(e) => setFile(e.target.files[0] || null)}
+                multiple
+                onChange={(e) => setFiles(Array.from(e.target.files || []))}
                 style={{ display: "none" }}
               />
             </label>
+
+            {/* File list when multiple selected */}
+            {files.length > 1 && (
+              <div style={{ marginTop: 8 }}>
+                {files.map((f, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "4px 0",
+                      fontSize: 13,
+                      color: "#374151",
+                    }}
+                  >
+                    <span style={{ color: "#6b7280", fontSize: 11 }}>PDF</span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {f.name}
+                    </span>
+                    <span style={{ color: "#9ca3af", fontSize: 11, flexShrink: 0 }}>
+                      {(f.size / 1024).toFixed(0)} KB
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Error banner */}
@@ -1031,6 +1260,8 @@ function App() {
                 {copied ? "Copied!" : "Copy to Clipboard"}
               </button>
             </div>
+
+            <DocumentSummary summary={documentSummary} />
 
             {sections.map(({ label: secLabel, content }, idx) => (
               <ReviewSection
