@@ -230,25 +230,6 @@ function HistoryRow({ row, isExpanded, onToggle }) {
         </span>
       </div>
 
-      {/* Escalation badge — shown below row when escalated */}
-      {row.escalated && (
-        <div
-          style={{
-            padding: "4px 20px",
-            background: "#fffbeb",
-            borderTop: "1px solid #fde68a",
-            fontSize: 12,
-            color: "#92400e",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span>⚑</span>
-          <span>Escalated to Medical Director{row.escalation_reason ? ` — ${row.escalation_reason}` : ""}</span>
-        </div>
-      )}
 
       {isExpanded && (
         <div
@@ -1107,13 +1088,6 @@ function App() {
   const [copied, setCopied]                   = useState(false);
   const [historyRefresh, setHistoryRefresh]   = useState(0);
 
-  // Escalation state
-  const [escalated, setEscalated]           = useState(false);
-  const [escalateOpen, setEscalateOpen]     = useState(false);
-  const [escalateReason, setEscalateReason] = useState("");
-  const [escalateOther, setEscalateOther]   = useState("");
-  const [escalateLoading, setEscalateLoading] = useState(false);
-
   const handleAuthSuccess = (tok, userData) => {
     localStorage.setItem("cogentus_token", tok);
     localStorage.setItem("cogentus_user", JSON.stringify(userData));
@@ -1174,10 +1148,6 @@ function App() {
     setReviewMetrics(null);
     setDocumentSummary(null);
     setCopied(false);
-    setEscalated(false);
-    setEscalateOpen(false);
-    setEscalateReason("");
-    setEscalateOther("");
 
     if (files.length === 0) { setError("At least one supporting PDF is required."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
@@ -1271,26 +1241,6 @@ function App() {
     a.download = `Cogentus_Review_${icd10}_${fileDateStr}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleEscalate = async () => {
-    if (!reviewId) return;
-    const reason = escalateReason === "Other" ? escalateOther.trim() : escalateReason;
-    if (!reason) return;
-    setEscalateLoading(true);
-    try {
-      await axios.patch(
-        `${API_BASE}/api/reviews/${reviewId}/escalate`,
-        { reason },
-        { headers: authHeaders }
-      );
-      setEscalated(true);
-      setEscalateOpen(false);
-    } catch (err) {
-      if (err?.response?.status === 401) handleAuthError();
-    } finally {
-      setEscalateLoading(false);
-    }
   };
 
   const sections = review ? parseReview(review) : null;
@@ -1644,127 +1594,6 @@ function App() {
                 isLast={idx === sections.length - 1}
               />
             ))}
-          </div>
-        )}
-
-        {/* -- Escalation -- */}
-        {sections && !loading && reviewId && (
-          <div
-            style={{
-              ...card,
-              padding: "18px 24px",
-            }}
-          >
-            {escalated ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 18 }}>⚑</span>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e" }}>
-                    Escalated to Medical Director
-                  </div>
-                  <div style={{ fontSize: 12, color: "#a16207", marginTop: 2 }}>
-                    This review has been flagged for physician review.
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: escalateOpen ? 14 : 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
-                    Requires physician review?
-                  </span>
-                  <button
-                    onClick={() => setEscalateOpen((o) => !o)}
-                    style={{
-                      background: "none",
-                      border: "1px solid #d1d5db",
-                      borderRadius: 6,
-                      padding: "5px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#374151",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {escalateOpen ? "Cancel" : "Escalate to Medical Director"}
-                  </button>
-                </div>
-
-                {escalateOpen && (
-                  <div>
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
-                        Escalation Reason
-                      </label>
-                      <select
-                        value={escalateReason}
-                        onChange={(e) => setEscalateReason(e.target.value)}
-                        style={{
-                          width: "100%",
-                          border: "1px solid #d1d5db",
-                          borderRadius: 7,
-                          padding: "8px 10px",
-                          fontSize: 13,
-                          color: "#111827",
-                          background: "#f9fafb",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <option value="">Select a reason...</option>
-                        <option value="Clinical complexity requiring physician review">Clinical complexity requiring physician review</option>
-                        <option value="Conflicting clinical information in submitted documentation">Conflicting clinical information in submitted documentation</option>
-                        <option value="Diagnosis not covered by current guidelines">Diagnosis not covered by current guidelines</option>
-                        <option value="Patient safety concern">Patient safety concern</option>
-                        <option value="Provider appeal anticipated">Provider appeal anticipated</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-
-                    {escalateReason === "Other" && (
-                      <div style={{ marginBottom: 10 }}>
-                        <input
-                          type="text"
-                          placeholder="Describe the reason..."
-                          value={escalateOther}
-                          onChange={(e) => setEscalateOther(e.target.value)}
-                          style={{
-                            width: "100%",
-                            border: "1px solid #d1d5db",
-                            borderRadius: 7,
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            color: "#111827",
-                            background: "#f9fafb",
-                            boxSizing: "border-box",
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleEscalate}
-                      disabled={
-                        escalateLoading ||
-                        !escalateReason ||
-                        (escalateReason === "Other" && !escalateOther.trim())
-                      }
-                      style={{
-                        background: escalateLoading ? "#d1d5db" : "#92400e",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        padding: "8px 18px",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        cursor: escalateLoading ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      {escalateLoading ? "Escalating..." : "Confirm Escalation"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
