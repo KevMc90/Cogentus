@@ -230,6 +230,26 @@ function HistoryRow({ row, isExpanded, onToggle }) {
         </span>
       </div>
 
+      {/* Escalation badge — shown below row when escalated */}
+      {row.escalated && (
+        <div
+          style={{
+            padding: "4px 20px",
+            background: "#fffbeb",
+            borderTop: "1px solid #fde68a",
+            fontSize: 12,
+            color: "#92400e",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <span>⚑</span>
+          <span>Escalated to Medical Director{row.escalation_reason ? ` — ${row.escalation_reason}` : ""}</span>
+        </div>
+      )}
+
       {isExpanded && (
         <div
           style={{
@@ -844,6 +864,221 @@ function DocumentSummary({ summary }) {
   );
 }
 
+// --- Dashboard --------------------------------------------------------------
+function Dashboard({ user, token, onAuthError, onBack }) {
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+
+  useEffect(() => {
+    axios
+      .get(`${API_BASE}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => setAnalytics(res.data))
+      .catch((err) => {
+        if (err?.response?.status === 401) onAuthError();
+        else setError("Could not load analytics.");
+      })
+      .finally(() => setLoading(false));
+  }, [token, onAuthError]);
+
+  const card = {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    overflow: "hidden",
+  };
+  const cardHeader = {
+    padding: "12px 20px",
+    background: "#1e3a5f",
+  };
+  const cardTitle = {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#fff",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "#6b7280", fontSize: 14 }}>Loading analytics...</span>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "#991b1b", fontSize: 14 }}>{error}</span>
+      </div>
+    );
+  }
+  if (!analytics) return null;
+
+  const a = analytics;
+  const total = a.totalReviews || 1;
+
+  const detItems = [
+    { label: "Approved",       count: a.determinationBreakdown.approved,      color: "#22c55e", bg: "#f0fdf4" },
+    { label: "Partial Denial", count: a.determinationBreakdown.partialDenial, color: "#f59e0b", bg: "#fffbeb" },
+    { label: "Full Denial",    count: a.determinationBreakdown.fullDenial,    color: "#ef4444", bg: "#fef2f2" },
+    { label: "Pend",           count: a.determinationBreakdown.pend,          color: "#9ca3af", bg: "#f9fafb" },
+  ];
+
+  // Fill last 14 days including zeros
+  const last14 = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const isoDate = d.toISOString().split("T")[0];
+    const found   = a.reviewsByDay.find((r) => {
+      const rd = new Date(r.date).toISOString().split("T")[0];
+      return rd === isoDate;
+    });
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    last14.push({ label: `${mm}/${dd}`, count: found ? found.count : 0 });
+  }
+  const maxDay = Math.max(...last14.map((d) => d.count), 1);
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f3f4f6",
+        padding: "32px 16px 60px",
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      }}
+    >
+      <div style={{ maxWidth: 740, margin: "0 auto" }}>
+
+        {/* Header */}
+        <div style={{ marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: "#1e3a5f", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>C</span>
+            </div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e3a5f", letterSpacing: "-0.01em" }}>
+                My Dashboard
+              </h1>
+              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{user?.name || user?.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={onBack}
+            style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 12px", fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}
+          >
+            ← Back to Reviews
+          </button>
+        </div>
+
+        {/* Row 1 — 4 metric cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+          {[
+            { label: "Total Reviews",    value: a.totalReviews,  color: "#1e3a5f" },
+            { label: "Reviews Today",    value: a.reviewsToday,  color: "#1e3a5f" },
+            { label: "Approval Rate",    value: `${a.approvalRate}%`, color: "#15803d" },
+            {
+              label: "Avg Review Time",
+              value: a.avgProcessingTimeSeconds != null ? `${a.avgProcessingTimeSeconds}s` : "—",
+              color: "#1e3a5f",
+            },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ ...card, padding: "18px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 30, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 6 }}>
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Row 2 — Determination breakdown */}
+        <div style={{ ...card, marginBottom: 16 }}>
+          <div style={cardHeader}><span style={cardTitle}>Determination Breakdown</span></div>
+          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            {detItems.map(({ label, count, color, bg }) => {
+              const pct = Math.round((count / total) * 100);
+              return (
+                <div key={label} style={{ background: bg, borderRadius: 8, padding: "14px 12px", border: `1px solid ${color}33` }}>
+                  <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1 }}>{count}</div>
+                  <div style={{ fontSize: 11, color: "#374151", fontWeight: 600, marginTop: 4 }}>{label}</div>
+                  <div style={{ marginTop: 10, height: 4, background: "#e5e7eb", borderRadius: 2 }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{pct}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Row 3 — Top 5 diagnoses */}
+        <div style={{ ...card, marginBottom: 16 }}>
+          <div style={cardHeader}><span style={cardTitle}>Top Diagnoses</span></div>
+          <div style={{ padding: "8px 20px 14px" }}>
+            {a.topDiagnoses.length === 0 ? (
+              <div style={{ padding: "16px 0", color: "#9ca3af", fontSize: 14, fontStyle: "italic" }}>No data yet</div>
+            ) : (
+              a.topDiagnoses.map(({ code, count }, i) => {
+                const maxCount = a.topDiagnoses[0]?.count || 1;
+                return (
+                  <div
+                    key={code}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: i < a.topDiagnoses.length - 1 ? "1px solid #f3f4f6" : "none" }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", width: 18 }}>#{i + 1}</span>
+                    <span style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 700, color: "#1e3a5f", width: 88, flexShrink: 0 }}>{code}</span>
+                    <div style={{ flex: 1, height: 6, background: "#f3f4f6", borderRadius: 3 }}>
+                      <div style={{ height: "100%", width: `${Math.round((count / maxCount) * 100)}%`, background: "#1e3a5f", borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 13, color: "#374151", fontWeight: 600, width: 28, textAlign: "right", flexShrink: 0 }}>{count}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Row 4 — Reviews per day bar chart */}
+        <div style={card}>
+          <div style={cardHeader}><span style={cardTitle}>Reviews — Last 14 Days</span></div>
+          <div style={{ padding: "16px 20px 8px" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 90 }}>
+              {last14.map(({ label, count }) => (
+                <div key={label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", height: 72 }}>
+                    <div
+                      style={{
+                        width: "80%",
+                        height: count === 0 ? 2 : `${Math.max(4, Math.round((count / maxDay) * 68))}px`,
+                        background: count === 0 ? "#e5e7eb" : "#1e3a5f",
+                        borderRadius: "2px 2px 0 0",
+                      }}
+                    />
+                  </div>
+                  {count > 0 && (
+                    <span style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>{count}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Date labels every 7 days */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, padding: "0 1%" }}>
+              <span style={{ fontSize: 10, color: "#9ca3af" }}>{last14[0]?.label}</span>
+              <span style={{ fontSize: 10, color: "#9ca3af" }}>{last14[6]?.label}</span>
+              <span style={{ fontSize: 10, color: "#9ca3af" }}>{last14[13]?.label}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -853,6 +1088,9 @@ function App() {
     catch { return null; }
   });
 
+  // View state
+  const [view, setView] = useState("reviews"); // "reviews" | "dashboard"
+
   // Review form state
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
@@ -861,11 +1099,20 @@ function App() {
   const [files, setFiles]                     = useState([]);
   const [review, setReview]                   = useState("");
   const [ruling, setRuling]                   = useState(null);
+  const [reviewId, setReviewId]               = useState(null);
+  const [reviewMetrics, setReviewMetrics]     = useState(null);
   const [documentSummary, setDocumentSummary] = useState(null);
   const [error, setError]                     = useState("");
   const [loading, setLoading]                 = useState(false);
   const [copied, setCopied]                   = useState(false);
   const [historyRefresh, setHistoryRefresh]   = useState(0);
+
+  // Escalation state
+  const [escalated, setEscalated]           = useState(false);
+  const [escalateOpen, setEscalateOpen]     = useState(false);
+  const [escalateReason, setEscalateReason] = useState("");
+  const [escalateOther, setEscalateOther]   = useState("");
+  const [escalateLoading, setEscalateLoading] = useState(false);
 
   const handleAuthSuccess = (tok, userData) => {
     localStorage.setItem("cogentus_token", tok);
@@ -895,6 +1142,18 @@ function App() {
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
+  // Dashboard view
+  if (view === "dashboard") {
+    return (
+      <Dashboard
+        user={user}
+        token={token}
+        onAuthError={handleAuthError}
+        onBack={() => setView("reviews")}
+      />
+    );
+  }
+
   const buildFormData = () => {
     const fd = new FormData();
     files.forEach(f => fd.append("pdfs", f));
@@ -911,8 +1170,14 @@ function App() {
     setError("");
     setReview("");
     setRuling(null);
+    setReviewId(null);
+    setReviewMetrics(null);
     setDocumentSummary(null);
     setCopied(false);
+    setEscalated(false);
+    setEscalateOpen(false);
+    setEscalateReason("");
+    setEscalateOther("");
 
     if (files.length === 0) { setError("At least one supporting PDF is required."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
@@ -926,6 +1191,8 @@ function App() {
       );
       setReview(res.data.review || "");
       setRuling(res.data.ruling || null);
+      setReviewId(res.data.reviewId || null);
+      setReviewMetrics(res.data.metrics || null);
       setDocumentSummary(res.data.documentSummary || null);
       setHistoryRefresh((n) => n + 1);
     } catch (err) {
@@ -950,6 +1217,80 @@ function App() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  };
+
+  const handleExport = () => {
+    if (!review) return;
+    const secs = parseReview(review);
+    if (!secs) return;
+    const get = (label) => secs.find((s) => s.label === label)?.content || "";
+
+    const now = new Date();
+    const mm   = String(now.getMonth() + 1).padStart(2, "0");
+    const dd   = String(now.getDate()).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const hh   = String(now.getHours()).padStart(2, "0");
+    const min  = String(now.getMinutes()).padStart(2, "0");
+    const dateStr     = `${mm}/${dd}/${yyyy} ${hh}:${min}`;
+    const fileDateStr = `${mm}${dd}${yyyy}`;
+    const icd10 = (reviewMetrics?.primaryDiagnosisCode || "Unknown").replace(/[^A-Z0-9.]/gi, "");
+
+    const content = [
+      "COGENTUS CLINICAL DETERMINATION",
+      `Generated: ${dateStr}`,
+      `Reviewer: ${user?.name || user?.email || "Unknown"}`,
+      `Review Type: ${reviewType === "initial" ? "Initial" : "Subsequent"}`,
+      "═══════════════════════════════════════",
+      "",
+      "HPI / CARE HISTORY",
+      get("HPI/Care History"),
+      "",
+      "CLINICAL SUMMARY",
+      get("Clinical Summary"),
+      "",
+      "PLAN OF CARE",
+      get("POC"),
+      "",
+      `REQUESTED VISITS: ${get("Requested Visits")}`,
+      "",
+      "DETERMINATION AND RATIONALE",
+      get("Determination and Rationale"),
+      "",
+      `APPROVED VISITS: ${get("Approved Visits")}`,
+      "",
+      "═══════════════════════════════════════",
+      "Generated by Cogentus Clinical Intelligence",
+      "This determination is based on submitted clinical documentation and published evidence-based guidelines.",
+      "For questions contact your utilization review supervisor.",
+    ].join("\n");
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `Cogentus_Review_${icd10}_${fileDateStr}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleEscalate = async () => {
+    if (!reviewId) return;
+    const reason = escalateReason === "Other" ? escalateOther.trim() : escalateReason;
+    if (!reason) return;
+    setEscalateLoading(true);
+    try {
+      await axios.patch(
+        `${API_BASE}/api/reviews/${reviewId}/escalate`,
+        { reason },
+        { headers: authHeaders }
+      );
+      setEscalated(true);
+      setEscalateOpen(false);
+    } catch (err) {
+      if (err?.response?.status === 401) handleAuthError();
+    } finally {
+      setEscalateLoading(false);
+    }
   };
 
   const sections = review ? parseReview(review) : null;
@@ -1036,8 +1377,23 @@ function App() {
             </div>
           </div>
 
-          {/* Reviewer info + logout */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Reviewer info + dashboard + logout */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={() => setView("dashboard")}
+              style={{
+                background: "none",
+                border: "1px solid #1e3a5f",
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#1e3a5f",
+                cursor: "pointer",
+              }}
+            >
+              Dashboard
+            </button>
             <span style={{ fontSize: 13, color: "#4b5563" }}>
               {user.name || user.email}
             </span>
@@ -1243,22 +1599,39 @@ function App() {
               <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                 Generated Review
               </span>
-              <button
-                onClick={handleCopy}
-                style={{
-                  background: copied ? "#22c55e" : "rgba(255,255,255,0.12)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  borderRadius: 6,
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#fff",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              >
-                {copied ? "Copied!" : "Copy to Clipboard"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleExport}
+                  style={{
+                    background: "rgba(255,255,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  Export .txt
+                </button>
+                <button
+                  onClick={handleCopy}
+                  style={{
+                    background: copied ? "#22c55e" : "rgba(255,255,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {copied ? "Copied!" : "Copy to Clipboard"}
+                </button>
+              </div>
             </div>
 
             <DocumentSummary summary={documentSummary} />
@@ -1271,6 +1644,127 @@ function App() {
                 isLast={idx === sections.length - 1}
               />
             ))}
+          </div>
+        )}
+
+        {/* -- Escalation -- */}
+        {sections && !loading && reviewId && (
+          <div
+            style={{
+              ...card,
+              padding: "18px 24px",
+            }}
+          >
+            {escalated ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 18 }}>⚑</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e" }}>
+                    Escalated to Medical Director
+                  </div>
+                  <div style={{ fontSize: 12, color: "#a16207", marginTop: 2 }}>
+                    This review has been flagged for physician review.
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: escalateOpen ? 14 : 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                    Requires physician review?
+                  </span>
+                  <button
+                    onClick={() => setEscalateOpen((o) => !o)}
+                    style={{
+                      background: "none",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 6,
+                      padding: "5px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#374151",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {escalateOpen ? "Cancel" : "Escalate to Medical Director"}
+                  </button>
+                </div>
+
+                {escalateOpen && (
+                  <div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                        Escalation Reason
+                      </label>
+                      <select
+                        value={escalateReason}
+                        onChange={(e) => setEscalateReason(e.target.value)}
+                        style={{
+                          width: "100%",
+                          border: "1px solid #d1d5db",
+                          borderRadius: 7,
+                          padding: "8px 10px",
+                          fontSize: 13,
+                          color: "#111827",
+                          background: "#f9fafb",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <option value="">Select a reason...</option>
+                        <option value="Clinical complexity requiring physician review">Clinical complexity requiring physician review</option>
+                        <option value="Conflicting clinical information in submitted documentation">Conflicting clinical information in submitted documentation</option>
+                        <option value="Diagnosis not covered by current guidelines">Diagnosis not covered by current guidelines</option>
+                        <option value="Patient safety concern">Patient safety concern</option>
+                        <option value="Provider appeal anticipated">Provider appeal anticipated</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    {escalateReason === "Other" && (
+                      <div style={{ marginBottom: 10 }}>
+                        <input
+                          type="text"
+                          placeholder="Describe the reason..."
+                          value={escalateOther}
+                          onChange={(e) => setEscalateOther(e.target.value)}
+                          style={{
+                            width: "100%",
+                            border: "1px solid #d1d5db",
+                            borderRadius: 7,
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            color: "#111827",
+                            background: "#f9fafb",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleEscalate}
+                      disabled={
+                        escalateLoading ||
+                        !escalateReason ||
+                        (escalateReason === "Other" && !escalateOther.trim())
+                      }
+                      style={{
+                        background: escalateLoading ? "#d1d5db" : "#92400e",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "8px 18px",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: escalateLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {escalateLoading ? "Escalating..." : "Confirm Escalation"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
