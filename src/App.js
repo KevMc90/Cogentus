@@ -30,13 +30,13 @@ const SECTION_STYLES = {
 
 // Determination badge colours
 function detColor(label) {
-  if (!label) return { bg: "#f3f4f6", text: "#374151" };
+  if (!label) return { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
   const l = label.toLowerCase();
-  if (l.startsWith("approved"))        return { bg: "#dcfce7", text: "#15803d" };
-  if (l.startsWith("partial denial"))  return { bg: "#fef3c7", text: "#92400e" };
-  if (l.startsWith("full denial"))     return { bg: "#fee2e2", text: "#991b1b" };
-  if (l.startsWith("pend"))            return { bg: "#f3f4f6", text: "#374151" };
-  return { bg: "#f3f4f6", text: "#374151" };
+  if (l.startsWith("approved"))        return { bg: "#dcfce7", text: "#15803d", border: "#86efac" };
+  if (l.startsWith("partial denial"))  return { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" };
+  if (l.startsWith("full denial"))     return { bg: "#fee2e2", text: "#991b1b", border: "#fca5a5" };
+  if (l.startsWith("pend"))            return { bg: "#eff6ff", text: "#1d4ed8", border: "#93c5fd" };
+  return { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" };
 }
 
 function formatDateTime(iso) {
@@ -99,26 +99,25 @@ function Spinner() {
         margin: "24px 0",
         padding: "16px 20px",
         background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 10,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        border: "1px solid #e2e8f0",
+        borderRadius: 12,
+        boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
       }}
     >
       <div
         style={{
-          width: 24,
-          height: 24,
-          border: "3px solid #e5e7eb",
-          borderTop: "3px solid #1e3a5f",
+          width: 22,
+          height: 22,
+          border: "2.5px solid #e2e8f0",
+          borderTop: "2.5px solid #1a3a5c",
           borderRadius: "50%",
           animation: "rn-spin 0.8s linear infinite",
           flexShrink: 0,
         }}
       />
-      <span style={{ color: "#1e3a5f", fontSize: 14, fontWeight: 600 }}>
+      <span style={{ color: "#1a3a5c", fontSize: 14, fontWeight: 600, fontFamily: '"DM Sans", sans-serif' }}>
         Generating review — this may take up to 30 seconds...
       </span>
-      <style>{`@keyframes rn-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -126,39 +125,68 @@ function Spinner() {
 // --- ReviewSection ----------------------------------------------------------
 function ReviewSection({ label, content, isLast }) {
   const extra = SECTION_STYLES[label] || {};
+  const isDetermination = label === "Determination and Rationale";
+  const detBadge = isDetermination && content ? detColor(content.split(":")[0].trim()) : null;
   return (
     <div
       style={{
-        padding: "16px 24px",
-        borderBottom: isLast ? "none" : "1px solid #e5e7eb",
+        padding: "18px 28px",
+        borderBottom: isLast ? "none" : "1px solid #f1f5f9",
         background: extra.background || "#fff",
         borderLeft: extra.borderLeft || "none",
       }}
     >
       <div
         style={{
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: 700,
-          color: "#1e3a5f",
+          color: "#64748b",
           textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          marginBottom: 6,
+          letterSpacing: "0.08em",
+          marginBottom: 8,
+          paddingBottom: 6,
+          borderBottom: "1px solid #f1f5f9",
+          fontFamily: '"DM Sans", sans-serif',
         }}
       >
         {label}
       </div>
-      <div
-        style={{
-          fontSize: 15,
-          lineHeight: 1.75,
-          color: "#1f2937",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        {content || (
-          <span style={{ color: "#9ca3af", fontStyle: "italic" }}>—</span>
-        )}
-      </div>
+      {isDetermination && detBadge && content ? (
+        <div>
+          <span
+            style={{
+              display: "inline-block",
+              padding: "3px 10px",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 700,
+              background: detBadge.bg,
+              color: detBadge.text,
+              border: `1px solid ${detBadge.border}`,
+              marginBottom: 8,
+              fontFamily: '"DM Sans", sans-serif',
+            }}
+          >
+            {content.split(":")[0].trim()}
+          </span>
+          <div style={{ fontSize: 15, lineHeight: 1.8, color: "#1e293b", whiteSpace: "pre-wrap" }}>
+            {content.includes(":") ? content.slice(content.indexOf(":") + 1).trim() : ""}
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            fontSize: 15,
+            lineHeight: 1.8,
+            color: "#1e293b",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {content || (
+            <span style={{ color: "#94a3b8", fontStyle: "italic" }}>—</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -183,15 +211,19 @@ function HistoryRow({ row, isExpanded, onToggle }) {
     });
   };
 
+  const [rowHover, setRowHover] = useState(false);
   return (
     <div
       style={{
-        borderBottom: "1px solid #e5e7eb",
-        background: isExpanded ? "#f8fafc" : "#fff",
+        borderBottom: "1px solid #f1f5f9",
+        background: isExpanded ? "#f8fafc" : rowHover ? "#fafbfc" : "#fff",
+        transition: "background 0.12s",
       }}
     >
       <div
         onClick={onToggle}
+        onMouseEnter={() => setRowHover(true)}
+        onMouseLeave={() => setRowHover(false)}
         style={{
           display: "grid",
           gridTemplateColumns: "140px 80px 90px 1fr 80px",
@@ -215,12 +247,15 @@ function HistoryRow({ row, isExpanded, onToggle }) {
           style={{
             display: "inline-block",
             padding: "2px 9px",
-            borderRadius: 99,
-            fontSize: 12,
+            borderRadius: 6,
+            fontSize: 11,
             fontWeight: 700,
             background: badge.bg,
             color: badge.text,
+            border: `1px solid ${badge.border}`,
             width: "fit-content",
+            fontFamily: '"DM Sans", sans-serif',
+            letterSpacing: "0.02em",
           }}
         >
           {row.determination_label || "—"}
@@ -318,10 +353,10 @@ function ReviewHistory({ refreshTrigger, token, onAuthError }) {
 
   const card = {
     background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
     marginBottom: 20,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
     overflow: "hidden",
   };
 
@@ -333,23 +368,24 @@ function ReviewHistory({ refreshTrigger, token, onAuthError }) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "14px 20px",
-          background: "#1e3a5f",
+          background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: '"DM Sans", sans-serif' }}>
           Review History
         </span>
         <button
           onClick={fetchReviews}
           style={{
             background: "rgba(255,255,255,0.12)",
-            border: "1px solid rgba(255,255,255,0.25)",
+            border: "1px solid rgba(255,255,255,0.28)",
             borderRadius: 6,
-            padding: "5px 12px",
+            padding: "4px 12px",
             fontSize: 12,
             fontWeight: 600,
             color: "#fff",
             cursor: "pointer",
+            fontFamily: '"DM Sans", sans-serif',
           }}
         >
           Refresh
@@ -364,13 +400,13 @@ function ReviewHistory({ refreshTrigger, token, onAuthError }) {
             gap: 12,
             padding: "8px 20px",
             background: "#f8fafc",
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid #e2e8f0",
           }}
         >
           {["Date / Time", "Type", "Dx Code", "Determination", "Approved"].map((h) => (
             <span
               key={h}
-              style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}
+              style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: '"DM Sans", sans-serif' }}
             >
               {h}
             </span>
@@ -479,48 +515,53 @@ function AuthPage({ onAuthSuccess }) {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f3f4f6",
+        background: "linear-gradient(135deg, #f0f4f8 0%, #e2eaf4 50%, #edf1f8 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: "24px 16px",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div style={{ width: "100%", maxWidth: 400 }}>
+      <div style={{ width: "100%", maxWidth: 400, animation: "rn-fadein 0.4s ease-out" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div
             style={{
-              width: 48,
-              height: 48,
-              background: "#1e3a5f",
-              borderRadius: 12,
+              width: 52,
+              height: 52,
+              background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
+              borderRadius: 14,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: 12,
+              marginBottom: 14,
+              boxShadow: "0 4px 16px rgba(26,58,92,0.25)",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}>C</span>
+            <span style={{ color: "#fff", fontSize: 26, fontWeight: 700, fontFamily: '"DM Sans", sans-serif' }}>C</span>
           </div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#1e3a5f", letterSpacing: "-0.01em" }}>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600, color: "#1a3a5c", letterSpacing: "-0.02em", fontFamily: '"DM Sans", sans-serif' }}>
             CogentCR
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>Clinical Review</p>
+          {view === "login" && (
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "#64748b", letterSpacing: "0.01em" }}>
+              AI-powered clinical prior authorization review
+            </p>
+          )}
         </div>
 
         {/* Card */}
         <div
           style={{
             background: "#fff",
-            border: "1px solid #e5e7eb",
-            borderRadius: 12,
-            padding: "32px 28px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: "36px 32px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.09)",
           }}
         >
-          <h2 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 700, color: "#111827" }}>
+          <h2 style={{ margin: "0 0 24px", fontSize: 17, fontWeight: 600, color: "#0f172a", fontFamily: '"DM Sans", sans-serif' }}>
             {view === "login" ? "Sign in to your account" : "Create your account"}
           </h2>
 
@@ -609,15 +650,18 @@ function AuthPage({ onAuthSuccess }) {
               disabled={loading}
               style={{
                 width: "100%",
-                background: loading ? "#93c5fd" : "#1e3a5f",
+                background: loading ? "#94a3b8" : "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
                 color: "#fff",
                 border: "none",
-                borderRadius: 7,
-                padding: "11px",
+                borderRadius: 8,
+                padding: "12px",
                 fontSize: 15,
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer",
-                transition: "background 0.2s",
+                transition: "opacity 0.2s",
+                fontFamily: '"DM Sans", sans-serif',
+                letterSpacing: "0.01em",
+                boxShadow: loading ? "none" : "0 2px 10px rgba(26,58,92,0.25)",
               }}
             >
               {loading ? "Please wait..." : view === "login" ? "Sign In" : "Create Account"}
@@ -864,33 +908,34 @@ function Dashboard({ user, token, onAuthError, onBack }) {
 
   const card = {
     background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 10,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
     overflow: "hidden",
   };
   const cardHeader = {
     padding: "12px 20px",
-    background: "#1e3a5f",
+    background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
   };
   const cardTitle = {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     color: "#fff",
-    letterSpacing: "0.06em",
+    letterSpacing: "0.08em",
     textTransform: "uppercase",
+    fontFamily: '"DM Sans", sans-serif',
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ color: "#6b7280", fontSize: 14 }}>Loading analytics...</span>
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ color: "#64748b", fontSize: 14 }}>Loading analytics...</span>
       </div>
     );
   }
   if (error) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ color: "#991b1b", fontSize: 14 }}>{error}</span>
       </div>
     );
@@ -927,9 +972,9 @@ function Dashboard({ user, token, onAuthError, onBack }) {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f3f4f6",
+        background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)",
         padding: "32px 16px 60px",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
@@ -937,14 +982,14 @@ function Dashboard({ user, token, onAuthError, onBack }) {
         {/* Header */}
         <div style={{ marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, background: "#1e3a5f", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>C</span>
+            <div style={{ width: 40, height: 40, background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(26,58,92,0.2)" }}>
+              <span style={{ color: "#fff", fontSize: 20, fontWeight: 700, fontFamily: '"DM Sans", sans-serif' }}>C</span>
             </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e3a5f", letterSpacing: "-0.01em" }}>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: "#1a3a5c", letterSpacing: "-0.02em", fontFamily: '"DM Sans", sans-serif' }}>
                 My Dashboard
               </h1>
-              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{user?.name || user?.email}</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>{user?.name || user?.email}</p>
             </div>
           </div>
           <button
@@ -967,9 +1012,9 @@ function Dashboard({ user, token, onAuthError, onBack }) {
               color: "#1e3a5f",
             },
           ].map(({ label, value, color }) => (
-            <div key={label} style={{ ...card, padding: "18px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 30, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 6 }}>
+            <div key={label} style={{ ...card, padding: "20px 16px", textAlign: "center" }}>
+              <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1, fontFamily: '"DM Sans", sans-serif' }}>{value}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 7, fontFamily: '"DM Sans", sans-serif' }}>
                 {label}
               </div>
             </div>
@@ -984,8 +1029,8 @@ function Dashboard({ user, token, onAuthError, onBack }) {
               const pct = Math.round((count / total) * 100);
               return (
                 <div key={label} style={{ background: bg, borderRadius: 8, padding: "14px 12px", border: `1px solid ${color}33` }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1 }}>{count}</div>
-                  <div style={{ fontSize: 11, color: "#374151", fontWeight: 600, marginTop: 4 }}>{label}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1, fontFamily: '"DM Sans", sans-serif' }}>{count}</div>
+                  <div style={{ fontSize: 11, color: "#374151", fontWeight: 600, marginTop: 4, fontFamily: '"DM Sans", sans-serif' }}>{label}</div>
                   <div style={{ marginTop: 10, height: 4, background: "#e5e7eb", borderRadius: 2 }}>
                     <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
                   </div>
@@ -1248,10 +1293,10 @@ function App() {
   // Shared style tokens
   const card = {
     background: "#fff",
-    border: "1px solid #e5e7eb",
-    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
     marginBottom: 20,
-    boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
     overflow: "hidden",
   };
   const fieldWrap = { marginBottom: 18 };
@@ -1259,11 +1304,13 @@ function App() {
     <label
       style={{
         display: "block",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 600,
-        color: "#374151",
+        color: "#475569",
         marginBottom: 6,
-        letterSpacing: "0.01em",
+        letterSpacing: "0.03em",
+        textTransform: "uppercase",
+        fontFamily: '"DM Sans", sans-serif',
       }}
     >
       {text}
@@ -1271,110 +1318,128 @@ function App() {
   );
   const inputBase = {
     width: "100%",
-    border: "1px solid #d1d5db",
-    borderRadius: 7,
-    padding: "9px 12px",
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    padding: "10px 14px",
     fontSize: 14,
-    color: "#111827",
-    background: "#f9fafb",
+    color: "#0f172a",
+    background: "#f8fafc",
     outline: "none",
     boxSizing: "border-box",
-    fontFamily: "inherit",
-    transition: "border-color 0.15s",
+    fontFamily: '"Inter", sans-serif',
+    transition: "border-color 0.15s, box-shadow 0.15s",
   };
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: "#f3f4f6",
-        padding: "32px 16px 60px",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)",
+        padding: "0 0 60px",
+        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      <div style={{ maxWidth: 740, margin: "0 auto" }}>
-
-        {/* -- Page header -- */}
-        <div style={{ marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* -- Sticky page header -- */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "#fff",
+          borderBottom: "1px solid #e2e8f0",
+          boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+          padding: "0 16px",
+        }}
+      >
+        <div style={{ maxWidth: 740, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
                 width: 36,
                 height: 36,
-                background: "#1e3a5f",
-                borderRadius: 8,
+                background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
+                borderRadius: 9,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
+                boxShadow: "0 2px 6px rgba(26,58,92,0.2)",
               }}
             >
-              <span style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>C</span>
+              <span style={{ color: "#fff", fontSize: 17, fontWeight: 700, fontFamily: '"DM Sans", sans-serif' }}>C</span>
             </div>
             <div>
-              <h1
+              <span
                 style={{
-                  margin: 0,
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: "#1e3a5f",
-                  letterSpacing: "-0.01em",
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: "#1a3a5c",
+                  letterSpacing: "-0.02em",
+                  fontFamily: '"DM Sans", sans-serif',
+                  lineHeight: 1,
                 }}
               >
                 CogentCR
-              </h1>
-              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>Clinical Review</p>
+              </span>
             </div>
           </div>
 
           {/* Reviewer info + dashboard + logout */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               onClick={() => setView("dashboard")}
               style={{
                 background: "none",
-                border: "1px solid #1e3a5f",
+                border: "1px solid #cbd5e1",
                 borderRadius: 6,
                 padding: "5px 12px",
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: 600,
-                color: "#1e3a5f",
+                color: "#1a3a5c",
                 cursor: "pointer",
+                fontFamily: '"DM Sans", sans-serif',
               }}
             >
               Dashboard
             </button>
-            <span style={{ fontSize: 13, color: "#4b5563" }}>
+            <span style={{ fontSize: 13, color: "#64748b" }}>
               {user.name || user.email}
             </span>
             <button
               onClick={handleLogout}
               style={{
                 background: "none",
-                border: "1px solid #d1d5db",
+                border: "1px solid #e2e8f0",
                 borderRadius: 6,
                 padding: "5px 12px",
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: 600,
-                color: "#374151",
+                color: "#475569",
                 cursor: "pointer",
+                fontFamily: '"DM Sans", sans-serif',
               }}
             >
               Log out
             </button>
           </div>
         </div>
+      </div>
+
+      <div style={{ maxWidth: 740, margin: "0 auto", padding: "28px 16px 0" }}>
 
         {/* -- Input card -- */}
-        <div style={{ ...card, padding: "24px 28px" }}>
+        <div style={{ ...card, padding: "28px 32px" }}>
           <h2
             style={{
-              margin: "0 0 20px",
-              fontSize: 14,
+              margin: "0 0 22px",
+              fontSize: 11,
               fontWeight: 700,
-              color: "#1e3a5f",
+              color: "#64748b",
               textTransform: "uppercase",
-              letterSpacing: "0.08em",
+              letterSpacing: "0.1em",
+              fontFamily: '"DM Sans", sans-serif',
+              paddingBottom: 12,
+              borderBottom: "1px solid #f1f5f9",
             }}
           >
             Review Details
@@ -1439,17 +1504,23 @@ function App() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "9px 14px",
-                border: "1px dashed #d1d5db",
-                borderRadius: 7,
+                gap: 12,
+                padding: "14px 18px",
+                border: "1.5px dashed #cbd5e1",
+                borderRadius: 10,
                 cursor: "pointer",
-                background: "#f9fafb",
+                background: "#f8fafc",
                 fontSize: 14,
-                color: files.length > 0 ? "#1e3a5f" : "#6b7280",
+                color: files.length > 0 ? "#1a3a5c" : "#64748b",
+                transition: "border-color 0.15s, background 0.15s",
               }}
             >
-              <span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: files.length > 0 ? "#1a3a5c" : "#94a3b8" }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span style={{ fontFamily: '"Inter", sans-serif', fontSize: 14 }}>
                 {files.length === 0
                   ? "Click to upload PDF(s)..."
                   : files.length === 1
@@ -1515,16 +1586,18 @@ function App() {
             onClick={handleSubmit}
             disabled={loading}
             style={{
-              background: loading ? "#93c5fd" : "#1e3a5f",
+              background: loading ? "#94a3b8" : "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
               color: "#fff",
               border: "none",
-              borderRadius: 7,
+              borderRadius: 8,
               padding: "11px 28px",
-              fontSize: 15,
-              fontWeight: 700,
+              fontSize: 14,
+              fontWeight: 600,
               cursor: loading ? "not-allowed" : "pointer",
               letterSpacing: "0.02em",
-              transition: "background 0.2s",
+              transition: "opacity 0.2s",
+              fontFamily: '"DM Sans", sans-serif',
+              boxShadow: loading ? "none" : "0 2px 10px rgba(26,58,92,0.25)",
             }}
           >
             Generate Review
@@ -1542,11 +1615,11 @@ function App() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "14px 24px",
-                background: "#1e3a5f",
+                padding: "14px 28px",
+                background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)",
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: '"DM Sans", sans-serif' }}>
                 Generated Review
               </span>
               <div style={{ display: "flex", gap: 8 }}>
