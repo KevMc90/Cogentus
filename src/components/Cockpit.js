@@ -101,6 +101,17 @@ const SYNTH_QUEUE = [
         },
         sopIndicators: ["Therapeutic exercise", "Manual therapy", "Gait training"],
         goalsTotal: 2, goalsMet: 0, visitsToDate: 8,
+        romComparison: {
+          "Knee Flex": { prior: 95, current: 108, normal: 135 },
+          "Knee Ext":  { prior: -10, current: -5, normal: 0 },
+        },
+        mmtComparison: {
+          Quadriceps: { prior: "3/5",  current: "3+/5" },
+          Hamstrings: { prior: "3+/5", current: "4/5"  },
+          "Hip Abd":  { prior: "2+/5", current: "3/5"  },
+        },
+        outcomeComparison: { tool: "KOOS", prior: 41, current: 52, maxScore: 100 },
+        painPrior: "6/10",
       },
       assessment: {
         d1: { finding: "FULLY_ESTABLISHED", reasoning: "Functional deficits persist; skilled care criteria met." },
@@ -177,6 +188,20 @@ const SYNTH_QUEUE = [
       cpgInfo: { diagCode: "M51.16", conditionLabel: "Lumbar disc degeneration — non-operative", mcgTypical: 10, mcgP75: 14, mcgMax: 20, cpgCitation: "APTA CPG Lumbar Spine (2021)" },
     },
   },
+];
+
+// ── POST-APPROVAL OPTIONS ──────────────────────────────────────────────────────
+const APPROVE_OPTIONS = [
+  "Transition to Home Exercise Program (HEP) upon discharge",
+  "Taper treatment frequency in upcoming visits",
+  "Emphasize skilled intervention documentation for future reviews",
+  "Progress to functional activity training",
+  "Recommend maintenance/wellness program post-discharge",
+  "Patient education re: self-management techniques",
+  "Reassess goals at next visit for continued necessity",
+  "Consider referral to specialist if plateau is reached",
+  "Coordinate with PCP regarding long-term plan",
+  "Update outcome measures at next visit",
 ];
 
 // ── SUBMISSION CONTRACT ────────────────────────────────────────────────────────
@@ -413,7 +438,7 @@ function ZoneHeader({ title }) {
 }
 
 // ── EVIDENCE ZONE ──────────────────────────────────────────────────────────────
-function EvidenceZone({ kase }) {
+function EvidenceZone({ kase, onToggleDocs, showDocs }) {
   if (!kase.contract) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -423,18 +448,22 @@ function EvidenceZone({ kase }) {
     );
   }
 
-  const ex     = kase.contract.extraction;
-  const rec    = kase.contract.recommendation;
-  const hasROM = ex.rom && Object.keys(ex.rom).length > 0;
-  const hasMMT = ex.mmt && Object.keys(ex.mmt).length > 0;
+  const ex          = kase.contract.extraction;
+  const rec         = kase.contract.recommendation;
+  const hasROM      = ex.rom && Object.keys(ex.rom).length > 0;
+  const hasMMT      = ex.mmt && Object.keys(ex.mmt).length > 0;
+  const hasROMComp  = ex.romComparison && Object.keys(ex.romComparison).length > 0;
+  const hasMMTComp  = ex.mmtComparison && Object.keys(ex.mmtComparison).length > 0;
+  const hasOutComp  = !!ex.outcomeComparison;
+  const hasProgress = hasROMComp || hasMMTComp || hasOutComp || !!ex.painPrior;
 
   const sevColor = rec.confidence === "high" ? "#15803d"
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ZoneHeader title="Clinical Evidence" />
-      <div style={{ padding: "16px 20px", flex: 1 }}>
+      <div style={{ padding: "16px 20px", flex: 1, overflowY: "auto" }}>
 
         <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: NAVY, fontFamily: FONTS.heading, lineHeight: 1.2 }}>
@@ -555,7 +584,7 @@ function EvidenceZone({ kase }) {
         )}
 
         {ex.documentationQuality && Object.keys(ex.documentationQuality).length > 0 && (
-          <div>
+          <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Doc Quality</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
               {Object.entries(ex.documentationQuality).filter(([k]) => k !== "missingElements").map(([key, val]) => {
@@ -580,6 +609,114 @@ function EvidenceZone({ kase }) {
             </div>
           </div>
         )}
+
+        {hasProgress && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>
+              Progress Since Last Review
+            </div>
+
+            {ex.painPrior && ex.painCurrent && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>Pain</div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6b7280", fontFamily: FONTS.body }}>Prior: <strong>{ex.painPrior}</strong></span>
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>→</span>
+                  <span style={{ fontSize: 12, color: "#1e293b", fontFamily: FONTS.body }}>Current: <strong>{ex.painCurrent}</strong></span>
+                </div>
+              </div>
+            )}
+
+            {hasROMComp && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>ROM</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc" }}>
+                      {["Movement", "Prior", "Current", "Δ", "Normal"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "3px 6px", fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(ex.romComparison).map(([joint, v]) => {
+                      const delta = typeof v.current === "number" && typeof v.prior === "number" ? v.current - v.prior : null;
+                      return (
+                        <tr key={joint} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "4px 6px", color: "#374151", fontFamily: FONTS.body }}>{joint}</td>
+                          <td style={{ padding: "4px 6px", color: "#6b7280", fontFamily: FONTS.body }}>{typeof v.prior === "number" ? `${v.prior}°` : v.prior}</td>
+                          <td style={{ padding: "4px 6px", fontWeight: 600, color: "#1e293b", fontFamily: FONTS.body }}>{typeof v.current === "number" ? `${v.current}°` : v.current}</td>
+                          <td style={{ padding: "4px 6px", fontWeight: 700, fontFamily: FONTS.body, color: delta > 0 ? "#15803d" : delta < 0 ? "#dc2626" : "#6b7280" }}>
+                            {delta !== null ? (delta > 0 ? `+${delta}°` : `${delta}°`) : "—"}
+                          </td>
+                          <td style={{ padding: "4px 6px", color: "#9ca3af", fontFamily: FONTS.body }}>{v.normal != null ? `${v.normal}°` : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {hasMMTComp && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>MMT</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc" }}>
+                      {["Muscle", "Prior", "Current"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "3px 6px", fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(ex.mmtComparison).map(([muscle, v]) => (
+                      <tr key={muscle} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "4px 6px", color: "#374151", fontFamily: FONTS.body }}>{muscle}</td>
+                        <td style={{ padding: "4px 6px", color: "#6b7280", fontFamily: "monospace" }}>{v.prior}</td>
+                        <td style={{ padding: "4px 6px", fontWeight: 600, fontFamily: "monospace", color: parseFloat(v.current) >= parseFloat(v.prior) ? "#15803d" : "#dc2626" }}>{v.current}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {hasOutComp && (
+              <div>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>Outcome ({ex.outcomeComparison.tool})</div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6b7280", fontFamily: FONTS.body }}>Prior: <strong>{ex.outcomeComparison.prior}/{ex.outcomeComparison.maxScore}</strong></span>
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>→</span>
+                  <span style={{ fontSize: 12, color: "#1e293b", fontFamily: FONTS.body }}>Current: <strong>{ex.outcomeComparison.current}/{ex.outcomeComparison.maxScore}</strong></span>
+                  {(() => {
+                    const d = ex.outcomeComparison.current - ex.outcomeComparison.prior;
+                    return <span style={{ fontSize: 12, fontWeight: 700, color: d > 0 ? "#15803d" : d < 0 ? "#dc2626" : "#6b7280", fontFamily: FONTS.body }}>{d > 0 ? `+${d}` : d}</span>;
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Docs button pinned to bottom of zone */}
+      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+        <button
+          onClick={onToggleDocs}
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            padding: "6px 14px", borderRadius: 7,
+            border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`,
+            background: showDocs ? NAVY : "#f8fafc",
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 600, color: showDocs ? "#fff" : "#374151", fontFamily: FONTS.body }}>
+            {showDocs ? "Hide Documents" : "View Documents"}
+          </span>
+          <span style={{ fontSize: 10, color: showDocs ? "rgba(255,255,255,0.6)" : "#9ca3af", fontFamily: FONTS.body }}>V</span>
+        </button>
       </div>
     </div>
   );
@@ -757,8 +894,12 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
 
 // ── DETERMINATION ZONE ─────────────────────────────────────────────────────────
 function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, actionState,
-  partialVisits, onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm,
-  onCancelAction, onNavigate, onToggleDocs, showDocs }) {
+  partialVisits, pendNote, approveChecks, denyNote,
+  onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm,
+  onPendNoteChange, onPendSubmit,
+  onApproveChecksChange, onApproveSubmit,
+  onDenyNoteChange, onDenySignoffSubmit,
+  onCancelAction, onNavigate }) {
 
   const decided    = decisions[kase.caseId];
   const rec        = kase.contract?.recommendation;
@@ -807,6 +948,24 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 )}
               </div>
             )}
+            {decided.pendNote && (
+              <div style={{ marginTop: 8, fontSize: 11, color: decColor.text, fontFamily: FONTS.body, textAlign: "left", background: "rgba(255,255,255,0.55)", borderRadius: 5, padding: "6px 8px" }}>
+                <span style={{ fontWeight: 700 }}>Pending reason: </span>{decided.pendNote}
+              </div>
+            )}
+            {decided.approveChecks && decided.approveChecks.length > 0 && (
+              <div style={{ marginTop: 8, textAlign: "left" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: decColor.text, fontFamily: FONTS.body, marginBottom: 3 }}>Recommendations recorded:</div>
+                {decided.approveChecks.map((r, i) => (
+                  <div key={i} style={{ fontSize: 11, color: decColor.text, fontFamily: FONTS.body }}>✓ {r}</div>
+                ))}
+              </div>
+            )}
+            {decided.denyNote && (
+              <div style={{ marginTop: 8, fontSize: 11, color: decColor.text, fontFamily: FONTS.body, textAlign: "left", background: "rgba(255,255,255,0.55)", borderRadius: 5, padding: "6px 8px" }}>
+                <span style={{ fontWeight: 700 }}>Reviewer note: </span>{decided.denyNote}
+              </div>
+            )}
           </div>
         )}
 
@@ -832,6 +991,127 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 flex: 1, padding: "6px 0", borderRadius: 6, border: "1.5px solid #e2e8f0",
                 background: "#fff", color: "#374151", fontSize: 12, fontWeight: 600,
                 cursor: "pointer", fontFamily: FONTS.body,
+              }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Pend input — what is missing */}
+        {actionState === "pend_input" && !decided && (
+          <div style={{
+            padding: "12px 14px", borderRadius: 8, border: "1.5px solid #93c5fd",
+            background: "#eff6ff", animation: "rn-fadein 0.15s ease-out",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", fontFamily: FONTS.heading, marginBottom: 4 }}>
+              Pend — Additional Information Required
+            </div>
+            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 8 }}>
+              Describe what information is needed from the provider:
+            </div>
+            <textarea
+              autoFocus
+              value={pendNote}
+              onChange={e => onPendNoteChange(e.target.value)}
+              placeholder="e.g. Missing plan of care frequency and duration; please resubmit with complete documentation..."
+              rows={3}
+              style={{
+                width: "100%", borderRadius: 6, border: "1.5px solid #93c5fd",
+                padding: "7px 10px", fontSize: 12, fontFamily: FONTS.body,
+                resize: "vertical", outline: "none", background: "#fff", color: "#1e293b",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={onPendSubmit} style={{
+                flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
+                background: "#3b82f6", color: "#fff", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", fontFamily: FONTS.body,
+              }}>Record Pend</button>
+              <button onClick={onCancelAction} style={{
+                padding: "7px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0",
+                background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
+              }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Approve checklist — post-approval recommendations */}
+        {actionState === "approve_checklist" && !decided && (
+          <div style={{
+            padding: "12px 14px", borderRadius: 8, border: "1.5px solid #86efac",
+            background: "#dcfce7", animation: "rn-fadein 0.15s ease-out",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d", fontFamily: FONTS.heading, marginBottom: 4 }}>
+              Approve — Post-Approval Recommendations
+            </div>
+            <div style={{ fontSize: 11, color: "#166534", fontFamily: FONTS.body, marginBottom: 8 }}>
+              Select any applicable recommendations (optional):
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+              {APPROVE_OPTIONS.map((opt, i) => (
+                <label key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={approveChecks.includes(opt)}
+                    onChange={e => onApproveChecksChange(
+                      e.target.checked
+                        ? [...approveChecks, opt]
+                        : approveChecks.filter(c => c !== opt)
+                    )}
+                    style={{ marginTop: 2, accentColor: "#15803d", flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: 12, color: "#166534", fontFamily: FONTS.body, lineHeight: 1.4 }}>{opt}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={onApproveSubmit} style={{
+                flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #22c55e",
+                background: "#22c55e", color: "#fff", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", fontFamily: FONTS.body,
+              }}>Confirm Approval</button>
+              <button onClick={onCancelAction} style={{
+                padding: "7px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0",
+                background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
+              }}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Deny sign-off */}
+        {actionState === "deny_signoff" && !decided && (
+          <div style={{
+            padding: "12px 14px", borderRadius: 8, border: "1.5px solid #fca5a5",
+            background: "#fef2f2", animation: "rn-fadein 0.15s ease-out",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", fontFamily: FONTS.heading, marginBottom: 4 }}>
+              Full Denial — Reviewer Sign-Off
+            </div>
+            <div style={{ fontSize: 11, color: "#dc2626", fontFamily: FONTS.body, marginBottom: 8 }}>
+              Document your rationale for the denial:
+            </div>
+            <textarea
+              autoFocus
+              value={denyNote}
+              onChange={e => onDenyNoteChange(e.target.value)}
+              placeholder="State the clinical basis for denial and any relevant criteria not met..."
+              rows={3}
+              style={{
+                width: "100%", borderRadius: 6, border: "1.5px solid #fca5a5",
+                padding: "7px 10px", fontSize: 12, fontFamily: FONTS.body,
+                resize: "vertical", outline: "none", background: "#fff", color: "#1e293b",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={onDenySignoffSubmit} style={{
+                flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #ef4444",
+                background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 700,
+                cursor: "pointer", fontFamily: FONTS.body,
+              }}>Finalize Denial</button>
+              <button onClick={onCancelAction} style={{
+                padding: "7px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0",
+                background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
               }}>Cancel</button>
             </div>
           </div>
@@ -890,23 +1170,6 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: FONTS.body }}>Awaiting engine...</span>
           </div>
         )}
-
-        <div style={{ borderTop: "1px solid #f1f5f9" }} />
-
-        {/* Document toggle */}
-        <button
-          onClick={onToggleDocs}
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0",
-            background: showDocs ? NAVY : "#fff", cursor: "pointer", transition: "all 0.15s",
-          }}
-        >
-          <span style={{ fontSize: 12, fontWeight: 600, color: showDocs ? "#fff" : "#374151", fontFamily: FONTS.body }}>
-            {showDocs ? "Hide Documents" : "View Documents"}
-          </span>
-          <span style={{ fontSize: 10, marginLeft: "auto", color: showDocs ? "rgba(255,255,255,0.6)" : "#9ca3af", fontFamily: FONTS.body }}>V</span>
-        </button>
 
         <div style={{ borderTop: "1px solid #f1f5f9" }} />
 
@@ -1201,6 +1464,9 @@ export default function Cockpit({ user, onBack, liveCase }) {
   const [decisions, setDecisions]         = useState({});
   const [actionState, setActionState]     = useState("idle");
   const [partialVisits, setPartialVisits] = useState("");
+  const [pendNote, setPendNote]           = useState("");
+  const [approveChecks, setApproveChecks] = useState([]);
+  const [denyNote, setDenyNote]           = useState("");
   const [showDocs, setShowDocs]           = useState(false);
   const [liveContract, setLiveContract]   = useState(null);
   const [engineState, setEngineState]     = useState("idle");
@@ -1296,14 +1562,17 @@ export default function Cockpit({ user, onBack, liveCase }) {
     if (showAuditLog) fetchAuditEvents(setAuditLog, setAuditLogLoading);
   }, [showAuditLog]);
 
-  const recordDecision = useCallback((determination, approvedVisits) => {
+  const recordDecision = useCallback((determination, approvedVisits, extras = {}) => {
     const caseId = kase.caseId;
     setDecisions(prev => ({
       ...prev,
-      [caseId]: { determination, approvedVisits, recordedAt: new Date().toISOString() },
+      [caseId]: { determination, approvedVisits, recordedAt: new Date().toISOString(), ...extras },
     }));
     setActionState("idle");
     setPartialVisits("");
+    setPendNote("");
+    setApproveChecks([]);
+    setDenyNote("");
 
     // Fire audit event best-effort
     const token = localStorage.getItem("cogentus_token") || "";
@@ -1338,30 +1607,53 @@ export default function Cockpit({ user, onBack, liveCase }) {
     if (decisions[kase.caseId] || !kase.contract) return;
     const rec = kase.contract.recommendation;
     if (type === "approve") {
-      recordDecision(rec.determination.startsWith("Approved") ? rec.determination : "Approved", rec.approvedVisits ?? 0);
+      setApproveChecks([]);
+      setActionState("approve_checklist");
     } else if (type === "partial") {
       setPartialVisits(String(rec.approvedVisits ?? ""));
       setActionState("partial_input");
     } else if (type === "deny") {
       setActionState("deny_confirm");
     } else if (type === "pend") {
-      recordDecision("Pend", 0);
+      setPendNote("");
+      setActionState("pend_input");
     }
-  }, [kase, decisions, recordDecision]);
+  }, [kase, decisions]);
 
   const handleDenyConfirm = useCallback(() => {
-    recordDecision("Full Denial", 0);
-  }, [recordDecision]);
+    setDenyNote("");
+    setActionState("deny_signoff");
+  }, []);
 
   const handlePartialSubmit = useCallback(() => {
     const v = parseInt(partialVisits, 10);
     recordDecision("Partial Denial", isNaN(v) ? (kase.contract?.recommendation?.approvedVisits ?? 0) : v);
   }, [partialVisits, kase, recordDecision]);
 
+  const handlePendSubmit = useCallback(() => {
+    recordDecision("Pend", 0, { pendNote });
+  }, [pendNote, recordDecision]);
+
+  const handleApproveSubmit = useCallback(() => {
+    const rec = kase.contract?.recommendation;
+    recordDecision(
+      rec?.determination?.startsWith("Approved") ? rec.determination : "Approved",
+      rec?.approvedVisits ?? 0,
+      { approveChecks: [...approveChecks] }
+    );
+  }, [approveChecks, kase, recordDecision]);
+
+  const handleDenySignoffSubmit = useCallback(() => {
+    recordDecision("Full Denial", 0, { denyNote });
+  }, [denyNote, recordDecision]);
+
   const handleNavigate = useCallback((i) => {
     setCursor(i);
     setActionState("idle");
     setPartialVisits("");
+    setPendNote("");
+    setApproveChecks([]);
+    setDenyNote("");
   }, []);
 
   // Keyboard handler
@@ -1370,7 +1662,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const key = e.key.toLowerCase();
-      if (key === "escape") { setActionState("idle"); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
+      if (key === "escape") { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
       if (key === "v") { setShowDocs(s => !s); return; }
       if (key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
       if (key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
@@ -1509,7 +1801,11 @@ export default function Cockpit({ user, onBack, liveCase }) {
       {/* ── Three-zone body ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", gap: 1 }}>
         <div style={{ flex: "0 0 34%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <EvidenceZone kase={kase} />
+          <EvidenceZone
+            kase={kase}
+            onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
+            showDocs={showDocs}
+          />
         </div>
         <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <RecommendationZone kase={kase} engineState={engineState} selectedPlan={selectedPlan} />
@@ -1524,14 +1820,21 @@ export default function Cockpit({ user, onBack, liveCase }) {
             auditState={auditStates[kase.caseId]}
             actionState={actionState}
             partialVisits={partialVisits}
+            pendNote={pendNote}
+            approveChecks={approveChecks}
+            denyNote={denyNote}
             onAction={handleAction}
             onPartialVisitsChange={setPartialVisits}
             onPartialSubmit={handlePartialSubmit}
             onDenyConfirm={handleDenyConfirm}
-            onCancelAction={() => setActionState("idle")}
+            onPendNoteChange={setPendNote}
+            onPendSubmit={handlePendSubmit}
+            onApproveChecksChange={setApproveChecks}
+            onApproveSubmit={handleApproveSubmit}
+            onDenyNoteChange={setDenyNote}
+            onDenySignoffSubmit={handleDenySignoffSubmit}
+            onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); }}
             onNavigate={handleNavigate}
-            onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
-            showDocs={showDocs}
           />
         </div>
       </div>
