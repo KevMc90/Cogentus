@@ -1121,6 +1121,17 @@ function App() {
   // Live case forwarded to cockpit from form result
   const [pendingCockpitCase, setPendingCockpitCase] = useState(null);
 
+  // Plan config
+  const [plans, setPlans]               = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+
+  useEffect(() => {
+    if (!token) { setPlans([]); return; }
+    axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setPlans(res.data.plans || []))
+      .catch(() => {});
+  }, [token]);
+
   // Review form state
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
@@ -1483,6 +1494,25 @@ function App() {
             </select>
           </div>
 
+          {/* Insurance Plan */}
+          {plans.length > 0 && (
+            <div style={fieldWrap}>
+              {labelEl("Insurance Plan")}
+              <select
+                value={selectedPlanId}
+                onChange={(e) => setSelectedPlanId(e.target.value)}
+                style={{ ...inputBase, cursor: "pointer" }}
+              >
+                <option value="">Default Plan (no override)</option>
+                {plans.map(p => (
+                  <option key={p.plan_id} value={p.plan_id}>
+                    {p.plan_name} — {p.payer}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* HPI / Care History */}
           <div style={fieldWrap}>
             {labelEl("HPI / Care History")}
@@ -1651,6 +1681,7 @@ function App() {
                 <button
                   onClick={() => {
                     if (!reviewMetrics) return;
+                    const chosenPlan = plans.find(p => p.plan_id === selectedPlanId);
                     setPendingCockpitCase({
                       caseId:      `LIVE-${reviewId || Date.now()}`,
                       memberName:  "Live Case",
@@ -1662,6 +1693,13 @@ function App() {
                       documents:   [],
                       metrics:     reviewMetrics,
                       ruling,
+                      planRuleSet: chosenPlan ? {
+                        planId:               chosenPlan.plan_id,
+                        planName:             chosenPlan.plan_name,
+                        payer:                chosenPlan.payer,
+                        autoApproveThreshold: chosenPlan.auto_approve_threshold,
+                        maxVisitsPerEpisode:  chosenPlan.max_visits_per_episode,
+                      } : null,
                     });
                     setView("cockpit");
                   }}

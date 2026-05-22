@@ -236,6 +236,20 @@ function buildFallbackContract(metrics, ruling) {
   };
 }
 
+// ── PLANS FETCH ────────────────────────────────────────────────────────────────
+async function fetchPlans(setPlans) {
+  const token = localStorage.getItem("cogentus_token") || "";
+  if (!token) return;
+  try {
+    const r = await fetch(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    setPlans(data.plans || []);
+  } catch {
+    // best-effort; cockpit works without plans
+  }
+}
+
 // ── AUDIT LOG FETCH ────────────────────────────────────────────────────────────
 async function fetchAuditEvents(setAuditLog, setAuditLogLoading) {
   const token = localStorage.getItem("cogentus_token") || "";
@@ -521,7 +535,7 @@ function EvidenceZone({ kase }) {
 }
 
 // ── RECOMMENDATION ZONE ────────────────────────────────────────────────────────
-function RecommendationZone({ kase, engineState }) {
+function RecommendationZone({ kase, engineState, selectedPlan }) {
   if (!kase.contract) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -582,6 +596,17 @@ function RecommendationZone({ kase, engineState }) {
               fontSize: 10, fontWeight: 700, fontFamily: FONTS.body, letterSpacing: "0.05em",
             }}>
               ✓ Auto-approval eligible
+            </div>
+          )}
+          {selectedPlan && (
+            <div style={{ marginTop: 6 }}>
+              <span style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe",
+                fontFamily: FONTS.body,
+              }}>
+                {selectedPlan.plan_name} · auto-approve ≤ {selectedPlan.auto_approve_threshold} visits
+              </span>
             </div>
           )}
         </div>
@@ -1024,6 +1049,9 @@ export default function Cockpit({ user, onBack, liveCase }) {
   const [showAuditLog, setShowAuditLog]   = useState(false);
   const [auditLog, setAuditLog]           = useState([]);
   const [auditLogLoading, setAuditLogLoading] = useState(false);
+  // Phase 5: plan config
+  const [plans, setPlans]                 = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState(liveCase?.planRuleSet?.planId || null);
 
   const liveCaseId = liveCase?.caseId ?? null;
 
@@ -1043,14 +1071,30 @@ export default function Cockpit({ user, onBack, liveCase }) {
   const queue = liveCaseEntry ? [liveCaseEntry, ...SYNTH_QUEUE] : [...SYNTH_QUEUE];
   const kase  = queue[cursor];
 
-  // Engine call
+  const selectedPlan = selectedPlanId
+    ? (plans.find(p => p.plan_id === selectedPlanId) || null)
+    : null;
+
+  // Reset cursor only when a new live case arrives
   useEffect(() => {
-    if (!liveCase || !liveCaseId) return;
+    if (!liveCaseId) return;
     setCursor(0);
     setActionState("idle");
+  }, [liveCaseId]);
+
+  // Engine call — re-runs when live case or selected plan changes
+  useEffect(() => {
+    if (!liveCase || !liveCaseId) return;
     setLiveContract(null);
     setEngineState("loading");
     const controller = new AbortController();
+    const activePlan = selectedPlanId && plans.length > 0
+      ? (plans.find(p => p.plan_id === selectedPlanId) || null) : null;
+    const planRuleSet = activePlan
+      ? { planId: activePlan.plan_id, planName: activePlan.plan_name, payer: activePlan.payer,
+          autoApproveThreshold: activePlan.auto_approve_threshold,
+          maxVisitsPerEpisode:  activePlan.max_visits_per_episode }
+      : (liveCase.planRuleSet || null);
     fetch(`${API_BASE}/v1/evaluate`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -1059,6 +1103,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
         discipline:       liveCase.discipline,
         reviewType:       liveCase.reviewType,
         extractedMetrics: liveCase.metrics,
+        planRuleSet,
       }),
       signal: controller.signal,
     })
@@ -1070,7 +1115,10 @@ export default function Cockpit({ user, onBack, liveCase }) {
         setEngineState("offline");
       });
     return () => controller.abort();
-  }, [liveCaseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [liveCaseId, selectedPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch plans on mount
+  useEffect(() => { fetchPlans(setPlans); }, []);
 
   // Fetch audit log when panel opens
   useEffect(() => {
@@ -1206,6 +1254,24 @@ export default function Cockpit({ user, onBack, liveCase }) {
           >
             Audit Log
           </button>
+          {plans.length > 0 && (
+            <select
+              value={selectedPlanId || ""}
+              onChange={e => setSelectedPlanId(e.target.value || null)}
+              style={{
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 5, padding: "3px 8px", color: "#fff",
+                fontSize: 11, cursor: "pointer", fontFamily: FONTS.body, outline: "none",
+              }}
+            >
+              <option value="" style={{ color: "#000" }}>Default Plan</option>
+              {plans.map(p => (
+                <option key={p.plan_id} value={p.plan_id} style={{ color: "#000" }}>
+                  {p.plan_name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1264,7 +1330,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
           <EvidenceZone kase={kase} />
         </div>
         <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <RecommendationZone kase={kase} engineState={engineState} />
+          <RecommendationZone kase={kase} engineState={engineState} selectedPlan={selectedPlan} />
         </div>
         <div style={{ flex: 1, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <DeterminationZone
