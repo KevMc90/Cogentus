@@ -188,6 +188,136 @@ const SYNTH_QUEUE = [
       cpgInfo: { diagCode: "M51.16", conditionLabel: "Lumbar disc degeneration — non-operative", mcgTypical: 10, mcgP75: 14, mcgMax: 20, cpgCitation: "APTA CPG Lumbar Spine (2021)" },
     },
   },
+  {
+    caseId: "SYNTH-004",
+    memberName: "Jordan Park",
+    memberId: "MBR-40293",
+    dob: "09/22/1952",
+    discipline: "OT",
+    reviewType: "initial",
+    submittedAt: "2026-05-22T10:45:00Z",
+    documents: [{ name: "OT_IE_Park_05182026.pdf", type: "Initial Evaluation", date: "05/18/2026" }],
+    contract: {
+      extraction: {
+        rom: {}, mmt: {},
+        painCurrent: "3/10 left UE",
+        functionalOutcomeScore: null,
+        goals: [
+          "Improve UE dressing independence from max assist to min assist within 6 wks",
+          "Improve meal prep safety to modified independent within 8 wks",
+        ],
+        poc: "5x/week × 4 weeks",
+        diagnosisCodes: ["G81.91"],
+        primaryDiagnosisCode: "G81.91",
+        primaryDiagnosis: "Hemiplegia, right dominant side, CVA",
+        requestedVisits: 20,
+        requestedFrequency: "5x/week × 4 weeks",
+        severity: "severe",
+        functionalLimitations: [
+          "Max assist for upper body dressing", "Unable to perform bilateral meal prep",
+          "Dependent for grooming tasks", "Impaired left UE active ROM limiting ADL reach",
+        ],
+        documentationQuality: {
+          hasEvalDate: true, hasDiagnosisCodes: true, hasObjectiveMeasures: true,
+          hasFunctionalLimitations: true, hasGoals: true, hasPOC: true,
+          hasStandardizedOutcomeMeasure: true, goalsMeasurable: true,
+          goalsFunctional: true, goalsHaveTimeframes: true, hasHEP: false,
+        },
+        sopIndicators: ["Neuromuscular re-education", "ADL training", "Constraint-induced movement therapy"],
+        goalsTotal: 2, goalsMet: 0, visitsToDate: 0,
+        fim: 68,
+        adlLevels: {
+          "Dressing (upper)": "Max Assist",
+          "Meal Prep": "Dependent",
+          "Grooming": "Max Assist",
+          "Bathing": "Moderate Assist",
+        },
+        iadlLevels: { "Home management": "Dependent", "Community mobility": "Dependent" },
+      },
+      assessment: {
+        d1: { finding: "FULLY_ESTABLISHED", reasoning: "FIM 68 (severe); significant ADL deficits; skilled OT criteria met for post-CVA rehabilitation." },
+        d2: { finding: "FULLY_ALIGNED", supportedFreq: 5, supportedDuration: 4, supportedVisits: 20, pocMaxVisits: 20, reasoning: "5x/week within AOTA CPG Stroke Rehab 2022 benchmark for severe presentation." },
+        d3: { finding: "COMPLETE", gaps: [], notes: [] },
+      },
+      recommendation: {
+        determination: "Approved",
+        approvedVisits: 20, frequency: 5, durationWeeks: 4,
+        criteria: [
+          "FIM 68/126 (severe functional impairment)",
+          "ADL: Max Assist dressing/grooming; Dependent meal prep",
+          "Skilled: NMR, ADL training, CIMT",
+          "AOTA CPG Stroke Rehab (2022): MCG typical 20 visits (p75: 32)",
+        ],
+        rationale: "Approved — Skilled OT is supported for right hemiplegia post-CVA (G81.91). FIM score of 68 indicates severe functional impairment across ADLs. Per AOTA CPG Stroke Rehab (2022), 5x/week is supported for severe presentation. Approving 20 visits at 5x/week × 4 weeks.",
+        confidence: "high",
+        autoApprovalEligible: false,
+      },
+      cpgInfo: { diagCode: "G81.91", conditionLabel: "Hemiplegia — CVA (OT)", mcgTypical: 20, mcgP75: 32, mcgMax: 48, cpgCitation: "AOTA CPG Stroke Rehab (2022)" },
+    },
+  },
+  {
+    caseId: "SYNTH-005",
+    memberName: "Riley Chen",
+    memberId: "MBR-50817",
+    dob: "06/14/2019",
+    discipline: "ST",
+    reviewType: "initial",
+    submittedAt: "2026-05-22T11:00:00Z",
+    documents: [{ name: "ST_IE_Chen_05192026.pdf", type: "Initial Evaluation", date: "05/19/2026" }],
+    contract: {
+      extraction: {
+        rom: {}, mmt: {},
+        painCurrent: null,
+        functionalOutcomeScore: null,
+        goals: [
+          "Increase receptive vocabulary age equivalency by 6 months within 12 wks",
+          "Produce 3-word utterances spontaneously in structured context within 16 wks",
+        ],
+        poc: "3x/week × 12 weeks",
+        diagnosisCodes: ["F80.2"],
+        primaryDiagnosisCode: "F80.2",
+        primaryDiagnosis: "Mixed receptive-expressive language disorder",
+        requestedVisits: 32,
+        requestedFrequency: "3x/week × 12 weeks",
+        severity: "severe",
+        functionalLimitations: [
+          "Unable to follow 2-step directions", "Expressive vocabulary <50 words at age 7",
+          "Significant classroom participation deficit",
+        ],
+        documentationQuality: {
+          hasEvalDate: true, hasDiagnosisCodes: true, hasObjectiveMeasures: true,
+          hasFunctionalLimitations: true, hasGoals: true, hasPOC: true,
+          hasStandardizedOutcomeMeasure: true, goalsMeasurable: true,
+          goalsFunctional: true, goalsHaveTimeframes: true, hasHEP: false,
+        },
+        sopIndicators: ["Structured language therapy", "AAC device training", "Parent education"],
+        goalsTotal: 2, goalsMet: 0, visitsToDate: 0,
+        standardizedScores: { "CELF-5 Core Language": 64, "PLS-5 Auditory Comprehension": 62 },
+        languageAgeEquivalent: "2y 4m (chronological age: 7y 0m)",
+        swallowingFindings: null,
+        dysphagiaSeverity: null,
+      },
+      assessment: {
+        d1: { finding: "FULLY_ESTABLISHED", reasoning: "CELF-5 SS 64 (severe); significant receptive/expressive language delay; skilled ST criteria met." },
+        d2: { finding: "FULLY_ALIGNED", supportedFreq: 3, supportedDuration: 12, supportedVisits: 36, pocMaxVisits: 32, reasoning: "3x/week within ASHA CPG benchmark for severe mixed language disorder." },
+        d3: { finding: "COMPLETE", gaps: [], notes: [] },
+      },
+      recommendation: {
+        determination: "Approved",
+        approvedVisits: 32, frequency: 3, durationWeeks: 12,
+        criteria: [
+          "CELF-5 SS 64 / PLS-5 AC SS 62 (both severe range, <70)",
+          "Language age equivalent 2y 4m vs. chronological age 7y 0m",
+          "Skilled: Structured language therapy, AAC training, parent education",
+          "ASHA CPG Language Disorders (2021): MCG typical 20 visits (p75: 36)",
+        ],
+        rationale: "Approved — Skilled ST is supported for mixed receptive-expressive language disorder (F80.2). CELF-5 Core Language SS of 64 indicates severe impairment with language age equivalent 2y 4m vs. chronological age 7y 0m. Per ASHA CPG, 3x/week is supported for severe presentation. Approving 32 visits at 3x/week × 12 weeks.",
+        confidence: "high",
+        autoApprovalEligible: false,
+      },
+      cpgInfo: { diagCode: "F80.2", conditionLabel: "Mixed receptive-expressive language disorder (ST)", mcgTypical: 20, mcgP75: 36, mcgMax: 52, cpgCitation: "ASHA CPG Language Disorders (2021)" },
+    },
+  },
 ];
 
 // ── POST-APPROVAL OPTIONS ──────────────────────────────────────────────────────
@@ -389,6 +519,12 @@ function fmtDateTime(iso) {
   return new Date(iso).toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function disciplineColor(d) {
+  if (d === "OT") return { bg: "#fff7ed", text: "#c2410c", border: "#fdba74" };
+  if (d === "ST") return { bg: "#f0fdf4", text: "#15803d", border: "#86efac" };
+  return { bg: "#eff6ff", text: NAVY, border: "#93c5fd" };
+}
+
 function disciplineLabel(d, rt) {
   const disc = d || "PT";
   const type = rt === "subsequent" ? "SUB" : "IE";
@@ -456,6 +592,13 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
   const hasMMTComp  = ex.mmtComparison && Object.keys(ex.mmtComparison).length > 0;
   const hasOutComp  = !!ex.outcomeComparison;
   const hasProgress = hasROMComp || hasMMTComp || hasOutComp || !!ex.painPrior;
+  const isOT        = kase.discipline === "OT";
+  const isST        = kase.discipline === "ST";
+  const hasFIM      = isOT && ex.fim != null;
+  const hasADL      = isOT && ex.adlLevels && Object.keys(ex.adlLevels).length > 0;
+  const hasScores   = isST && ex.standardizedScores && Object.keys(ex.standardizedScores).length > 0;
+  const OT_COLOR    = "#c2410c";
+  const ST_COLOR    = "#15803d";
 
   const sevColor = rec.confidence === "high" ? "#15803d"
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
@@ -694,6 +837,99 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
                     return <span style={{ fontSize: 12, fontWeight: 700, color: d > 0 ? "#15803d" : d < 0 ? "#dc2626" : "#6b7280", fontFamily: FONTS.body }}>{d > 0 ? `+${d}` : d}</span>;
                   })()}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* OT — FIM + ADL table */}
+        {(hasFIM || hasADL) && (
+          <div style={{ marginTop: hasProgress ? 14 : 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: OT_COLOR, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>
+              OT Functional Measures
+            </div>
+            {hasFIM && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>
+                  FIM Score <span style={{ color: "#94a3b8" }}>(18–126; higher = more independent)</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1, height: 10, background: "#f1f5f9", borderRadius: 5, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round(((ex.fim - 18) / 108) * 100)}%`, background: ex.fim < 55 ? "#dc2626" : ex.fim < 90 ? "#f59e0b" : "#15803d", borderRadius: 5, transition: "width 0.3s" }} />
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: ex.fim < 55 ? "#dc2626" : ex.fim < 90 ? "#92400e" : "#15803d", fontFamily: FONTS.body, width: 52 }}>{ex.fim}/126</span>
+                  <span style={{ fontSize: 10, color: "#6b7280", fontFamily: FONTS.body }}>{ex.fim < 55 ? "Severe" : ex.fim < 90 ? "Moderate" : "Mild"}</span>
+                </div>
+              </div>
+            )}
+            {hasADL && (
+              <div>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>ADL Independence</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: "#fff7ed" }}>
+                      {["Activity", "Level"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "3px 6px", fontSize: 9, fontWeight: 700, color: OT_COLOR, textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(ex.adlLevels).map(([act, lvl]) => (
+                      <tr key={act} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "4px 6px", color: "#374151", fontFamily: FONTS.body }}>{act}</td>
+                        <td style={{ padding: "4px 6px", fontWeight: 600, fontFamily: FONTS.body, color: /dependent|max/i.test(lvl) ? "#dc2626" : /mod/i.test(lvl) ? "#92400e" : "#15803d" }}>{lvl}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ST — standardized scores + swallowing */}
+        {(hasScores || ex.dysphagiaSeverity) && (
+          <div style={{ marginTop: hasProgress || hasFIM || hasADL ? 14 : 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: ST_COLOR, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>
+              ST Assessment Scores
+            </div>
+            {hasScores && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body, marginBottom: 4 }}>Standardized Test Scores</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: "#f0fdf4" }}>
+                      {["Test", "SS", "Range"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "3px 6px", fontSize: 9, fontWeight: 700, color: ST_COLOR, textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(ex.standardizedScores).map(([test, ss]) => (
+                      <tr key={test} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "4px 6px", color: "#374151", fontFamily: FONTS.body }}>{test}</td>
+                        <td style={{ padding: "4px 6px", fontWeight: 700, fontFamily: "monospace", color: ss < 70 ? "#dc2626" : ss <= 85 ? "#92400e" : "#15803d" }}>{ss}</td>
+                        <td style={{ padding: "4px 6px", fontSize: 10, color: ss < 70 ? "#dc2626" : ss <= 85 ? "#92400e" : "#15803d", fontFamily: FONTS.body }}>{ss < 70 ? "Severe" : ss <= 85 ? "Moderate" : "Mild"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {ex.languageAgeEquivalent && (
+              <div style={{ marginBottom: 8, fontSize: 11, color: "#374151", fontFamily: FONTS.body }}>
+                <span style={{ fontWeight: 600 }}>Language AE: </span>{ex.languageAgeEquivalent}
+              </div>
+            )}
+            {ex.dysphagiaSeverity && (
+              <div style={{ fontSize: 11, fontFamily: FONTS.body }}>
+                <span style={{ fontWeight: 600, color: "#374151" }}>Dysphagia Severity: </span>
+                <span style={{ color: /severe/i.test(ex.dysphagiaSeverity) ? "#dc2626" : /mod/i.test(ex.dysphagiaSeverity) ? "#92400e" : "#15803d" }}>{ex.dysphagiaSeverity}</span>
+              </div>
+            )}
+            {ex.swallowingFindings && (
+              <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>
+                <span style={{ fontWeight: 600, color: "#374151" }}>Swallowing: </span>{ex.swallowingFindings}
               </div>
             )}
           </div>
@@ -1183,6 +1419,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
               const isCurrent = i === cursor;
               const dec       = decisions[q.caseId];
               const dc2       = dec ? detColors(dec.determination) : null;
+              const discC     = disciplineColor(q.discipline);
               return (
                 <div
                   key={q.caseId}
@@ -1196,11 +1433,16 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: isCurrent ? NAVY_MID : "#94a3b8", fontFamily: FONTS.body, width: 14 }}>{isCurrent ? "●" : "○"}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {q.memberName}
-                        {q.isLive && <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: NAVY_MID }}>[LIVE]</span>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {q.memberName}
+                          {q.isLive && <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: NAVY_MID }}>[LIVE]</span>}
+                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: discC.bg, color: discC.text, border: `1px solid ${discC.border}`, fontFamily: FONTS.body, flexShrink: 0 }}>
+                          {q.discipline || "PT"}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 10, color: "#6b7280", fontFamily: FONTS.body }}>{q.caseId} · {disciplineLabel(q.discipline, q.reviewType)}</div>
+                      <div style={{ fontSize: 10, color: "#6b7280", fontFamily: FONTS.body }}>{q.caseId} · {q.reviewType === "subsequent" ? "SUB" : "IE"}</div>
                     </div>
                     {dc2 && (
                       <span style={{

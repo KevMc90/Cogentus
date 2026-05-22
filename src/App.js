@@ -1267,6 +1267,7 @@ function App() {
 
   // Review form state
   const [reviewType, setReviewType]           = useState("initial");
+  const [therapyType, setTherapyType]         = useState("PT");
   const [hpi, setHpi]                         = useState("");
   const [priorNote, setPriorNote]             = useState("");
   const [requestedVisits, setRequestedVisits] = useState("");
@@ -1335,6 +1336,7 @@ function App() {
     const fd = new FormData();
     files.forEach(f => fd.append("pdfs", f));
     fd.append("reviewType", reviewType);
+    fd.append("therapyType", therapyType);
     fd.append("hpi", hpi.trim());
     fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
     if (reviewType === "subsequent") {
@@ -1625,6 +1627,20 @@ function App() {
             >
               <option value="initial">Initial</option>
               <option value="subsequent">Subsequent</option>
+            </select>
+          </div>
+
+          {/* Discipline */}
+          <div style={fieldWrap}>
+            {labelEl("Discipline")}
+            <select
+              value={therapyType}
+              onChange={(e) => setTherapyType(e.target.value)}
+              style={{ ...inputBase, cursor: "pointer" }}
+            >
+              <option value="PT">PT — Physical Therapy</option>
+              <option value="OT">OT — Occupational Therapy</option>
+              <option value="ST">ST — Speech-Language Therapy</option>
             </select>
           </div>
 
