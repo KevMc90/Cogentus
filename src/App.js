@@ -1118,6 +1118,9 @@ function App() {
   // View state
   const [view, setView] = useState("reviews"); // "reviews" | "dashboard" | "cockpit"
 
+  // Live case forwarded to cockpit from form result
+  const [pendingCockpitCase, setPendingCockpitCase] = useState(null);
+
   // Review form state
   const [reviewType, setReviewType]           = useState("initial");
   const [hpi, setHpi]                         = useState("");
@@ -1176,7 +1179,7 @@ function App() {
 
   // Cockpit view
   if (view === "cockpit") {
-    return <Cockpit user={user} onBack={() => setView("reviews")} />;
+    return <Cockpit user={user} onBack={() => setView("reviews")} liveCase={pendingCockpitCase} />;
   }
 
   const buildFormData = () => {
@@ -1645,6 +1648,36 @@ function App() {
                 Generated Review
               </span>
               <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    if (!reviewMetrics) return;
+                    setPendingCockpitCase({
+                      caseId:      `LIVE-${reviewId || Date.now()}`,
+                      memberName:  "Live Case",
+                      memberId:    reviewId ? `RID-${reviewId}` : "—",
+                      dob:         "—",
+                      discipline:  reviewMetrics.therapyType || "PT",
+                      reviewType,
+                      submittedAt: new Date().toISOString(),
+                      documents:   [],
+                      metrics:     reviewMetrics,
+                      ruling,
+                    });
+                    setView("cockpit");
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.18)",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  Send to Cockpit
+                </button>
                 <button
                   onClick={handleExport}
                   style={{

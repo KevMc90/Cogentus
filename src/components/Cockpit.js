@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
+const API_BASE =
+  process.env.REACT_APP_API_BASE ||
+  "https://cogentus-backend.onrender.com";
+
 // ── DESIGN TOKENS ──────────────────────────────────────────────────────────────
 const NAVY      = "#1a3a5c";
 const NAVY_DARK = "#0d1b2a";
@@ -8,7 +12,7 @@ const FONTS     = { heading: "'Fraunces', Georgia, serif", body: "'Public Sans',
 
 // ── SYNTHETIC QUEUE ────────────────────────────────────────────────────────────
 // All names/IDs/dates are fictitious. No PHI.
-const QUEUE = [
+const SYNTH_QUEUE = [
   {
     caseId: "SYNTH-001",
     memberName: "Alex Rivera",
@@ -57,7 +61,7 @@ const QUEUE = [
           "Skilled: Manual therapy, Therapeutic exercise, NMR",
           "APTA CPG Shoulder (2021): MCG typical 10 visits (p75: 16)",
         ],
-        rationale: "Approved — Skilled PT is supported for Left shoulder pain (M25.561) with pain of 6/10, significant ROM deficits, and MMT averaging 3.7/5. Per APTA CPG, 2x/week is supported for severe presentation. Approving 12 visits at 2x/week × 6 weeks. Goals are functional, measurable with objective baselines, and demonstrate skilled rehabilitation need.",
+        rationale: "Approved — Skilled PT is supported for Left shoulder pain (M25.561) with pain of 6/10, significant ROM deficits, and MMT averaging 3.7/5. Per APTA CPG, 2x/week is supported for severe presentation. Approving 12 visits at 2x/week × 6 weeks.",
         confidence: "high",
         autoApprovalEligible: true,
       },
@@ -112,7 +116,7 @@ const QUEUE = [
           "Requested 3x/week > CPG max 2x/week for moderate presentation",
           "APTA CPG Knee OA (2021): MCG typical 8 visits (p75: 12)",
         ],
-        rationale: "Partial Denial — Unsupported Frequency: Skilled PT is supported for right knee OA (M17.11). Requested 3x/week exceeds the evidence-supported maximum of 2x/week per APTA CPG for moderate knee OA. Approving 11 visits at 2x/week × 6 weeks. Provider may resubmit with a revised plan of care.",
+        rationale: "Partial Denial — Unsupported Frequency: Skilled PT is supported for right knee OA (M17.11). Requested 3x/week exceeds the evidence-supported maximum of 2x/week per APTA CPG. Approving 11 visits at 2x/week × 6 weeks.",
         confidence: "high",
         autoApprovalEligible: false,
       },
@@ -156,7 +160,7 @@ const QUEUE = [
       assessment: {
         d1: { finding: "FULLY_ESTABLISHED", reasoning: "Pain and functional deficits documented; skilled indicators present." },
         d2: { finding: "VOLUME_MISALIGNED", supportedFreq: null, supportedDuration: null, supportedVisits: null, pocMaxVisits: null, reasoning: "No POC frequency or duration identified." },
-        d3: { finding: "INCOMPLETE", gaps: ["goals", "poc"], notes: ["Treatment goals not identified in submitted documentation.", "Plan of care frequency not identified."] },
+        d3: { finding: "INCOMPLETE", gaps: ["goals", "poc"], notes: ["Treatment goals not identified.", "Plan of care frequency not identified."] },
       },
       recommendation: {
         determination: "Pend",
@@ -174,6 +178,64 @@ const QUEUE = [
     },
   },
 ];
+
+// ── FALLBACK CONTRACT ──────────────────────────────────────────────────────────
+// Built from form response data when /v1/evaluate is unreachable.
+function buildFallbackContract(metrics, ruling) {
+  const m  = metrics  || {};
+  const r  = ruling   || {};
+  const dd = r.domainDetails || {
+    d1: { finding: "UNKNOWN", reasoning: "" },
+    d2: { finding: "UNKNOWN", supportedFreq: null, supportedDuration: null, supportedVisits: null, pocMaxVisits: null, reasoning: "" },
+    d3: { finding: "UNKNOWN", gaps: [], notes: [] },
+  };
+  return {
+    extraction: {
+      rom:                    m.rom                    || {},
+      romNormals:             {},
+      mmt:                    m.mmt                    || {},
+      painCurrent:            m.painCurrent            || null,
+      functionalOutcomeScore: m.functionalOutcomeScore || null,
+      goals:                  m.goalsText              || [],
+      poc:                    m.poc                    || null,
+      diagnosisCodes:         m.diagnosisCodes         || [],
+      primaryDiagnosisCode:   m.primaryDiagnosisCode   || null,
+      primaryDiagnosis:       m.primaryDiagnosis       || null,
+      requestedVisits:        m.requestedVisits        || null,
+      requestedFrequency:     m.requestedFrequency     || null,
+      severity:               r.severity               || null,
+      functionalLimitations:  m.functionalLimitations  || [],
+      documentationQuality:   m.documentationQuality   || {},
+      sopIndicators:          m.sopIndicators          || [],
+      goalsTotal:             (m.goalsText || []).length,
+      goalsMet:               0,
+      visitsToDate:           0,
+    },
+    assessment: {
+      d1: { finding: dd.d1.finding, reasoning: dd.d1.reasoning || "" },
+      d2: {
+        finding:           dd.d2.finding,
+        supportedFreq:     dd.d2.supportedFreq     || null,
+        supportedDuration: dd.d2.supportedDuration || null,
+        supportedVisits:   dd.d2.supportedVisits   || null,
+        pocMaxVisits:      dd.d2.pocMaxVisits       || null,
+        reasoning:         dd.d2.reasoning          || "",
+      },
+      d3: { finding: dd.d3.finding, gaps: dd.d3.gaps || [], notes: dd.d3.notes || [] },
+    },
+    recommendation: {
+      determination:        r.determination   || "Pend",
+      approvedVisits:       r.visitsApproved  || 0,
+      frequency:            null,
+      durationWeeks:        null,
+      criteria:             [],
+      rationale:            r.determinationLine || "Engine offline — determination from prior form review.",
+      confidence:           "low",
+      autoApprovalEligible: false,
+    },
+    cpgInfo: r.cpgInfo || null,
+  };
+}
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
 function detColors(determination) {
@@ -196,7 +258,7 @@ function domainColors(finding) {
 
 function domainLabel(key, finding) {
   const short = finding
-    .replace("FULLY_", "").replace("NOT_ESTABLISHED_", "").replace("_", " ")
+    .replace("FULLY_", "").replace("NOT_ESTABLISHED_", "").replace(/_/g, " ")
     .toLowerCase().replace(/^\w/, c => c.toUpperCase());
   const labels = { d1: "D1 Clinical", d2: "D2 Evidence", d3: "D3 Docs" };
   return { key: labels[key] || key.toUpperCase(), finding: short };
@@ -220,6 +282,21 @@ function disciplineLabel(d, rt) {
   return `${disc} · ${type}`;
 }
 
+// ── LOADING PULSE ──────────────────────────────────────────────────────────────
+function LoadingPulse({ label }) {
+  return (
+    <div style={{ textAlign: "center", padding: "40px 24px" }}>
+      <div style={{
+        width: 28, height: 28,
+        border: "2.5px solid #e2e8f0", borderTop: `2.5px solid ${NAVY}`,
+        borderRadius: "50%", animation: "rn-spin 0.8s linear infinite",
+        margin: "0 auto 14px",
+      }} />
+      <div style={{ fontSize: 12, color: "#64748b", fontFamily: FONTS.body }}>{label}</div>
+    </div>
+  );
+}
+
 // ── KEYBOARD HINT CHIP ──────────────────────────────────────────────────────────
 function KbdChip({ k, label, style }) {
   return (
@@ -238,15 +315,10 @@ function KbdChip({ k, label, style }) {
 // ── ZONE HEADER ────────────────────────────────────────────────────────────────
 function ZoneHeader({ title }) {
   return (
-    <div style={{
-      padding: "12px 20px 11px",
-      borderBottom: "1px solid #e2e8f0",
-      background: "#f8fafc",
-    }}>
+    <div style={{ padding: "12px 20px 11px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
       <span style={{
         fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
-        textTransform: "uppercase", color: "#64748b",
-        fontFamily: FONTS.body,
+        textTransform: "uppercase", color: "#64748b", fontFamily: FONTS.body,
       }}>{title}</span>
     </div>
   );
@@ -254,6 +326,15 @@ function ZoneHeader({ title }) {
 
 // ── EVIDENCE ZONE ──────────────────────────────────────────────────────────────
 function EvidenceZone({ kase }) {
+  if (!kase.contract) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <ZoneHeader title="Clinical Evidence" />
+        <LoadingPulse label="Awaiting engine response..." />
+      </div>
+    );
+  }
+
   const ex  = kase.contract.extraction;
   const rec = kase.contract.recommendation;
   const hasROM = ex.rom && Object.keys(ex.rom).length > 0;
@@ -321,7 +402,7 @@ function EvidenceZone({ kase }) {
               </thead>
               <tbody>
                 {Object.entries(ex.rom).map(([joint, val]) => {
-                  const norm = ex.romNormals && ex.romNormals[joint];
+                  const norm   = ex.romNormals && ex.romNormals[joint];
                   const numVal = typeof val === "number" ? val : parseFloat(val);
                   const pctDef = (norm && !isNaN(numVal)) ? Math.round(((norm - numVal) / norm) * 100) : null;
                   return (
@@ -402,8 +483,8 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* Doc quality gaps */}
-        {ex.documentationQuality && (
+        {/* Doc quality chips */}
+        {ex.documentationQuality && Object.keys(ex.documentationQuality).length > 0 && (
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Doc Quality</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -437,7 +518,16 @@ function EvidenceZone({ kase }) {
 }
 
 // ── RECOMMENDATION ZONE ────────────────────────────────────────────────────────
-function RecommendationZone({ kase }) {
+function RecommendationZone({ kase, engineState }) {
+  if (!kase.contract) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <ZoneHeader title="Recommendation" />
+        <LoadingPulse label="Calling live engine..." />
+      </div>
+    );
+  }
+
   const rec  = kase.contract.recommendation;
   const asmn = kase.contract.assessment;
   const cpg  = kase.contract.cpgInfo;
@@ -448,6 +538,22 @@ function RecommendationZone({ kase }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
       <ZoneHeader title="Recommendation" />
       <div style={{ padding: "16px 20px", flex: 1 }}>
+
+        {/* Engine offline banner */}
+        {kase.isLive && engineState === "offline" && (
+          <div style={{
+            marginBottom: 12, padding: "8px 12px", borderRadius: 6,
+            background: "#fef2f2", border: "1px solid #fca5a5",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#991b1b", fontFamily: FONTS.body }}>
+              ● Engine Offline
+            </span>
+            <span style={{ fontSize: 11, color: "#dc2626", fontFamily: FONTS.body }}>
+              Showing determination from prior form review. Full contract unavailable.
+            </span>
+          </div>
+        )}
 
         {/* Determination badge */}
         <div style={{
@@ -495,10 +601,7 @@ function RecommendationZone({ kase }) {
                   display: "flex", alignItems: "flex-start", gap: 8,
                   padding: "7px 10px", borderRadius: 6, border: "1px solid #f1f5f9", background: "#fafafa",
                 }}>
-                  <span style={{
-                    flex: "0 0 72px", fontSize: 10, fontWeight: 700, color: "#374151",
-                    fontFamily: FONTS.body, paddingTop: 1,
-                  }}>{lbl.key}</span>
+                  <span style={{ flex: "0 0 72px", fontSize: 10, fontWeight: 700, color: "#374151", fontFamily: FONTS.body, paddingTop: 1 }}>{lbl.key}</span>
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
                     background: dc2.bg, color: dc2.text, fontFamily: FONTS.body,
@@ -586,12 +689,12 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, style }) 
 }
 
 // ── DETERMINATION ZONE ─────────────────────────────────────────────────────────
-function DeterminationZone({ kase, cursor, total, decisions, actionState, partialVisits,
+function DeterminationZone({ kase, queue, cursor, total, decisions, actionState, partialVisits,
   onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm, onCancelAction,
   onNavigate, onToggleDocs, showDocs }) {
 
   const decided    = decisions[kase.caseId];
-  const rec        = kase.contract.recommendation;
+  const rec        = kase.contract?.recommendation;
   const partialRef = useRef(null);
 
   useEffect(() => {
@@ -664,7 +767,7 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
               Partial Denial — set approved visits
             </div>
             <div style={{ fontSize: 11, color: "#78350f", fontFamily: FONTS.body, marginBottom: 8 }}>
-              Engine recommends {rec.approvedVisits} visits. Enter override or press Enter to accept.
+              Engine recommends {rec?.approvedVisits ?? 0} visits. Enter override or press Enter to accept.
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
@@ -673,7 +776,7 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
                 value={partialVisits}
                 onChange={e => onPartialVisitsChange(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") onPartialSubmit(); if (e.key === "Escape") onCancelAction(); }}
-                placeholder={String(rec.approvedVisits)}
+                placeholder={String(rec?.approvedVisits ?? "")}
                 style={{
                   flex: 1, padding: "7px 10px", borderRadius: 6, border: "1.5px solid #fcd34d",
                   fontSize: 13, fontFamily: FONTS.body, outline: "none",
@@ -694,8 +797,8 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
           </div>
         )}
 
-        {/* Action buttons */}
-        {!decided && actionState === "idle" && (
+        {/* Action buttons — only when contract loaded and not yet decided */}
+        {!decided && actionState === "idle" && kase.contract && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <ActionBtn kbd="A" label="Approve" color="#166534" bg="#dcfce7" border="#86efac"
               onClick={() => onAction("approve")} />
@@ -705,6 +808,18 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
               onClick={() => onAction("deny")} />
             <ActionBtn kbd="N" label="Pend" color="#1d4ed8" bg="#eff6ff" border="#93c5fd"
               onClick={() => onAction("pend")} />
+          </div>
+        )}
+
+        {/* Loading placeholder for action area */}
+        {!decided && !kase.contract && actionState === "idle" && (
+          <div style={{
+            padding: "14px", borderRadius: 8, border: "1px dashed #e2e8f0",
+            background: "#f8fafc", textAlign: "center",
+          }}>
+            <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: FONTS.body }}>
+              Awaiting engine...
+            </span>
           </div>
         )}
 
@@ -736,7 +851,7 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
             Queue ({total}) · J prev · K next
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {QUEUE.map((q, i) => {
+            {queue.map((q, i) => {
               const isCurrent = i === cursor;
               const dec       = decisions[q.caseId];
               const dc2       = dec ? detColors(dec.determination) : null;
@@ -754,7 +869,10 @@ function DeterminationZone({ kase, cursor, total, decisions, actionState, partia
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, color: isCurrent ? NAVY_MID : "#94a3b8", fontFamily: FONTS.body, width: 14 }}>{isCurrent ? "●" : "○"}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.memberName}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {q.memberName}
+                        {q.isLive && <span style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: NAVY_MID }}>[LIVE]</span>}
+                      </div>
                       <div style={{ fontSize: 10, color: "#6b7280", fontFamily: FONTS.body }}>{q.caseId} · {disciplineLabel(q.discipline, q.reviewType)}</div>
                     </div>
                     {dc2 && (
@@ -799,14 +917,14 @@ function DocumentsPanel({ kase, onClose }) {
         }}>Esc / V</button>
       </div>
       <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-        {kase.documents.map((doc, i) => (
+        {kase.documents && kase.documents.length > 0 ? kase.documents.map((doc, i) => (
           <div key={i} style={{
             padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0",
             background: "#f8fafc", marginBottom: 10,
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 4 }}>{doc.name}</div>
             <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>
-              {doc.type} · {doc.date}
+              {doc.type}{doc.date ? ` · ${doc.date}` : ""}
             </div>
             <div style={{
               marginTop: 10, padding: "8px 10px", background: "#f0f4f8", borderRadius: 6,
@@ -816,21 +934,78 @@ function DocumentsPanel({ kase, onClose }) {
               PDF viewer available in Phase 6
             </div>
           </div>
-        ))}
+        )) : (
+          <div style={{ padding: "24px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: FONTS.body, fontStyle: "italic" }}>
+            No documents attached to this case
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── COCKPIT ROOT ───────────────────────────────────────────────────────────────
-export default function Cockpit({ user, onBack }) {
+export default function Cockpit({ user, onBack, liveCase }) {
   const [cursor, setCursor]               = useState(0);
   const [decisions, setDecisions]         = useState({});
   const [actionState, setActionState]     = useState("idle"); // idle | deny_confirm | partial_input
   const [partialVisits, setPartialVisits] = useState("");
   const [showDocs, setShowDocs]           = useState(false);
+  const [liveContract, setLiveContract]   = useState(null);
+  const [engineState, setEngineState]     = useState("idle"); // idle | loading | ok | offline
 
-  const kase = QUEUE[cursor];
+  // Stable caseId for effect dependency
+  const liveCaseId = liveCase?.caseId ?? null;
+
+  // Build dynamic queue: live case (if any) prepended to synthetic fixture
+  const liveCaseEntry = liveCase ? {
+    caseId:      liveCase.caseId,
+    memberName:  liveCase.memberName  || "Live Case",
+    memberId:    liveCase.memberId    || "—",
+    dob:         liveCase.dob         || "—",
+    discipline:  liveCase.discipline  || "PT",
+    reviewType:  liveCase.reviewType  || "initial",
+    submittedAt: liveCase.submittedAt || new Date().toISOString(),
+    documents:   liveCase.documents   || [],
+    contract:    liveContract,
+    isLive:      true,
+  } : null;
+
+  const queue = liveCaseEntry ? [liveCaseEntry, ...SYNTH_QUEUE] : [...SYNTH_QUEUE];
+  const kase  = queue[cursor];
+
+  // Engine call — fires when a new live caseId arrives
+  useEffect(() => {
+    if (!liveCase || !liveCaseId) return;
+
+    setCursor(0);
+    setActionState("idle");
+    setLiveContract(null);
+    setEngineState("loading");
+
+    const controller = new AbortController();
+
+    fetch(`${API_BASE}/v1/evaluate`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        caseId:           liveCaseId,
+        discipline:       liveCase.discipline,
+        reviewType:       liveCase.reviewType,
+        extractedMetrics: liveCase.metrics,
+      }),
+      signal: controller.signal,
+    })
+      .then(r => { if (!r.ok) throw new Error("Engine " + r.status); return r.json(); })
+      .then(contract => { setLiveContract(contract); setEngineState("ok"); })
+      .catch(err => {
+        if (err.name === "AbortError") return;
+        setLiveContract(buildFallbackContract(liveCase.metrics, liveCase.ruling));
+        setEngineState("offline");
+      });
+
+    return () => controller.abort();
+  }, [liveCaseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recordDecision = useCallback((determination, approvedVisits) => {
     setDecisions(prev => ({
@@ -842,11 +1017,15 @@ export default function Cockpit({ user, onBack }) {
   }, [kase]);
 
   const handleAction = useCallback((type) => {
-    if (decisions[kase.caseId]) return;
+    if (decisions[kase.caseId] || !kase.contract) return;
+    const rec = kase.contract.recommendation;
     if (type === "approve") {
-      recordDecision(kase.contract.recommendation.determination.startsWith("Approved") ? kase.contract.recommendation.determination : "Approved", kase.contract.recommendation.approvedVisits);
+      recordDecision(
+        rec.determination.startsWith("Approved") ? rec.determination : "Approved",
+        rec.approvedVisits ?? 0
+      );
     } else if (type === "partial") {
-      setPartialVisits(String(kase.contract.recommendation.approvedVisits));
+      setPartialVisits(String(rec.approvedVisits ?? ""));
       setActionState("partial_input");
     } else if (type === "deny") {
       setActionState("deny_confirm");
@@ -861,7 +1040,7 @@ export default function Cockpit({ user, onBack }) {
 
   const handlePartialSubmit = useCallback(() => {
     const v = parseInt(partialVisits, 10);
-    recordDecision("Partial Denial", isNaN(v) ? kase.contract.recommendation.approvedVisits : v);
+    recordDecision("Partial Denial", isNaN(v) ? (kase.contract?.recommendation?.approvedVisits ?? 0) : v);
   }, [partialVisits, kase, recordDecision]);
 
   const handleNavigate = useCallback((i) => {
@@ -879,25 +1058,25 @@ export default function Cockpit({ user, onBack }) {
       const key = e.key.toLowerCase();
 
       if (key === "escape") { setActionState("idle"); setShowDocs(false); return; }
-      if (key === "v") { setShowDocs(s => !s); return; }
-      if (key === "j" && cursor > 0) { handleNavigate(cursor - 1); return; }
-      if (key === "k" && cursor < QUEUE.length - 1) { handleNavigate(cursor + 1); return; }
+      if (key === "v")      { setShowDocs(s => !s); return; }
+      if (key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
+      if (key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
 
-      if (decisions[kase.caseId]) return; // already decided
+      if (!kase.contract || decisions[kase.caseId]) return; // loading or already decided
 
       if (key === "a" && actionState === "idle") { handleAction("approve"); return; }
       if (key === "p" && actionState === "idle") { handleAction("partial"); return; }
-      if (key === "n" && actionState === "idle") { handleAction("pend"); return; }
+      if (key === "n" && actionState === "idle") { handleAction("pend");    return; }
       if (key === "d") {
-        if (actionState === "idle") { setActionState("deny_confirm"); return; }
+        if (actionState === "idle")        { setActionState("deny_confirm"); return; }
         if (actionState === "deny_confirm") { handleDenyConfirm(); return; }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [cursor, kase, decisions, actionState, handleAction, handleDenyConfirm, handleNavigate]);
+  }, [cursor, kase, queue.length, decisions, actionState, handleAction, handleDenyConfirm, handleNavigate]);
 
-  const decided = !!decisions[kase.caseId];
+  const decided      = !!decisions[kase.caseId];
   const decidedCount = Object.keys(decisions).length;
 
   return (
@@ -930,10 +1109,10 @@ export default function Cockpit({ user, onBack }) {
           }}>Cockpit</div>
         </div>
 
-        {/* Case ID */}
+        {/* Case ID + engine badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: FONTS.body }}>
-            {cursor + 1} / {QUEUE.length}
+            {cursor + 1} / {queue.length}
           </span>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>
             {kase.caseId}
@@ -944,19 +1123,33 @@ export default function Cockpit({ user, onBack }) {
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: FONTS.body }}>
             submitted {fmtTime(kase.submittedAt)}
           </span>
+          {kase.isLive && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+              background: engineState === "ok"      ? "#dcfce7"
+                        : engineState === "offline" ? "#fee2e2"
+                        :                             "#fef3c7",
+              color:      engineState === "ok"      ? "#166534"
+                        : engineState === "offline" ? "#991b1b"
+                        :                             "#92400e",
+              fontFamily: FONTS.body, letterSpacing: "0.04em",
+            }}>
+              {engineState === "loading" ? "Engine..." : engineState === "ok" ? "● Live" : "● Offline"}
+            </span>
+          )}
         </div>
 
         {/* Keyboard hints */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 16, alignItems: "center" }}>
           {decidedCount > 0 && (
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", fontFamily: FONTS.body }}>
-              {decidedCount}/{QUEUE.length} decided
+              {decidedCount}/{queue.length} decided
             </span>
           )}
           <KbdChip k="J" label="prev" />
           <KbdChip k="K" label="next" />
           <KbdChip k="V" label="docs" />
-          {!decided && (
+          {!decided && kase.contract && (
             <>
               <KbdChip k="A" label="approve" />
               <KbdChip k="P" label="partial" />
@@ -975,33 +1168,20 @@ export default function Cockpit({ user, onBack }) {
       {/* ── Three-zone body ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", gap: 1 }}>
 
-        {/* Clinical Evidence */}
-        <div style={{
-          flex: "0 0 34%", background: "#fff",
-          borderRight: "1px solid #e2e8f0", overflow: "hidden",
-          display: "flex", flexDirection: "column",
-        }}>
+        <div style={{ flex: "0 0 34%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <EvidenceZone kase={kase} />
         </div>
 
-        {/* Recommendation */}
-        <div style={{
-          flex: "0 0 36%", background: "#fff",
-          borderRight: "1px solid #e2e8f0", overflow: "hidden",
-          display: "flex", flexDirection: "column",
-        }}>
-          <RecommendationZone kase={kase} />
+        <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <RecommendationZone kase={kase} engineState={engineState} />
         </div>
 
-        {/* Determination + Queue */}
-        <div style={{
-          flex: 1, background: "#fff",
-          overflow: "hidden", display: "flex", flexDirection: "column",
-        }}>
+        <div style={{ flex: 1, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <DeterminationZone
             kase={kase}
+            queue={queue}
             cursor={cursor}
-            total={QUEUE.length}
+            total={queue.length}
             decisions={decisions}
             actionState={actionState}
             partialVisits={partialVisits}
@@ -1017,7 +1197,6 @@ export default function Cockpit({ user, onBack }) {
         </div>
       </div>
 
-      {/* Documents side panel */}
       {showDocs && <DocumentsPanel kase={kase} onClose={() => setShowDocs(false)} />}
     </div>
   );
