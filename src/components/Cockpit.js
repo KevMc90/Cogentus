@@ -180,7 +180,6 @@ const SYNTH_QUEUE = [
 ];
 
 // ── FALLBACK CONTRACT ──────────────────────────────────────────────────────────
-// Built from form response data when /v1/evaluate is unreachable.
 function buildFallbackContract(metrics, ruling) {
   const m  = metrics  || {};
   const r  = ruling   || {};
@@ -237,6 +236,25 @@ function buildFallbackContract(metrics, ruling) {
   };
 }
 
+// ── AUDIT LOG FETCH ────────────────────────────────────────────────────────────
+async function fetchAuditEvents(setAuditLog, setAuditLogLoading) {
+  const token = localStorage.getItem("cogentus_token") || "";
+  if (!token) return;
+  setAuditLogLoading(true);
+  try {
+    const r = await fetch(`${API_BASE}/v1/audit-events?limit=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    setAuditLog(data.events || []);
+  } catch {
+    setAuditLog(null); // null signals fetch error
+  } finally {
+    setAuditLogLoading(false);
+  }
+}
+
 // ── HELPERS ────────────────────────────────────────────────────────────────────
 function detColors(determination) {
   if (!determination) return { bg: "#f3f4f6", text: "#374151", border: "#d1d5db", glow: "transparent" };
@@ -276,6 +294,11 @@ function fmtTime(iso) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 function disciplineLabel(d, rt) {
   const disc = d || "PT";
   const type = rt === "subsequent" ? "SUB" : "IE";
@@ -297,7 +320,7 @@ function LoadingPulse({ label }) {
   );
 }
 
-// ── KEYBOARD HINT CHIP ──────────────────────────────────────────────────────────
+// ── KEYBOARD HINT CHIP ─────────────────────────────────────────────────────────
 function KbdChip({ k, label, style }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, ...style }}>
@@ -335,8 +358,8 @@ function EvidenceZone({ kase }) {
     );
   }
 
-  const ex  = kase.contract.extraction;
-  const rec = kase.contract.recommendation;
+  const ex     = kase.contract.extraction;
+  const rec    = kase.contract.recommendation;
   const hasROM = ex.rom && Object.keys(ex.rom).length > 0;
   const hasMMT = ex.mmt && Object.keys(ex.mmt).length > 0;
 
@@ -348,7 +371,6 @@ function EvidenceZone({ kase }) {
       <ZoneHeader title="Clinical Evidence" />
       <div style={{ padding: "16px 20px", flex: 1 }}>
 
-        {/* Member header */}
         <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: NAVY, fontFamily: FONTS.heading, lineHeight: 1.2 }}>
             {kase.memberName}
@@ -361,9 +383,7 @@ function EvidenceZone({ kase }) {
             <span style={{ fontSize: 11, color: "#64748b", fontFamily: FONTS.body }}>{disciplineLabel(kase.discipline, kase.reviewType)}</span>
           </div>
           <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "monospace" }}>
-              {ex.primaryDiagnosisCode}
-            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "monospace" }}>{ex.primaryDiagnosisCode}</span>
             <span style={{ fontSize: 12, color: "#374151", fontFamily: FONTS.body }}>{ex.primaryDiagnosis}</span>
           </div>
           <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
@@ -371,16 +391,11 @@ function EvidenceZone({ kase }) {
               fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
               background: sevColor + "18", color: sevColor, fontFamily: FONTS.body,
               textTransform: "uppercase", letterSpacing: "0.06em",
-            }}>
-              {ex.severity || "—"}
-            </span>
-            <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: FONTS.body }}>
-              {ex.visitsToDate || 0} VTD
-            </span>
+            }}>{ex.severity || "—"}</span>
+            <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: FONTS.body }}>{ex.visitsToDate || 0} VTD</span>
           </div>
         </div>
 
-        {/* Pain */}
         {ex.painCurrent && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4, fontFamily: FONTS.body }}>Pain</div>
@@ -388,7 +403,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* ROM table */}
         {hasROM && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>ROM</div>
@@ -412,9 +426,7 @@ function EvidenceZone({ kase }) {
                         {typeof val === "number" ? `${val}°` : val}
                         {pctDef !== null && pctDef > 5 && <span style={{ fontSize: 10, color: "#dc2626", marginLeft: 4 }}>{pctDef}%↓</span>}
                       </td>
-                      <td style={{ padding: "5px 6px", color: "#9ca3af", fontFamily: FONTS.body }}>
-                        {norm != null ? `${norm}°` : "—"}
-                      </td>
+                      <td style={{ padding: "5px 6px", color: "#9ca3af", fontFamily: FONTS.body }}>{norm != null ? `${norm}°` : "—"}</td>
                     </tr>
                   );
                 })}
@@ -423,7 +435,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* MMT table */}
         {hasMMT && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>MMT</div>
@@ -432,9 +443,7 @@ function EvidenceZone({ kase }) {
                 {Object.entries(ex.mmt).map(([muscle, grade]) => (
                   <tr key={muscle} style={{ borderBottom: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "5px 6px", color: "#374151", fontFamily: FONTS.body }}>{muscle}</td>
-                    <td style={{ padding: "5px 6px", fontWeight: 600, fontFamily: "monospace", color: parseFloat(grade) < 4 ? "#dc2626" : "#1e293b" }}>
-                      {grade}
-                    </td>
+                    <td style={{ padding: "5px 6px", fontWeight: 600, fontFamily: "monospace", color: parseFloat(grade) < 4 ? "#dc2626" : "#1e293b" }}>{grade}</td>
                   </tr>
                 ))}
               </tbody>
@@ -442,7 +451,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* Functional outcome */}
         {ex.functionalOutcomeScore && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4, fontFamily: FONTS.body }}>Outcome Score</div>
@@ -450,7 +458,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* Functional limitations */}
         {ex.functionalLimitations && ex.functionalLimitations.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Functional Limitations</div>
@@ -463,7 +470,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* Goals */}
         {ex.goals && ex.goals.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>
@@ -483,7 +489,6 @@ function EvidenceZone({ kase }) {
           </div>
         )}
 
-        {/* Doc quality chips */}
         {ex.documentationQuality && Object.keys(ex.documentationQuality).length > 0 && (
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Doc Quality</div>
@@ -500,8 +505,7 @@ function EvidenceZone({ kase }) {
                 return (
                   <span key={key} style={{
                     fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
-                    background: val ? "#dcfce7" : "#fee2e2",
-                    color: val ? "#166534" : "#991b1b",
+                    background: val ? "#dcfce7" : "#fee2e2", color: val ? "#166534" : "#991b1b",
                     fontFamily: FONTS.body, letterSpacing: "0.04em",
                   }}>
                     {val ? "✓" : "✗"} {label}
@@ -511,7 +515,6 @@ function EvidenceZone({ kase }) {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
@@ -539,27 +542,22 @@ function RecommendationZone({ kase, engineState }) {
       <ZoneHeader title="Recommendation" />
       <div style={{ padding: "16px 20px", flex: 1 }}>
 
-        {/* Engine offline banner */}
         {kase.isLive && engineState === "offline" && (
           <div style={{
             marginBottom: 12, padding: "8px 12px", borderRadius: 6,
             background: "#fef2f2", border: "1px solid #fca5a5",
             display: "flex", alignItems: "center", gap: 8,
           }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#991b1b", fontFamily: FONTS.body }}>
-              ● Engine Offline
-            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#991b1b", fontFamily: FONTS.body }}>● Engine Offline</span>
             <span style={{ fontSize: 11, color: "#dc2626", fontFamily: FONTS.body }}>
               Showing determination from prior form review. Full contract unavailable.
             </span>
           </div>
         )}
 
-        {/* Determination badge */}
         <div style={{
           padding: "12px 16px", borderRadius: 8, border: `1px solid ${dc.border}`,
-          background: dc.bg, marginBottom: 16,
-          boxShadow: `0 0 0 3px ${dc.glow}`,
+          background: dc.bg, marginBottom: 16, boxShadow: `0 0 0 3px ${dc.glow}`,
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: dc.text, fontFamily: FONTS.heading, lineHeight: 1.3 }}>
             {rec.determination}
@@ -588,7 +586,6 @@ function RecommendationZone({ kase, engineState }) {
           )}
         </div>
 
-        {/* Domain findings */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>Three Domain Assessment</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -618,7 +615,6 @@ function RecommendationZone({ kase, engineState }) {
           </div>
         </div>
 
-        {/* Criteria bullets */}
         {rec.criteria && rec.criteria.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Criteria</div>
@@ -631,7 +627,6 @@ function RecommendationZone({ kase, engineState }) {
           </div>
         )}
 
-        {/* CPG reference */}
         {cpg && (
           <div style={{ marginBottom: 16, padding: "8px 10px", background: "#eff6ff", borderRadius: 6, border: "1px solid #bfdbfe" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 2 }}>CPG Reference</div>
@@ -641,7 +636,6 @@ function RecommendationZone({ kase, engineState }) {
           </div>
         )}
 
-        {/* Rationale */}
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6, fontFamily: FONTS.body }}>Rationale</div>
           <div style={{
@@ -651,14 +645,13 @@ function RecommendationZone({ kase, engineState }) {
             {rec.rationale}
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
 // ── ACTION BUTTON ──────────────────────────────────────────────────────────────
-function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, style }) {
+function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -671,9 +664,7 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, style }) 
         border: `1.5px solid ${disabled ? "#e2e8f0" : border}`,
         borderRadius: 8, cursor: disabled ? "not-allowed" : "pointer",
         background: disabled ? "#f8fafc" : hover ? bg + "dd" : bg,
-        transition: "all 0.12s",
-        opacity: disabled ? 0.45 : 1,
-        ...style,
+        transition: "all 0.12s", opacity: disabled ? 0.45 : 1,
       }}
     >
       <span style={{
@@ -689,9 +680,9 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, style }) 
 }
 
 // ── DETERMINATION ZONE ─────────────────────────────────────────────────────────
-function DeterminationZone({ kase, queue, cursor, total, decisions, actionState, partialVisits,
-  onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm, onCancelAction,
-  onNavigate, onToggleDocs, showDocs }) {
+function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, actionState,
+  partialVisits, onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm,
+  onCancelAction, onNavigate, onToggleDocs, showDocs }) {
 
   const decided    = decisions[kase.caseId];
   const rec        = kase.contract?.recommendation;
@@ -710,7 +701,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
       <ZoneHeader title="Determination" />
       <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
 
-        {/* Decided overlay */}
+        {/* Decided overlay with audit status */}
         {decided && (
           <div style={{
             padding: "12px 14px", borderRadius: 8, border: `1.5px solid ${decColor.border}`,
@@ -727,10 +718,23 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
             <div style={{ fontSize: 10, color: decColor.text, marginTop: 4, fontFamily: FONTS.body, opacity: 0.6 }}>
               Recorded — use J/K to navigate
             </div>
+            {auditState && (
+              <div style={{ marginTop: 6 }}>
+                {auditState === "recording" && (
+                  <span style={{ fontSize: 9, color: NAVY, fontFamily: FONTS.body }}>● Saving to audit log...</span>
+                )}
+                {auditState === "recorded" && (
+                  <span style={{ fontSize: 9, color: "#166534", fontWeight: 700, fontFamily: FONTS.body }}>✓ Audit logged</span>
+                )}
+                {auditState === "error" && (
+                  <span style={{ fontSize: 9, color: "#991b1b", fontFamily: FONTS.body }}>✗ Audit log error</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Deny confirmation banner */}
+        {/* Deny confirmation */}
         {actionState === "deny_confirm" && !decided && (
           <div style={{
             padding: "12px 14px", borderRadius: 8, border: "1.5px solid #fca5a5",
@@ -757,7 +761,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
           </div>
         )}
 
-        {/* Partial input form */}
+        {/* Partial input */}
         {actionState === "partial_input" && !decided && (
           <div style={{
             padding: "12px 14px", borderRadius: 8, border: "1.5px solid #fcd34d",
@@ -779,8 +783,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
                 placeholder={String(rec?.approvedVisits ?? "")}
                 style={{
                   flex: 1, padding: "7px 10px", borderRadius: 6, border: "1.5px solid #fcd34d",
-                  fontSize: 13, fontFamily: FONTS.body, outline: "none",
-                  background: "#fff", color: "#1e293b",
+                  fontSize: 13, fontFamily: FONTS.body, outline: "none", background: "#fff", color: "#1e293b",
                 }}
               />
               <button onClick={onPartialSubmit} style={{
@@ -790,40 +793,28 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
               }}>Record</button>
               <button onClick={onCancelAction} style={{
                 padding: "7px 10px", borderRadius: 6, border: "1.5px solid #e2e8f0",
-                background: "#fff", color: "#374151", fontSize: 12,
-                cursor: "pointer", fontFamily: FONTS.body,
+                background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
               }}>Esc</button>
             </div>
           </div>
         )}
 
-        {/* Action buttons — only when contract loaded and not yet decided */}
+        {/* Action buttons */}
         {!decided && actionState === "idle" && kase.contract && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <ActionBtn kbd="A" label="Approve" color="#166534" bg="#dcfce7" border="#86efac"
-              onClick={() => onAction("approve")} />
-            <ActionBtn kbd="P" label="Partial Denial" color="#92400e" bg="#fef3c7" border="#fcd34d"
-              onClick={() => onAction("partial")} />
-            <ActionBtn kbd="D" label="Full Denial" color="#991b1b" bg="#fee2e2" border="#fca5a5"
-              onClick={() => onAction("deny")} />
-            <ActionBtn kbd="N" label="Pend" color="#1d4ed8" bg="#eff6ff" border="#93c5fd"
-              onClick={() => onAction("pend")} />
+            <ActionBtn kbd="A" label="Approve"       color="#166534" bg="#dcfce7" border="#86efac" onClick={() => onAction("approve")} />
+            <ActionBtn kbd="P" label="Partial Denial" color="#92400e" bg="#fef3c7" border="#fcd34d" onClick={() => onAction("partial")} />
+            <ActionBtn kbd="D" label="Full Denial"    color="#991b1b" bg="#fee2e2" border="#fca5a5" onClick={() => onAction("deny")} />
+            <ActionBtn kbd="N" label="Pend"           color="#1d4ed8" bg="#eff6ff" border="#93c5fd" onClick={() => onAction("pend")} />
           </div>
         )}
 
-        {/* Loading placeholder for action area */}
         {!decided && !kase.contract && actionState === "idle" && (
-          <div style={{
-            padding: "14px", borderRadius: 8, border: "1px dashed #e2e8f0",
-            background: "#f8fafc", textAlign: "center",
-          }}>
-            <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: FONTS.body }}>
-              Awaiting engine...
-            </span>
+          <div style={{ padding: "14px", borderRadius: 8, border: "1px dashed #e2e8f0", background: "#f8fafc", textAlign: "center" }}>
+            <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: FONTS.body }}>Awaiting engine...</span>
           </div>
         )}
 
-        {/* Divider */}
         <div style={{ borderTop: "1px solid #f1f5f9" }} />
 
         {/* Document toggle */}
@@ -832,8 +823,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0",
-            background: showDocs ? NAVY : "#fff", cursor: "pointer",
-            transition: "all 0.15s",
+            background: showDocs ? NAVY : "#fff", cursor: "pointer", transition: "all 0.15s",
           }}
         >
           <span style={{ fontSize: 12, fontWeight: 600, color: showDocs ? "#fff" : "#374151", fontFamily: FONTS.body }}>
@@ -842,7 +832,6 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
           <span style={{ fontSize: 10, marginLeft: "auto", color: showDocs ? "rgba(255,255,255,0.6)" : "#9ca3af", fontFamily: FONTS.body }}>V</span>
         </button>
 
-        {/* Divider */}
         <div style={{ borderTop: "1px solid #f1f5f9" }} />
 
         {/* Queue list */}
@@ -862,8 +851,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
                   style={{
                     padding: "8px 10px", borderRadius: 7, cursor: "pointer",
                     border: `1.5px solid ${isCurrent ? NAVY_MID : "#e2e8f0"}`,
-                    background: isCurrent ? "#eff6ff" : "#fff",
-                    transition: "all 0.1s",
+                    background: isCurrent ? "#eff6ff" : "#fff", transition: "all 0.1s",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -878,8 +866,8 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, actionState,
                     {dc2 && (
                       <span style={{
                         fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
-                        background: dc2.bg, color: dc2.text, fontFamily: FONTS.body, flexShrink: 0,
-                        border: `1px solid ${dc2.border}`,
+                        background: dc2.bg, color: dc2.text, border: `1px solid ${dc2.border}`,
+                        fontFamily: FONTS.body, flexShrink: 0,
                       }}>
                         {dec.determination.split(" ")[0].toUpperCase()}
                       </span>
@@ -905,32 +893,19 @@ function DocumentsPanel({ kase, onClose }) {
       display: "flex", flexDirection: "column", zIndex: 100,
       animation: "rn-slidein 0.18s ease-out",
     }}>
-      <div style={{
-        padding: "14px 20px", background: NAVY,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
+      <div style={{ padding: "14px 20px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>Documents</span>
         <button onClick={onClose} style={{
           background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)",
-          borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12,
-          cursor: "pointer", fontFamily: FONTS.body,
+          borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
         }}>Esc / V</button>
       </div>
       <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
         {kase.documents && kase.documents.length > 0 ? kase.documents.map((doc, i) => (
-          <div key={i} style={{
-            padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0",
-            background: "#f8fafc", marginBottom: 10,
-          }}>
+          <div key={i} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 4 }}>{doc.name}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>
-              {doc.type}{doc.date ? ` · ${doc.date}` : ""}
-            </div>
-            <div style={{
-              marginTop: 10, padding: "8px 10px", background: "#f0f4f8", borderRadius: 6,
-              fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, textAlign: "center",
-              border: "1px dashed #cbd5e1",
-            }}>
+            <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>{doc.type}{doc.date ? ` · ${doc.date}` : ""}</div>
+            <div style={{ marginTop: 10, padding: "8px 10px", background: "#f0f4f8", borderRadius: 6, fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, textAlign: "center", border: "1px dashed #cbd5e1" }}>
               PDF viewer available in Phase 6
             </div>
           </div>
@@ -944,20 +919,114 @@ function DocumentsPanel({ kase, onClose }) {
   );
 }
 
+// ── AUDIT LOG PANEL ────────────────────────────────────────────────────────────
+function AuditLogPanel({ events, loading, onClose, onRefresh }) {
+  return (
+    <div style={{
+      position: "fixed", top: 0, right: 0, bottom: 0, width: 420,
+      background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
+      display: "flex", flexDirection: "column", zIndex: 100,
+      animation: "rn-slidein 0.18s ease-out",
+    }}>
+      <div style={{ padding: "14px 20px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>Audit Log</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onRefresh} style={{
+            background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.25)",
+            borderRadius: 5, padding: "3px 10px", color: "rgba(255,255,255,0.8)", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
+          }}>Refresh</button>
+          <button onClick={onClose} style={{
+            background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)",
+            borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
+          }}>Close</button>
+        </div>
+      </div>
+      <div style={{ padding: "12px 20px 16px", overflowY: "auto", flex: 1 }}>
+        {loading ? (
+          <LoadingPulse label="Loading audit log..." />
+        ) : events === null ? (
+          <div style={{ padding: "24px 0", textAlign: "center" }}>
+            <div style={{ color: "#991b1b", fontSize: 13, fontFamily: FONTS.body }}>Failed to load audit log</div>
+            <button onClick={onRefresh} style={{ marginTop: 10, padding: "5px 14px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>
+              Retry
+            </button>
+          </div>
+        ) : events.length === 0 ? (
+          <div style={{ padding: "24px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: FONTS.body, fontStyle: "italic" }}>
+            No audit events recorded yet. Make a determination in the cockpit to start the trail.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {events.map((evt, i) => {
+              const dc        = detColors(evt.determination);
+              const isOverride = evt.is_override;
+              const isSynth   = evt.is_synthetic;
+              const engineDiffers = evt.engine_determination && evt.engine_determination !== evt.determination;
+              return (
+                <div key={evt.id || i} style={{
+                  padding: "10px 14px", borderRadius: 8, marginBottom: 8,
+                  border: `1px solid ${isOverride ? "#fcd34d" : "#e2e8f0"}`,
+                  background: isOverride ? "#fffbeb" : "#f8fafc",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
+                      background: dc.bg, color: dc.text, border: `1px solid ${dc.border}`,
+                      fontFamily: FONTS.body, letterSpacing: "0.04em", flexShrink: 0,
+                    }}>
+                      {evt.determination.split(" ")[0].toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {evt.case_id}
+                    </span>
+                    {isOverride && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: "#92400e", fontFamily: FONTS.body, flexShrink: 0 }}>OVERRIDE</span>
+                    )}
+                    {isSynth && (
+                      <span style={{ fontSize: 9, color: "#9ca3af", fontFamily: FONTS.body, flexShrink: 0 }}>SYNTH</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#374151", fontFamily: FONTS.body, marginBottom: 4 }}>
+                    {evt.determination}
+                    {evt.approved_visits != null && ` · ${evt.approved_visits} visits`}
+                  </div>
+                  {engineDiffers && (
+                    <div style={{ fontSize: 11, color: "#92400e", fontFamily: FONTS.body, marginBottom: 4 }}>
+                      Engine rec: {evt.engine_determination}
+                      {evt.engine_confidence ? ` (${evt.engine_confidence} conf.)` : ""}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "#6b7280", fontFamily: FONTS.body }}>{evt.reviewer_email}</span>
+                    <span style={{ fontSize: 10, color: "#9ca3af", fontFamily: FONTS.body }}>{fmtDateTime(evt.recorded_at)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── COCKPIT ROOT ───────────────────────────────────────────────────────────────
 export default function Cockpit({ user, onBack, liveCase }) {
   const [cursor, setCursor]               = useState(0);
   const [decisions, setDecisions]         = useState({});
-  const [actionState, setActionState]     = useState("idle"); // idle | deny_confirm | partial_input
+  const [actionState, setActionState]     = useState("idle");
   const [partialVisits, setPartialVisits] = useState("");
   const [showDocs, setShowDocs]           = useState(false);
   const [liveContract, setLiveContract]   = useState(null);
-  const [engineState, setEngineState]     = useState("idle"); // idle | loading | ok | offline
+  const [engineState, setEngineState]     = useState("idle");
+  // Phase 4: audit trail
+  const [auditStates, setAuditStates]     = useState({}); // caseId → "recording"|"recorded"|"error"
+  const [showAuditLog, setShowAuditLog]   = useState(false);
+  const [auditLog, setAuditLog]           = useState([]);
+  const [auditLogLoading, setAuditLogLoading] = useState(false);
 
-  // Stable caseId for effect dependency
   const liveCaseId = liveCase?.caseId ?? null;
 
-  // Build dynamic queue: live case (if any) prepended to synthetic fixture
   const liveCaseEntry = liveCase ? {
     caseId:      liveCase.caseId,
     memberName:  liveCase.memberName  || "Live Case",
@@ -974,17 +1043,14 @@ export default function Cockpit({ user, onBack, liveCase }) {
   const queue = liveCaseEntry ? [liveCaseEntry, ...SYNTH_QUEUE] : [...SYNTH_QUEUE];
   const kase  = queue[cursor];
 
-  // Engine call — fires when a new live caseId arrives
+  // Engine call
   useEffect(() => {
     if (!liveCase || !liveCaseId) return;
-
     setCursor(0);
     setActionState("idle");
     setLiveContract(null);
     setEngineState("loading");
-
     const controller = new AbortController();
-
     fetch(`${API_BASE}/v1/evaluate`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
@@ -1003,27 +1069,57 @@ export default function Cockpit({ user, onBack, liveCase }) {
         setLiveContract(buildFallbackContract(liveCase.metrics, liveCase.ruling));
         setEngineState("offline");
       });
-
     return () => controller.abort();
   }, [liveCaseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch audit log when panel opens
+  useEffect(() => {
+    if (showAuditLog) fetchAuditEvents(setAuditLog, setAuditLogLoading);
+  }, [showAuditLog]);
+
   const recordDecision = useCallback((determination, approvedVisits) => {
+    const caseId = kase.caseId;
     setDecisions(prev => ({
       ...prev,
-      [kase.caseId]: { determination, approvedVisits, recordedAt: new Date().toISOString() },
+      [caseId]: { determination, approvedVisits, recordedAt: new Date().toISOString() },
     }));
     setActionState("idle");
     setPartialVisits("");
-  }, [kase]);
+
+    // Fire audit event best-effort
+    const token = localStorage.getItem("cogentus_token") || "";
+    if (token) {
+      const rec        = kase.contract?.recommendation;
+      const isOverride = rec ? rec.determination !== determination : false;
+      setAuditStates(prev => ({ ...prev, [caseId]: "recording" }));
+      fetch(`${API_BASE}/v1/audit-event`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({
+          caseId,
+          determination,
+          approvedVisits,
+          engineDetermination:   rec?.determination          || null,
+          engineApprovedVisits:  rec?.approvedVisits         ?? null,
+          engineConfidence:      rec?.confidence             || null,
+          autoApprovalEligible:  rec?.autoApprovalEligible  ?? null,
+          isOverride,
+          discipline:  kase.discipline  || null,
+          reviewType:  kase.reviewType  || null,
+          isSynthetic: !kase.isLive,
+        }),
+      })
+        .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(() => setAuditStates(prev => ({ ...prev, [caseId]: "recorded" })))
+        .catch(() => setAuditStates(prev => ({ ...prev, [caseId]: "error" })));
+    }
+  }, [kase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAction = useCallback((type) => {
     if (decisions[kase.caseId] || !kase.contract) return;
     const rec = kase.contract.recommendation;
     if (type === "approve") {
-      recordDecision(
-        rec.determination.startsWith("Approved") ? rec.determination : "Approved",
-        rec.approvedVisits ?? 0
-      );
+      recordDecision(rec.determination.startsWith("Approved") ? rec.determination : "Approved", rec.approvedVisits ?? 0);
     } else if (type === "partial") {
       setPartialVisits(String(rec.approvedVisits ?? ""));
       setActionState("partial_input");
@@ -1054,16 +1150,12 @@ export default function Cockpit({ user, onBack, liveCase }) {
     const handler = (e) => {
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
-
       const key = e.key.toLowerCase();
-
-      if (key === "escape") { setActionState("idle"); setShowDocs(false); return; }
-      if (key === "v")      { setShowDocs(s => !s); return; }
+      if (key === "escape") { setActionState("idle"); setShowDocs(false); setShowAuditLog(false); return; }
+      if (key === "v") { setShowDocs(s => !s); return; }
       if (key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
       if (key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
-
-      if (!kase.contract || decisions[kase.caseId]) return; // loading or already decided
-
+      if (!kase.contract || decisions[kase.caseId]) return;
       if (key === "a" && actionState === "idle") { handleAction("approve"); return; }
       if (key === "p" && actionState === "idle") { handleAction("partial"); return; }
       if (key === "n" && actionState === "idle") { handleAction("pend");    return; }
@@ -1080,10 +1172,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
   const decidedCount = Object.keys(decisions).length;
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      background: NAVY_DARK, fontFamily: FONTS.body,
-    }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: NAVY_DARK, fontFamily: FONTS.body }}>
 
       {/* ── Top bar ── */}
       <div style={{
@@ -1093,7 +1182,6 @@ export default function Cockpit({ user, onBack, liveCase }) {
         padding: "0 20px", gap: 20, flexShrink: 0,
         boxShadow: "0 1px 8px rgba(0,0,0,0.3)",
       }}>
-        {/* Logo + nav */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 16, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading, letterSpacing: "-0.02em" }}>CogentCR</span>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.2)" }} />
@@ -1107,9 +1195,19 @@ export default function Cockpit({ user, onBack, liveCase }) {
             borderRadius: 5, padding: "3px 10px", color: "#fff",
             fontSize: 11, fontFamily: FONTS.body, fontWeight: 700,
           }}>Cockpit</div>
+          <button
+            onClick={() => { setShowAuditLog(s => !s); setShowDocs(false); }}
+            style={{
+              background: showAuditLog ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 5, padding: "3px 10px", color: showAuditLog ? "#fff" : "rgba(255,255,255,0.65)",
+              fontSize: 11, cursor: "pointer", fontFamily: FONTS.body, fontWeight: 600,
+            }}
+          >
+            Audit Log
+          </button>
         </div>
 
-        {/* Case ID + engine badge */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontFamily: FONTS.body }}>
             {cursor + 1} / {queue.length}
@@ -1126,12 +1224,8 @@ export default function Cockpit({ user, onBack, liveCase }) {
           {kase.isLive && (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
-              background: engineState === "ok"      ? "#dcfce7"
-                        : engineState === "offline" ? "#fee2e2"
-                        :                             "#fef3c7",
-              color:      engineState === "ok"      ? "#166534"
-                        : engineState === "offline" ? "#991b1b"
-                        :                             "#92400e",
+              background: engineState === "ok" ? "#dcfce7" : engineState === "offline" ? "#fee2e2" : "#fef3c7",
+              color:      engineState === "ok" ? "#166534" : engineState === "offline" ? "#991b1b" : "#92400e",
               fontFamily: FONTS.body, letterSpacing: "0.04em",
             }}>
               {engineState === "loading" ? "Engine..." : engineState === "ok" ? "● Live" : "● Offline"}
@@ -1139,7 +1233,6 @@ export default function Cockpit({ user, onBack, liveCase }) {
           )}
         </div>
 
-        {/* Keyboard hints */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 16, alignItems: "center" }}>
           {decidedCount > 0 && (
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", fontFamily: FONTS.body }}>
@@ -1167,15 +1260,12 @@ export default function Cockpit({ user, onBack, liveCase }) {
 
       {/* ── Three-zone body ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", gap: 1 }}>
-
         <div style={{ flex: "0 0 34%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <EvidenceZone kase={kase} />
         </div>
-
         <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <RecommendationZone kase={kase} engineState={engineState} />
         </div>
-
         <div style={{ flex: 1, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <DeterminationZone
             kase={kase}
@@ -1183,6 +1273,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
             cursor={cursor}
             total={queue.length}
             decisions={decisions}
+            auditState={auditStates[kase.caseId]}
             actionState={actionState}
             partialVisits={partialVisits}
             onAction={handleAction}
@@ -1191,13 +1282,21 @@ export default function Cockpit({ user, onBack, liveCase }) {
             onDenyConfirm={handleDenyConfirm}
             onCancelAction={() => setActionState("idle")}
             onNavigate={handleNavigate}
-            onToggleDocs={() => setShowDocs(s => !s)}
+            onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); }}
             showDocs={showDocs}
           />
         </div>
       </div>
 
       {showDocs && <DocumentsPanel kase={kase} onClose={() => setShowDocs(false)} />}
+      {showAuditLog && (
+        <AuditLogPanel
+          events={auditLog}
+          loading={auditLogLoading}
+          onClose={() => setShowAuditLog(false)}
+          onRefresh={() => fetchAuditEvents(setAuditLog, setAuditLogLoading)}
+        />
+      )}
     </div>
   );
 }
