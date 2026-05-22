@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import Cockpit from "./components/Cockpit";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -1115,7 +1116,7 @@ function App() {
   });
 
   // View state
-  const [view, setView] = useState("reviews"); // "reviews" | "dashboard"
+  const [view, setView] = useState("reviews"); // "reviews" | "dashboard" | "cockpit"
 
   // Review form state
   const [reviewType, setReviewType]           = useState("initial");
@@ -1171,6 +1172,11 @@ function App() {
         onBack={() => setView("reviews")}
       />
     );
+  }
+
+  // Cockpit view
+  if (view === "cockpit") {
+    return <Cockpit user={user} onBack={() => setView("reviews")} />;
   }
 
   const buildFormData = () => {
@@ -1384,7 +1390,7 @@ function App() {
             </div>
           </div>
 
-          {/* Reviewer info + dashboard + logout */}
+          {/* Reviewer info + nav + logout */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               onClick={() => setView("dashboard")}
@@ -1401,6 +1407,22 @@ function App() {
               }}
             >
               Dashboard
+            </button>
+            <button
+              onClick={() => setView("cockpit")}
+              style={{
+                background: "none",
+                border: "1px solid #cbd5e1",
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#1a3a5c",
+                cursor: "pointer",
+                fontFamily: '"DM Sans", sans-serif',
+              }}
+            >
+              Cockpit
             </button>
             <span style={{ fontSize: 13, color: "#64748b" }}>
               {user.name || user.email}
