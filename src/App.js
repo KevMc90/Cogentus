@@ -1106,6 +1106,139 @@ function Dashboard({ user, token, onAuthError, onBack }) {
   );
 }
 
+// --- SubmitCaseView ---------------------------------------------------------
+function SubmitCaseView({ user, token, plans, onBack }) {
+  const [providerName, setProviderName]   = useState("");
+  const [providerNpi, setProviderNpi]     = useState("");
+  const [memberName, setMemberName]       = useState("");
+  const [memberId, setMemberId]           = useState("");
+  const [dob, setDob]                     = useState("");
+  const [discipline, setDiscipline]       = useState("PT");
+  const [diagCodes, setDiagCodes]         = useState("");
+  const [requestedVisits, setRequestedVisits] = useState("");
+  const [planId, setPlanId]               = useState("");
+  const [docList, setDocList]             = useState("");
+  const [providerNotes, setProviderNotes] = useState("");
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState("");
+  const [submitted, setSubmitted]         = useState(null);
+
+  const parsedDiags = diagCodes.split(",").map(s => s.trim()).filter(Boolean);
+  const parsedDocs  = docList.split("\n").map(s => s.trim()).filter(Boolean);
+  const completeness = Math.round([
+    !!providerName.trim(), !!memberName.trim(), !!memberId.trim(), !!dob.trim(),
+    !!discipline, parsedDiags.length > 0, parseInt(requestedVisits, 10) > 0, parsedDocs.length > 0,
+  ].filter(Boolean).length / 8 * 100);
+
+  const meterColor = completeness >= 80 ? "#22c55e" : completeness >= 50 ? "#f59e0b" : "#ef4444";
+
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/v1/submit`, {
+        providerName: providerName.trim() || null, providerNpi: providerNpi.trim() || null,
+        memberName: memberName.trim() || null, memberId: memberId.trim() || null,
+        dob: dob.trim() || null, discipline,
+        diagnosisCodes: parsedDiags, requestedVisits: parseInt(requestedVisits, 10) || null,
+        planId: planId || null, documentList: parsedDocs,
+        providerNotes: providerNotes.trim() || null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setSubmitted(res.data);
+    } catch (err) {
+      setError(err?.response?.data?.error || "Submission failed. Please try again.");
+    } finally { setLoading(false); }
+  };
+
+  const card = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, marginBottom: 20, boxShadow: "0 2px 12px rgba(0,0,0,0.07)", overflow: "hidden" };
+  const fieldWrapS = { marginBottom: 16 };
+  const labelS = (t) => (<label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.03em", fontFamily: '"DM Sans", sans-serif' }}>{t}</label>);
+  const inputS = { width: "100%", border: "1px solid #e2e8f0", borderRadius: 8, padding: "9px 13px", fontSize: 14, color: "#0f172a", background: "#f8fafc", outline: "none", boxSizing: "border-box", fontFamily: '"Inter", sans-serif' };
+
+  if (submitted) {
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ maxWidth: 480, width: "100%", background: "#fff", borderRadius: 16, padding: "40px 36px", boxShadow: "0 4px 24px rgba(0,0,0,0.09)", textAlign: "center" }}>
+          <div style={{ width: 52, height: 52, background: "#dcfce7", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 24 }}>✓</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 22, fontWeight: 700, color: "#166534", fontFamily: '"DM Sans", sans-serif' }}>Submission Received</h2>
+          <p style={{ margin: "0 0 20px", color: "#64748b", fontSize: 14 }}>Your prior auth request has been submitted for review.</p>
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px 20px", marginBottom: 24, textAlign: "left" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6, fontFamily: '"DM Sans", sans-serif' }}>Submission ID</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3a5c", fontFamily: "monospace" }}>{submitted.submissionId}</div>
+            <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Completeness</div>
+            <div style={{ height: 6, background: "#e2e8f0", borderRadius: 3 }}>
+              <div style={{ height: "100%", width: `${submitted.completenessScore}%`, background: meterColor, borderRadius: 3 }} />
+            </div>
+            <div style={{ fontSize: 12, color: "#374151", marginTop: 4 }}>{submitted.completenessScore}% complete</div>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onBack} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Back to Reviews</button>
+            <button onClick={() => setSubmitted(null)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)", fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer" }}>Submit Another</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%)", padding: "0 0 60px", fontFamily: '"Inter", sans-serif' }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#fff", borderBottom: "1px solid #e2e8f0", boxShadow: "0 1px 8px rgba(0,0,0,0.06)", padding: "0 16px" }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ color: "#fff", fontSize: 17, fontWeight: 700, fontFamily: '"DM Sans", sans-serif' }}>C</span>
+            </div>
+            <span style={{ fontSize: 16, fontWeight: 700, color: "#1a3a5c", fontFamily: '"DM Sans", sans-serif' }}>Submit Prior Auth Request</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 120, height: 6, background: "#e2e8f0", borderRadius: 3 }}>
+              <div style={{ height: "100%", width: `${completeness}%`, background: meterColor, borderRadius: 3, transition: "width 0.2s, background 0.2s" }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: meterColor, width: 36, fontFamily: '"DM Sans", sans-serif' }}>{completeness}%</span>
+            <button onClick={onBack} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "#374151", cursor: "pointer" }}>← Back</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 680, margin: "0 auto", padding: "28px 16px 0" }}>
+        <div style={{ ...card, padding: "24px 28px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", fontFamily: '"DM Sans", sans-serif' }}>Provider Information</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={fieldWrapS}>{labelS("Provider Name *")}<input value={providerName} onChange={e => setProviderName(e.target.value)} placeholder="e.g. Springfield PT Associates" style={inputS} /></div>
+            <div style={fieldWrapS}>{labelS("Provider NPI")}<input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="10-digit NPI" style={inputS} /></div>
+          </div>
+        </div>
+
+        <div style={{ ...card, padding: "24px 28px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", fontFamily: '"DM Sans", sans-serif' }}>Member Information</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div style={fieldWrapS}>{labelS("Member Name *")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last" style={inputS} /></div>
+            <div style={fieldWrapS}>{labelS("Member ID *")}<input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="MBR-XXXXX" style={inputS} /></div>
+            <div style={fieldWrapS}>{labelS("Date of Birth *")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
+          </div>
+        </div>
+
+        <div style={{ ...card, padding: "24px 28px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", fontFamily: '"DM Sans", sans-serif' }}>Clinical Details</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={fieldWrapS}>{labelS("Discipline *")}<select value={discipline} onChange={e => setDiscipline(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="PT">PT</option><option value="OT">OT</option><option value="ST">ST</option></select></div>
+            <div style={fieldWrapS}>{labelS("Requested Visits *")}<input type="number" min="0" value={requestedVisits} onChange={e => setRequestedVisits(e.target.value)} placeholder="e.g. 16" style={inputS} /></div>
+            <div style={fieldWrapS}>{labelS("Insurance Plan")}<select value={planId} onChange={e => setPlanId(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="">— Select Plan —</option>{plans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>)}</select></div>
+          </div>
+          <div style={fieldWrapS}>{labelS("Diagnosis Codes * (comma-separated)")}<input value={diagCodes} onChange={e => setDiagCodes(e.target.value)} placeholder="e.g. M25.561, M75.1" style={inputS} /></div>
+          <div style={fieldWrapS}>{labelS("Document List * (one filename per line)")}<textarea value={docList} onChange={e => setDocList(e.target.value)} placeholder={"IE_Patient_05202026.pdf\nScript_Patient_05182026.pdf"} rows={3} style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} /></div>
+          <div style={fieldWrapS}>{labelS("Provider Notes")}<textarea value={providerNotes} onChange={e => setProviderNotes(e.target.value)} placeholder="Clinical context, urgency, history — anything that helps the reviewer." rows={3} style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} /></div>
+        </div>
+
+        {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 7, padding: "10px 14px", color: "#991b1b", fontSize: 13, marginBottom: 16 }}>{error}</div>}
+
+        <button onClick={handleSubmit} disabled={loading} style={{ background: loading ? "#94a3b8" : "linear-gradient(135deg, #1a3a5c 0%, #2d5a8e 100%)", color: "#fff", border: "none", borderRadius: 8, padding: "12px 32px", fontSize: 14, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", fontFamily: '"DM Sans", sans-serif', boxShadow: loading ? "none" : "0 2px 10px rgba(26,58,92,0.25)" }}>
+          {loading ? "Submitting..." : `Submit Request (${completeness}% complete)`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -1191,6 +1324,11 @@ function App() {
   // Cockpit view
   if (view === "cockpit") {
     return <Cockpit user={user} onBack={() => setView("reviews")} liveCase={pendingCockpitCase} />;
+  }
+
+  // Submit view
+  if (view === "submit") {
+    return <SubmitCaseView user={user} token={token} plans={plans} onBack={() => setView("reviews")} />;
   }
 
   const buildFormData = () => {
@@ -1424,19 +1562,15 @@ function App() {
             </button>
             <button
               onClick={() => setView("cockpit")}
-              style={{
-                background: "none",
-                border: "1px solid #cbd5e1",
-                borderRadius: 6,
-                padding: "5px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#1a3a5c",
-                cursor: "pointer",
-                fontFamily: '"DM Sans", sans-serif',
-              }}
+              style={{ background: "none", border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "#1a3a5c", cursor: "pointer", fontFamily: '"DM Sans", sans-serif' }}
             >
               Cockpit
+            </button>
+            <button
+              onClick={() => setView("submit")}
+              style={{ background: "none", border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "#1a3a5c", cursor: "pointer", fontFamily: '"DM Sans", sans-serif' }}
+            >
+              Submit Case
             </button>
             <span style={{ fontSize: 13, color: "#64748b" }}>
               {user.name || user.email}

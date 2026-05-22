@@ -179,6 +179,43 @@ const SYNTH_QUEUE = [
   },
 ];
 
+// ── SUBMISSION CONTRACT ────────────────────────────────────────────────────────
+function buildSubmissionContract(sub) {
+  const diags = sub.diagnosis_codes || [];
+  return {
+    extraction: {
+      rom: {}, mmt: {}, painCurrent: null, functionalOutcomeScore: null,
+      goals: [], poc: null,
+      diagnosisCodes:       diags,
+      primaryDiagnosisCode: diags[0] || null,
+      primaryDiagnosis:     null,
+      requestedVisits:      sub.requested_visits || null,
+      requestedFrequency:   null, severity: null, functionalLimitations: [],
+      documentationQuality: {}, sopIndicators: [],
+      goalsTotal: 0, goalsMet: null, visitsToDate: 0,
+    },
+    assessment: {
+      d1: { finding: "PENDING_REVIEW", reasoning: "Provider submission — manual document review required." },
+      d2: { finding: "PENDING_REVIEW", supportedFreq: null, supportedDuration: null, supportedVisits: null, pocMaxVisits: null, reasoning: "" },
+      d3: { finding: "PENDING_REVIEW", gaps: [], notes: ["Documents listed but not yet extracted."] },
+    },
+    recommendation: {
+      determination: "Pend",
+      approvedVisits: 0, frequency: null, durationWeeks: null,
+      criteria: [
+        `Provider: ${sub.provider_name || "Unknown"}`,
+        `Requested: ${sub.requested_visits || 0} visits`,
+        `Dx: ${diags.join(", ") || "Not specified"}`,
+        "Manual document review required.",
+      ],
+      rationale: `Provider submission from ${sub.provider_name || "unknown provider"} — pending manual document review. Documents listed: ${(sub.document_list || []).join(", ") || "none"}.`,
+      confidence: "low",
+      autoApprovalEligible: false,
+    },
+    cpgInfo: null,
+  };
+}
+
 // ── FALLBACK CONTRACT ──────────────────────────────────────────────────────────
 function buildFallbackContract(metrics, ruling) {
   const m  = metrics  || {};
@@ -250,6 +287,20 @@ async function fetchPlans(setPlans) {
   }
 }
 
+// ── SUBMISSIONS FETCH ──────────────────────────────────────────────────────────
+async function fetchSubmissions(setSubmissions) {
+  const token = localStorage.getItem("cogentus_token") || "";
+  if (!token) return;
+  try {
+    const r = await fetch(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    setSubmissions(data.submissions || []);
+  } catch {
+    setSubmissions([]);
+  }
+}
+
 // ── AUDIT LOG FETCH ────────────────────────────────────────────────────────────
 async function fetchAuditEvents(setAuditLog, setAuditLogLoading) {
   const token = localStorage.getItem("cogentus_token") || "";
@@ -281,7 +332,7 @@ function detColors(determination) {
 }
 
 function domainColors(finding) {
-  if (!finding || finding === "UNKNOWN") return { bg: "#f3f4f6", text: "#374151" };
+  if (!finding || finding === "UNKNOWN" || finding === "PENDING_REVIEW") return { bg: "#f3f4f6", text: "#6b7280" };
   if (finding.startsWith("FULLY") || finding === "COMPLETE") return { bg: "#dcfce7", text: "#166534" };
   if (finding.includes("ESTABLISHED") || finding.includes("ALIGNED")) return { bg: "#dcfce7", text: "#166534" };
   if (finding === "INCOMPLETE" || finding.includes("PARTIALLY")) return { bg: "#fef3c7", text: "#92400e" };
@@ -1035,6 +1086,115 @@ function AuditLogPanel({ events, loading, onClose, onRefresh }) {
   );
 }
 
+// ── SUBMISSIONS PANEL ──────────────────────────────────────────────────────────
+function SubmissionsPanel({ submissions, onClose, onForward, onRefresh }) {
+  const [rmiTargetId, setRmiTargetId] = useState(null);
+  const [rmiText, setRmiText]         = useState("");
+  const [rmiLoading, setRmiLoading]   = useState(false);
+
+  const STATUS = {
+    submitted:   { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe", label: "SUBMITTED" },
+    in_review:   { bg: "#fffbeb", text: "#92400e", border: "#fcd34d", label: "IN REVIEW" },
+    rmi_pending: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa", label: "RMI SENT" },
+    decided:     { bg: "#dcfce7", text: "#166534", border: "#86efac", label: "DECIDED" },
+  };
+
+  const token = localStorage.getItem("cogentus_token") || "";
+
+  const markStatus = async (submissionId, status, rmiRequest) => {
+    setRmiLoading(true);
+    try {
+      await fetch(`${API_BASE}/v1/submissions/${submissionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status, rmiRequest: rmiRequest || undefined }),
+      });
+      onRefresh();
+      setRmiTargetId(null); setRmiText("");
+    } catch { /* best-effort */ } finally { setRmiLoading(false); }
+  };
+
+  return (
+    <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 480, background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.15)", display: "flex", flexDirection: "column", zIndex: 100, animation: "rn-slidein 0.18s ease-out" }}>
+      <div style={{ padding: "14px 20px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>Provider Submissions</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onRefresh} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 5, padding: "3px 10px", color: "rgba(255,255,255,0.8)", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>Refresh</button>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>Close</button>
+        </div>
+      </div>
+      <div style={{ overflowY: "auto", flex: 1, padding: "12px 16px" }}>
+        {submissions.length === 0 ? (
+          <div style={{ padding: "32px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: FONTS.body, fontStyle: "italic" }}>
+            No submissions yet. Providers submit via the "Submit Case" view.
+          </div>
+        ) : submissions.map(sub => {
+          const sc  = STATUS[sub.status] || STATUS.submitted;
+          const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
+          const docs  = Array.isArray(sub.document_list)   ? sub.document_list  : [];
+          const pct   = sub.completeness_score || 0;
+          const mColor = pct >= 80 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444";
+          return (
+            <div key={sub.id} style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${sc.border}`, background: sc.bg, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 3, background: "#fff", color: sc.text, border: `1px solid ${sc.border}`, fontFamily: FONTS.body }}>{sc.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: NAVY, fontFamily: FONTS.heading, flex: 1 }}>{sub.member_name || "Unknown Member"}</span>
+                <span style={{ fontSize: 10, color: "#9ca3af", fontFamily: FONTS.body }}>{sub.discipline} · {fmtDateTime(sub.submitted_at)}</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, marginBottom: 6 }}>
+                <strong>{sub.provider_name || "Unknown Provider"}</strong>
+                {sub.provider_npi && <span style={{ color: "#9ca3af", marginLeft: 6 }}>NPI {sub.provider_npi}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, marginBottom: 6 }}>
+                {diags.length > 0 && <span style={{ fontFamily: "monospace", fontWeight: 700, color: NAVY, marginRight: 8 }}>{diags.join(", ")}</span>}
+                {sub.requested_visits != null && <span>{sub.requested_visits} visits requested</span>}
+                {sub.member_id && <span style={{ color: "#9ca3af", marginLeft: 8 }}>ID: {sub.member_id}</span>}
+              </div>
+              {pct > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2 }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: mColor, borderRadius: 2 }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2, fontFamily: FONTS.body }}>{pct}% complete</div>
+                </div>
+              )}
+              {docs.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3, fontFamily: FONTS.body }}>Documents ({docs.length})</div>
+                  {docs.map((d, i) => <div key={i} style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body }}>· {d}</div>)}
+                </div>
+              )}
+              {sub.provider_notes && <div style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, fontStyle: "italic", marginBottom: 6, padding: "6px 8px", background: "rgba(255,255,255,0.6)", borderRadius: 5 }}>{sub.provider_notes}</div>}
+              {sub.rmi_request && <div style={{ fontSize: 11, color: "#c2410c", fontFamily: FONTS.body, marginBottom: 6, padding: "6px 8px", background: "#fff7ed", borderRadius: 5, border: "1px solid #fed7aa" }}><strong>RMI: </strong>{sub.rmi_request}</div>}
+
+              {/* Actions */}
+              {sub.status !== "decided" && (
+                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                  {sub.status === "submitted" && (
+                    <button onClick={() => markStatus(sub.submission_id, "in_review")} disabled={rmiLoading} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 5, border: "1px solid #fcd34d", background: "#fffbeb", color: "#92400e", cursor: "pointer", fontFamily: FONTS.body }}>Mark In Review</button>
+                  )}
+                  {rmiTargetId !== sub.submission_id ? (
+                    <button onClick={() => { setRmiTargetId(sub.submission_id); setRmiText(""); }} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 5, border: "1px solid #fed7aa", background: "#fff7ed", color: "#c2410c", cursor: "pointer", fontFamily: FONTS.body }}>Request Info</button>
+                  ) : (
+                    <div style={{ width: "100%", marginTop: 4 }}>
+                      <textarea value={rmiText} onChange={e => setRmiText(e.target.value)} placeholder="Describe what additional information is needed..." rows={2} style={{ width: "100%", borderRadius: 6, border: "1px solid #fed7aa", padding: "6px 8px", fontSize: 12, fontFamily: FONTS.body, resize: "vertical", outline: "none", boxSizing: "border-box" }} />
+                      <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                        <button onClick={() => markStatus(sub.submission_id, "rmi_pending", rmiText)} disabled={!rmiText.trim() || rmiLoading} style={{ flex: 1, fontSize: 11, fontWeight: 700, padding: "5px 0", borderRadius: 5, border: "none", background: "#c2410c", color: "#fff", cursor: "pointer", fontFamily: FONTS.body }}>Send RMI</button>
+                        <button onClick={() => { setRmiTargetId(null); setRmiText(""); }} style={{ fontSize: 11, padding: "5px 10px", borderRadius: 5, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", cursor: "pointer", fontFamily: FONTS.body }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => onForward(sub)} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 5, border: `1px solid ${NAVY_MID}`, background: "#eff6ff", color: NAVY_MID, cursor: "pointer", fontFamily: FONTS.body }}>Forward to Cockpit</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── COCKPIT ROOT ───────────────────────────────────────────────────────────────
 export default function Cockpit({ user, onBack, liveCase }) {
   const [cursor, setCursor]               = useState(0);
@@ -1052,6 +1212,10 @@ export default function Cockpit({ user, onBack, liveCase }) {
   // Phase 5: plan config
   const [plans, setPlans]                 = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState(liveCase?.planRuleSet?.planId || null);
+  // Phase 6: provider submissions
+  const [submissions, setSubmissions]       = useState([]);
+  const [submissionCases, setSubmissionCases] = useState([]);
+  const [showSubmissions, setShowSubmissions] = useState(false);
 
   const liveCaseId = liveCase?.caseId ?? null;
 
@@ -1068,7 +1232,11 @@ export default function Cockpit({ user, onBack, liveCase }) {
     isLive:      true,
   } : null;
 
-  const queue = liveCaseEntry ? [liveCaseEntry, ...SYNTH_QUEUE] : [...SYNTH_QUEUE];
+  const queue = [
+    ...(liveCaseEntry ? [liveCaseEntry] : []),
+    ...submissionCases,
+    ...SYNTH_QUEUE,
+  ];
   const kase  = queue[cursor];
 
   const selectedPlan = selectedPlanId
@@ -1119,6 +1287,9 @@ export default function Cockpit({ user, onBack, liveCase }) {
 
   // Fetch plans on mount
   useEffect(() => { fetchPlans(setPlans); }, []);
+
+  // Fetch submissions on mount
+  useEffect(() => { fetchSubmissions(setSubmissions); }, []);
 
   // Fetch audit log when panel opens
   useEffect(() => {
@@ -1199,7 +1370,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const key = e.key.toLowerCase();
-      if (key === "escape") { setActionState("idle"); setShowDocs(false); setShowAuditLog(false); return; }
+      if (key === "escape") { setActionState("idle"); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
       if (key === "v") { setShowDocs(s => !s); return; }
       if (key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
       if (key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
@@ -1244,7 +1415,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
             fontSize: 11, fontFamily: FONTS.body, fontWeight: 700,
           }}>Cockpit</div>
           <button
-            onClick={() => { setShowAuditLog(s => !s); setShowDocs(false); }}
+            onClick={() => { setShowAuditLog(s => !s); setShowDocs(false); setShowSubmissions(false); }}
             style={{
               background: showAuditLog ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.2)",
@@ -1253,6 +1424,17 @@ export default function Cockpit({ user, onBack, liveCase }) {
             }}
           >
             Audit Log
+          </button>
+          <button
+            onClick={() => { setShowSubmissions(s => !s); setShowDocs(false); setShowAuditLog(false); if (!showSubmissions) fetchSubmissions(setSubmissions); }}
+            style={{
+              background: showSubmissions ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 5, padding: "3px 10px", color: showSubmissions ? "#fff" : "rgba(255,255,255,0.65)",
+              fontSize: 11, cursor: "pointer", fontFamily: FONTS.body, fontWeight: 600,
+            }}
+          >
+            Submissions {submissions.length > 0 && `(${submissions.length})`}
           </button>
           {plans.length > 0 && (
             <select
@@ -1348,7 +1530,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
             onDenyConfirm={handleDenyConfirm}
             onCancelAction={() => setActionState("idle")}
             onNavigate={handleNavigate}
-            onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); }}
+            onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
             showDocs={showDocs}
           />
         </div>
@@ -1361,6 +1543,34 @@ export default function Cockpit({ user, onBack, liveCase }) {
           loading={auditLogLoading}
           onClose={() => setShowAuditLog(false)}
           onRefresh={() => fetchAuditEvents(setAuditLog, setAuditLogLoading)}
+        />
+      )}
+      {showSubmissions && (
+        <SubmissionsPanel
+          submissions={submissions}
+          onClose={() => setShowSubmissions(false)}
+          onRefresh={() => fetchSubmissions(setSubmissions)}
+          onForward={sub => {
+            const entry = {
+              caseId:      `SUB-${sub.submission_id.substring(0, 8).toUpperCase()}`,
+              memberName:  sub.member_name  || "Unknown",
+              memberId:    sub.member_id    || "—",
+              dob:         sub.dob          || "—",
+              discipline:  sub.discipline   || "PT",
+              reviewType:  "initial",
+              submittedAt: sub.submitted_at,
+              documents:   (sub.document_list || []).map(name => ({ name, type: "Provider Document", date: null })),
+              contract:    buildSubmissionContract(sub),
+              isSubmission: true,
+              providerName: sub.provider_name,
+            };
+            setSubmissionCases(prev => {
+              if (prev.some(c => c.caseId === entry.caseId)) return prev;
+              return [entry, ...prev];
+            });
+            setCursor(liveCaseEntry ? 1 : 0);
+            setShowSubmissions(false);
+          }}
         />
       )}
     </div>
