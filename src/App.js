@@ -2282,6 +2282,8 @@ function NewSubmissionForm({ token, onSubmitted }) {
   const [planId,          setPlanId]          = useState("");
   const [documentNames,   setDocumentNames]   = useState([""]);
   const [providerNotes,   setProviderNotes]   = useState("");
+  const [uploadedFiles,   setUploadedFiles]   = useState([]);  // File objects
+  const [dragOver,        setDragOver]        = useState(false);
   const [loading,         setLoading]         = useState(false);
   const [error,           setError]           = useState("");
   const [plans,           setPlans]           = useState([]);
@@ -2289,40 +2291,68 @@ function NewSubmissionForm({ token, onSubmitted }) {
   useEffect(() => {
     axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => setPlans(r.data.plans || [])).catch(() => {});
-  }, [token]);
+  }, [token]); // eslint-disable-line
 
   const docList = documentNames.filter(d => d.trim());
   const fields = [
-    !!providerName.trim(),
-    !!memberName.trim(),
-    !!memberId.trim(),
-    !!dob,
-    !!discipline,
+    !!providerName.trim(), !!memberName.trim(), !!memberId.trim(), !!dob, !!discipline,
     diagnosisCodes.length > 0,
     parseInt(requestedVisits) > 0,
-    docList.length > 0,
+    docList.length > 0 || uploadedFiles.length > 0,
   ];
   const completeness = Math.round(fields.filter(Boolean).length / 8 * 100);
 
   const addDiagCode = () => {
     const code = diagInput.trim().toUpperCase();
-    if (code && !diagnosisCodes.includes(code)) {
-      setDiagnosisCodes(prev => [...prev, code]);
-    }
+    if (code && !diagnosisCodes.includes(code)) setDiagnosisCodes(prev => [...prev, code]);
     setDiagInput("");
+  };
+
+  const addFiles = (fileList) => {
+    const pdfs = Array.from(fileList).filter(f => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    setUploadedFiles(prev => {
+      const existing = new Set(prev.map(f => f.name));
+      const newFiles = pdfs.filter(f => !existing.has(f.name));
+      return [...prev, ...newFiles].slice(0, 5);
+    });
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    addFiles(e.dataTransfer.files);
   };
 
   const handleSubmit = async () => {
     setError(""); setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/v1/submit`, {
-        providerName, providerNpi, memberName, memberId, dob,
-        discipline, diagnosisCodes,
-        requestedVisits: parseInt(requestedVisits) || 0,
-        planId: planId || null,
-        documentList: docList,
-        providerNotes,
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      let res;
+      if (uploadedFiles.length > 0) {
+        // Multipart with file upload → AI extraction endpoint
+        const fd = new FormData();
+        fd.append("providerName", providerName);
+        fd.append("providerNpi",  providerNpi);
+        fd.append("memberName",   memberName);
+        fd.append("memberId",     memberId);
+        fd.append("dob",          dob);
+        fd.append("discipline",   discipline);
+        fd.append("diagnosisCodes", JSON.stringify(diagnosisCodes));
+        fd.append("requestedVisits", requestedVisits);
+        fd.append("planId",       planId || "");
+        fd.append("documentList", JSON.stringify(docList));
+        fd.append("providerNotes", providerNotes);
+        uploadedFiles.forEach(f => fd.append("documents", f));
+        res = await axios.post(`${API_BASE}/v1/submit-with-docs`, fd, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // Plain JSON path
+        res = await axios.post(`${API_BASE}/v1/submit`, {
+          providerName, providerNpi, memberName, memberId, dob,
+          discipline, diagnosisCodes,
+          requestedVisits: parseInt(requestedVisits) || 0,
+          planId: planId || null, documentList: docList, providerNotes,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      }
       onSubmitted(res.data);
     } catch (err) {
       setError(err.response?.data?.error || "Submission failed. Please try again.");
@@ -2346,13 +2376,51 @@ function NewSubmissionForm({ token, onSubmitted }) {
           <div style={{ width: completeness + "%", height: "100%", background: completeness >= 85 ? "#15803d" : completeness >= 50 ? "#f59e0b" : "#94a3b8", borderRadius: 6, transition: "width 0.3s ease" }} />
         </div>
         {completeness >= 85 && (
-          <div style={{ fontSize: 11, color: "#15803d", marginTop: 6, fontFamily: "'DM Sans', sans-serif" }}>
-            Complete — eligible for auto-review on submission
-          </div>
+          <div style={{ fontSize: 11, color: "#15803d", marginTop: 6, fontFamily: "'DM Sans', sans-serif" }}>Complete — eligible for auto-review on submission</div>
         )}
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, padding: "24px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+
+        {/* ── AI Document Upload ── */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>
+          Clinical Documents
+          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "#f0fdf4", color: "#15803d", border: "1px solid #86efac" }}>AI EXTRACTION</span>
+        </div>
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          style={{ border: `2px dashed ${dragOver ? "#1a3a5c" : "#93c5fd"}`, borderRadius: 10, padding: "24px 20px", textAlign: "center", background: dragOver ? "#eff6ff" : "#f8fafc", marginBottom: 12, transition: "all 0.15s", cursor: "pointer" }}
+          onClick={() => document.getElementById("doc-upload-input").click()}
+        >
+          <input id="doc-upload-input" type="file" accept=".pdf,application/pdf" multiple style={{ display: "none" }}
+            onChange={e => { addFiles(e.target.files); e.target.value = ""; }} />
+          <div style={{ fontSize: 22, marginBottom: 6 }}>📄</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1a3a5c", fontFamily: "'Public Sans', sans-serif" }}>
+            Drop PDF files here or click to upload
+          </div>
+          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+            Clinical notes, evaluations, progress notes — Claude AI extracts diagnosis codes, ROM, goals, and more
+          </div>
+        </div>
+        {uploadedFiles.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {uploadedFiles.map((f, i) => (
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "#eff6ff", border: "1px solid #93c5fd", fontSize: 12, color: "#1a3a5c" }}>
+                📄 {f.name}
+                <button onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))}
+                  style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1 }}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        {uploadedFiles.length > 0 && (
+          <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 7, border: "1px solid #86efac", fontSize: 11, color: "#15803d", marginBottom: 16, fontFamily: "'DM Sans', sans-serif" }}>
+            ✦ AI will extract diagnosis codes, visit count, clinical findings, and documentation quality on submit. You can still fill fields manually below.
+          </div>
+        )}
+
         {/* Provider info */}
         <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Provider Information</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
@@ -2363,7 +2431,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
         {/* Member info */}
         <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Member Information</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
-          <div style={{ gridColumn: "1 / 3" }}>{labelS("Member Name")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last" style={inputS} /></div>
+          <div style={{ gridColumn: "1 / 3" }}>{labelS("Member Name")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last (or let AI fill from document)" style={inputS} /></div>
           <div>{labelS("Date of Birth")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
           <div>{labelS("Member ID")}<input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="e.g. XYZ123456" style={inputS} /></div>
           <div>{labelS("Plan / Payer")}<select value={planId} onChange={e => setPlanId(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
@@ -2384,8 +2452,8 @@ function NewSubmissionForm({ token, onSubmitted }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
             <input value={diagInput} onChange={e => setDiagInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addDiagCode()}
-              placeholder="e.g. M54.5 then Enter" style={{ ...inputS, flex: 1 }} />
-            <button onClick={addDiagCode} style={{ padding: "8px 14px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "'Public Sans', sans-serif" }}>Add</button>
+              placeholder={uploadedFiles.length ? "Leave blank — AI will extract" : "e.g. M54.5 then Enter"} style={{ ...inputS, flex: 1 }} />
+            <button onClick={addDiagCode} style={{ padding: "8px 14px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0 }}>Add</button>
           </div>
           {diagnosisCodes.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -2399,21 +2467,20 @@ function NewSubmissionForm({ token, onSubmitted }) {
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 14 }}>
-          <div>{labelS("Requested Visits")}<input type="number" min="1" value={requestedVisits} onChange={e => setRequestedVisits(e.target.value)} placeholder="e.g. 16" style={inputS} /></div>
+          <div>{labelS("Requested Visits")}<input type="number" min="1" value={requestedVisits} onChange={e => setRequestedVisits(e.target.value)} placeholder={uploadedFiles.length ? "Leave blank — AI will extract" : "e.g. 16"} style={inputS} /></div>
         </div>
         <div style={{ marginBottom: 20 }}>
           {labelS("Clinical Notes (optional)")}
           <textarea value={providerNotes} onChange={e => setProviderNotes(e.target.value)} rows={3} placeholder="Brief clinical context or special circumstances..." style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} />
         </div>
 
-        {/* Documents */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Supporting Documents</div>
+        {/* Additional document names */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Additional Document References</div>
         <div style={{ marginBottom: 20 }}>
-          {labelS("Document Names")}
           {documentNames.map((d, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
               <input value={d} onChange={e => { const next = [...documentNames]; next[i] = e.target.value; setDocumentNames(next); }}
-                placeholder={`e.g. Initial Evaluation Report ${i > 0 ? i + 1 : ""}`} style={{ ...inputS, flex: 1 }} />
+                placeholder={`e.g. X-ray report, lab results`} style={{ ...inputS, flex: 1 }} />
               {documentNames.length > 1 && (
                 <button onClick={() => setDocumentNames(prev => prev.filter((_, j) => j !== i))}
                   style={{ padding: "8px 10px", borderRadius: 7, background: "#fee2e2", color: "#991b1b", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer" }}>×</button>
@@ -2422,18 +2489,23 @@ function NewSubmissionForm({ token, onSubmitted }) {
           ))}
           <button onClick={() => setDocumentNames(prev => [...prev, ""])}
             style={{ fontSize: 12, color: "#1a3a5c", background: "none", border: "1px dashed #93c5fd", borderRadius: 7, padding: "6px 14px", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", marginTop: 2 }}>
-            + Add document
+            + Add reference
           </button>
         </div>
 
-        {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 7, fontSize: 13, color: "#991b1b", fontFamily: "'DM Sans', sans-serif" }}>{error}</div>}
+        {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 7, fontSize: 13, color: "#991b1b" }}>{error}</div>}
 
         <button onClick={handleSubmit} disabled={loading} style={{
-          width: "100%", padding: "13px 0", borderRadius: 9, background: loading ? "#94a3b8" : "#1a3a5c",
-          color: "#fff", fontSize: 14, fontWeight: 700, border: "none", cursor: loading ? "not-allowed" : "pointer",
-          fontFamily: "'Public Sans', sans-serif", boxShadow: loading ? "none" : "0 4px 14px rgba(26,58,92,0.25)",
+          width: "100%", padding: "13px 0", borderRadius: 9,
+          background: loading ? "#94a3b8" : "#1a3a5c",
+          color: "#fff", fontSize: 14, fontWeight: 700, border: "none",
+          cursor: loading ? "not-allowed" : "pointer",
+          fontFamily: "'Public Sans', sans-serif",
+          boxShadow: loading ? "none" : "0 4px 14px rgba(26,58,92,0.25)",
         }}>
-          {loading ? "Submitting..." : `Submit Authorization Request (${completeness}% complete)`}
+          {loading
+            ? (uploadedFiles.length ? "Uploading & extracting with AI…" : "Submitting…")
+            : `Submit Authorization Request (${completeness}% complete)`}
         </button>
       </div>
     </div>
@@ -3457,6 +3529,52 @@ function ProviderPortal({ user, token, onLogout }) {
                 </div>
               ))}
             </div>
+            {confirmation.extractedData && (() => {
+              const ex = confirmation.extractedData;
+              const dq = ex.documentationQuality || {};
+              const dqFlags = [
+                ["Objective Measures", dq.hasObjectiveMeasures],
+                ["Functional Limitations", dq.hasFunctionalLimitations],
+                ["Goals Documented", dq.hasGoals],
+                ["Plan of Care", dq.hasPOC],
+              ];
+              return (
+                <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "16px 20px", marginBottom: 18 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 16 }}>🤖</span>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>AI Extraction Complete</div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px" }}>
+                    {ex.diagnosisCodes?.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>Diagnoses Extracted</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {ex.diagnosisCodes.map(c => (
+                            <span key={c} style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 4, padding: "2px 7px", fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{c}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {ex.painScore != null && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>Pain Score</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#1e293b", fontFamily: "'Fraunces', Georgia, serif" }}>{ex.painScore}<span style={{ fontSize: 12, fontWeight: 500, color: "#6b7280" }}>/10</span></div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif", marginBottom: 6 }}>Documentation Quality</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {dqFlags.map(([label, val]) => (
+                        <span key={label} style={{ display: "flex", alignItems: "center", gap: 4, background: val ? "#dcfce7" : "#f1f5f9", color: val ? "#15803d" : "#94a3b8", borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                          <span>{val ? "✓" : "–"}</span>{label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
             <button onClick={() => { setProvView("my_cases"); setConfirmation(null); }}
               style={{ padding: "10px 24px", borderRadius: 8, background: "#1a3a5c", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
               View My Cases
