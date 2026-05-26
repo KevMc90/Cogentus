@@ -1626,47 +1626,55 @@ function ReviewerShell({ user, token, onLogout }) {
       </div>
 
       {/* Home content */}
-      <div style={{ maxWidth: 560, margin: "60px auto", padding: "0 24px" }}>
-        {/* Stats row */}
-        <div style={{ display: "flex", gap: 14, marginBottom: 40 }}>
-          {[
-            { label: "Pending in your queue", value: pendingCount !== null ? pendingCount : "—", color: pendingCount > 0 ? "#1a3a5c" : "#9ca3af" },
-            { label: "Completed today", value: queueStats?.casesToday ?? "—", color: "#15803d" },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6, fontFamily: "'Public Sans', sans-serif" }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
+      <div style={{ maxWidth: 520, margin: "72px auto", padding: "0 24px" }}>
 
-        {/* Get Case button */}
-        <div style={{ background: "#fff", borderRadius: 16, padding: "40px 32px", boxShadow: "0 2px 12px rgba(26,58,92,0.1)", border: "1px solid #e2e8f0", textAlign: "center" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 8, fontFamily: "'Public Sans', sans-serif" }}>Ready to review?</div>
-          <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 28, fontFamily: "'Public Sans', sans-serif" }}>
-            Cases are assigned by priority and submission age.
+        {/* ── Get Case hero — dominant first element ── */}
+        <div style={{ background: "#fff", borderRadius: 20, padding: "52px 40px 44px", boxShadow: "0 4px 24px rgba(26,58,92,0.13)", border: "1px solid #dde4ef", textAlign: "center", marginBottom: 28 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6b7280", marginBottom: 12, fontFamily: "'Public Sans', sans-serif" }}>
+            {discLabel} Reviewer
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1, marginBottom: 10 }}>
+            Ready to review?
+          </div>
+          <div style={{ fontSize: 14, color: "#9ca3af", marginBottom: 36, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.5 }}>
+            Cases are assigned by priority and submission age.<br />
+            Click below to get your next case.
           </div>
           <button
             onClick={handleGetCase}
             disabled={getCaseLoading}
             style={{
               display: "inline-flex", alignItems: "center", gap: 10,
-              padding: "14px 40px", borderRadius: 10,
+              padding: "16px 56px", borderRadius: 12,
               background: getCaseLoading ? "#94a3b8" : "#1a3a5c",
-              color: "#fff", fontSize: 16, fontWeight: 700,
+              color: "#fff", fontSize: 18, fontWeight: 700,
               border: "none", cursor: getCaseLoading ? "not-allowed" : "pointer",
               fontFamily: "'Public Sans', sans-serif",
-              boxShadow: getCaseLoading ? "none" : "0 4px 14px rgba(26,58,92,0.35)",
+              boxShadow: getCaseLoading ? "none" : "0 6px 20px rgba(26,58,92,0.38)",
               transition: "all 0.15s",
+              letterSpacing: "-0.01em",
             }}
           >
-            {getCaseLoading ? "Finding case..." : "Get Case"}
+            {getCaseLoading ? "Finding case…" : "Get Case"}
           </button>
           {getCaseError && (
-            <div style={{ marginTop: 16, fontSize: 13, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>
+            <div style={{ marginTop: 18, fontSize: 13, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>
               {getCaseError}
             </div>
           )}
+        </div>
+
+        {/* ── Queue stats — secondary ── */}
+        <div style={{ display: "flex", gap: 12 }}>
+          {[
+            { label: "Pending in your queue", value: pendingCount !== null ? pendingCount : "—", color: pendingCount > 0 ? "#1a3a5c" : "#9ca3af" },
+            { label: "Completed today",        value: queueStats?.casesToday ?? "—",              color: "#15803d" },
+          ].map(s => (
+            <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 5, fontFamily: "'Public Sans', sans-serif" }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

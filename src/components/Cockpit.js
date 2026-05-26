@@ -936,8 +936,8 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
         )}
       </div>
 
-      {/* Docs button pinned to bottom of zone */}
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
+      {/* Docs button pinned to bottom-left of zone */}
+      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-start", flexShrink: 0 }}>
         <button
           onClick={onToggleDocs}
           style={{
@@ -1742,11 +1742,13 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
     isLive:      true,
   } : null;
 
-  const queue = [
-    ...(liveCaseEntry ? [liveCaseEntry] : []),
-    ...submissionCases,
-    ...SYNTH_QUEUE,
-  ];
+  const queue = hideQueueNav
+    ? (liveCaseEntry ? [liveCaseEntry] : [])
+    : [
+        ...(liveCaseEntry ? [liveCaseEntry] : []),
+        ...submissionCases,
+        ...SYNTH_QUEUE,
+      ];
   const kase  = queue[cursor];
 
   const selectedPlan = selectedPlanId
