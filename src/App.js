@@ -2508,6 +2508,344 @@ function ProviderPortal({ user, token, onLogout }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MASTER DASHBOARD (Phase 12)
+// ─────────────────────────────────────────────────────────────────────────────
+function MasterDashboard({ token }) {
+  const [stats, setStats]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod]   = useState("today");
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/master-stats`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setStats(r.data); setLoading(false); })
+      .catch(() => { setError("Failed to load stats."); setLoading(false); });
+  }, [token]);
+
+  const PERIODS = [
+    { key: "today",      label: "Today" },
+    { key: "this_week",  label: "This Week" },
+    { key: "this_month", label: "This Month" },
+    { key: "all_time",   label: "All Time" },
+  ];
+  const DET_COLORS = {
+    "Approved":      "#15803d",
+    "Partial Denial":"#92400e",
+    "Full Denial":   "#991b1b",
+    "Pended":        "#1d4ed8",
+  };
+  const discColor = (d) => d === "OT" ? "#c2410c" : d === "ST" ? "#15803d" : "#1a3a5c";
+
+  const detBadge = (det) => {
+    if (!det) return { bg: "#f3f4f6", text: "#374151" };
+    const l = det.toLowerCase();
+    if (l.startsWith("approved"))       return { bg: "#dcfce7", text: "#15803d" };
+    if (l.includes("denial"))           return { bg: "#fee2e2", text: "#991b1b" };
+    if (l.startsWith("partial"))        return { bg: "#fef3c7", text: "#92400e" };
+    if (l.startsWith("pend"))           return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#374151" };
+  };
+
+  if (loading) return <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading team stats...</div>;
+  if (error)   return <div style={{ textAlign: "center", padding: "60px 0", color: "#dc2626", fontSize: 13 }}>{error}</div>;
+  if (!stats)  return null;
+
+  const totals  = stats.totals  || {};
+  const byDet   = stats.byDetermination || [];
+  const revs    = stats.reviewers || [];
+  const queue   = stats.queue || [];
+
+  const totalForPeriod  = parseInt(totals[period] || 0);
+  const detRows = byDet.map(r => ({
+    det: r.determination,
+    count: parseInt(r[period] || 0),
+    color: DET_COLORS[r.determination] || "#6b7280",
+  })).filter(r => r.count > 0).sort((a, b) => b.count - a.count);
+
+  const autoApprPct = totalForPeriod > 0 && totals.auto_approved_all
+    ? Math.round(parseInt(totals.auto_approved_all) / parseInt(totals.all_time) * 100)
+    : 0;
+
+  return (
+    <div style={{ maxWidth: 1000, margin: "28px auto", padding: "0 24px" }}>
+      {/* Period selector + top stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+        {PERIODS.map(p => {
+          const val = parseInt(totals[p.key] || 0);
+          const active = period === p.key;
+          return (
+            <button key={p.key} onClick={() => setPeriod(p.key)} style={{
+              background: active ? "#1a3a5c" : "#fff",
+              border: active ? "2px solid #1a3a5c" : "1px solid #e2e8f0",
+              borderRadius: 12, padding: "18px 16px", cursor: "pointer", textAlign: "left",
+              boxShadow: active ? "0 4px 16px rgba(26,58,92,0.18)" : "0 1px 4px rgba(0,0,0,0.06)",
+              transition: "all 0.14s",
+            }}>
+              <div style={{ fontSize: 30, fontWeight: 800, color: active ? "#fff" : "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{val}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: active ? "rgba(255,255,255,0.75)" : "#6b7280", marginTop: 6, fontFamily: "'Public Sans', sans-serif" }}>Cases — {p.label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+        {/* Determination breakdown */}
+        <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", marginBottom: 16, fontFamily: "'Fraunces', Georgia, serif" }}>
+            Team Breakdown — {PERIODS.find(p => p.key === period)?.label}
+          </div>
+          {detRows.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>No cases for this period.</div>
+          ) : detRows.map(r => {
+            const pct = totalForPeriod > 0 ? Math.round(r.count / totalForPeriod * 100) : 0;
+            return (
+              <div key={r.det} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{r.det}</span>
+                  <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{r.count} ({pct}%)</span>
+                </div>
+                <div style={{ background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                  <div style={{ width: pct + "%", height: "100%", background: r.color, borderRadius: 4, transition: "width 0.4s ease" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Queue health + auto-approval */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif" }}>Queue Health</div>
+            {queue.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>Queue is clear.</div>
+            ) : queue.map(q => {
+              const slaRisk = parseInt(q.sla_at_risk || 0);
+              const breached = parseInt(q.sla_breached || 0);
+              return (
+                <div key={q.discipline} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: "#eff6ff", color: discColor(q.discipline), minWidth: 28, textAlign: "center", fontFamily: "'DM Sans', sans-serif" }}>{q.discipline}</span>
+                  <div style={{ flex: 1, background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                    <div style={{ width: "100%", height: "100%", background: breached > 0 ? "#dc2626" : slaRisk > 0 ? "#f59e0b" : "#1a3a5c", borderRadius: 4 }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#374151", minWidth: 24, textAlign: "right", fontFamily: "'Fraunces', Georgia, serif" }}>{q.pending}</span>
+                  {(slaRisk > 0 || breached > 0) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: breached > 0 ? "#dc2626" : "#f59e0b", fontFamily: "'DM Sans', sans-serif" }}>
+                      {breached > 0 ? `${breached} breached` : `${slaRisk} at risk`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif", marginBottom: 6 }}>Auto-Approval Rate (All Time)</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontSize: 26, fontWeight: 800, color: "#15803d", fontFamily: "'Fraunces', Georgia, serif" }}>{autoApprPct}%</span>
+              <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>{totals.auto_approved_all || 0} of {totals.all_time || 0} cases</span>
+            </div>
+            <div style={{ marginTop: 6, background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden" }}>
+              <div style={{ width: autoApprPct + "%", height: "100%", background: "#15803d", borderRadius: 4 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Per-reviewer performance table */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>
+          Reviewer Performance
+        </div>
+        {revs.length === 0 ? (
+          <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No reviewer activity yet.</div>
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+              {["Reviewer","Disc.","Today","Week","Month","All Time","Approved","Denied"].map(h => (
+                <span key={h} style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
+              ))}
+            </div>
+            {revs.map((r, i) => {
+              const allTime = parseInt(r.all_time || 0);
+              const approved = parseInt(r.approved || 0);
+              const denied = parseInt(r.denied || 0);
+              const approvePct = allTime > 0 ? Math.round(approved / allTime * 100) : 0;
+              return (
+                <div key={r.email} style={{ display: "grid", gridTemplateColumns: "1fr 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "12px 20px", borderBottom: i < revs.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.full_name || "—"}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{r.email}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "#eff6ff", color: discColor(r.discipline), fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{r.discipline}</span>
+                  {[r.today, r.this_week, r.this_month, r.all_time].map((v, j) => (
+                    <span key={j} style={{ fontSize: 13, fontWeight: j === 3 ? 700 : 400, color: j === 3 ? "#1a3a5c" : "#374151", fontFamily: j === 3 ? "'Fraunces', Georgia, serif" : "'Public Sans', sans-serif" }}>{parseInt(v || 0)}</span>
+                  ))}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#15803d", fontFamily: "'DM Sans', sans-serif" }}>{approved} ({approvePct}%)</div>
+                    <div style={{ background: "#f1f5f9", borderRadius: 3, height: 4, marginTop: 2, overflow: "hidden" }}>
+                      <div style={{ width: approvePct + "%", height: "100%", background: "#15803d", borderRadius: 3 }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, color: denied > 0 ? "#991b1b" : "#9ca3af", fontWeight: denied > 0 ? 600 : 400, fontFamily: "'DM Sans', sans-serif" }}>{denied}</span>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MasterQueueView({ token }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [discFilter, setDiscFilter]     = useState("all");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (discFilter  !== "all") params.set("discipline", discFilter);
+      const r = await axios.get(`${API_BASE}/v1/submissions?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      setSubmissions(r.data.submissions || []);
+    } catch {}
+    setLoading(false);
+  }, [token, statusFilter, discFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const statusBadge = (s) => {
+    if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
+    if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
+    if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
+    if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#374151" };
+  };
+
+  const selS = { padding: "7px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none", background: "#fff", cursor: "pointer" };
+
+  return (
+    <div style={{ maxWidth: 1000, margin: "28px auto", padding: "0 24px" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selS}>
+          <option value="all">All Statuses</option>
+          <option value="submitted">Submitted</option>
+          <option value="pending_review">Pending Review</option>
+          <option value="under_review">Under Review</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+        </select>
+        <select value={discFilter} onChange={e => setDiscFilter(e.target.value)} style={selS}>
+          <option value="all">All Disciplines</option>
+          <option value="PT">PT</option>
+          <option value="OT">OT</option>
+          <option value="ST">ST</option>
+        </select>
+        <button onClick={load} style={{ padding: "7px 16px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Refresh</button>
+        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>{submissions.length} case{submissions.length !== 1 ? "s" : ""}</span>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 60px 130px 90px 110px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+          {["Member","Case ID","Disc.","Status","Visits","Submitted"].map(h => (
+            <span key={h} style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
+          ))}
+        </div>
+        {loading ? (
+          <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading...</div>
+        ) : submissions.length === 0 ? (
+          <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No submissions match the current filters.</div>
+        ) : submissions.map((s, i) => {
+          const sb = statusBadge(s.status);
+          const discC = s.discipline === "OT" ? "#c2410c" : s.discipline === "ST" ? "#15803d" : "#1a3a5c";
+          return (
+            <div key={s.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 60px 130px 90px 110px", gap: 0, padding: "12px 20px", borderBottom: i < submissions.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{s.member_name || "—"}</div>
+                <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{s.member_id || "—"}</div>
+              </div>
+              <span style={{ fontSize: 10, fontFamily: "monospace", color: "#374151" }}>{s.submission_id}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "#eff6ff", color: discC, fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{s.discipline || "—"}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: sb.bg, color: sb.text, textTransform: "capitalize", fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{(s.status || "—").replace(/_/g," ")}</span>
+              <span style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{s.requested_visits || "—"}</span>
+              <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MasterShell({ user, token, onLogout }) {
+  const [masterView, setMasterView] = useState("dashboard");
+
+  // Cockpit full-screen override
+  if (masterView === "cockpit") {
+    return (
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: "#1a3a5c", padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>Master — Cockpit</span>
+          <div style={{ flex: 1 }} />
+          <NotificationBell token={token} />
+          <button onClick={() => setMasterView("dashboard")} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>← Dashboard</button>
+        </div>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <Cockpit user={user} onBack={() => setMasterView("dashboard")} />
+        </div>
+      </div>
+    );
+  }
+
+  const TABS = [
+    ["dashboard", "Dashboard"],
+    ["queue",     "All Cases"],
+    ["ur_form",   "UR Form"],
+    ["cockpit",   "Cockpit"],
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: "#0d1b2a", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>|</span>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 10, background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.05em" }}>MASTER</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+        <NotificationBell token={token} />
+        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+        {TABS.map(([v, label]) => (
+          <button key={v} onClick={() => setMasterView(v)} style={{
+            padding: "12px 20px", fontSize: 13, fontWeight: masterView === v ? 700 : 500,
+            color: masterView === v ? "#0d1b2a" : "#6b7280", background: "none", border: "none",
+            borderBottom: masterView === v ? "2.5px solid #0d1b2a" : "2.5px solid transparent",
+            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Content */}
+      {masterView === "dashboard" && <MasterDashboard token={token} />}
+      {masterView === "queue"     && <MasterQueueView token={token} />}
+      {masterView === "ur_form"   && (
+        <div style={{ background: "#f8fafc" }}>
+          <URFormEmbed user={user} token={token} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -2584,7 +2922,10 @@ function App() {
   if (user.role === "provider") {
     return <ProviderPortal user={user} token={token} onLogout={handleLogout} />;
   }
-  // master / admin / legacy → existing UI below
+  if (user.role === "master" || user.role === "admin") {
+    return <MasterShell user={user} token={token} onLogout={handleLogout} />;
+  }
+  // legacy / unknown role → existing UI below
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
