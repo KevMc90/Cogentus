@@ -1168,8 +1168,10 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 {decided.approvedVisits} visits approved
               </div>
             )}
-            <div style={{ fontSize: 10, color: decColor.text, marginTop: 4, fontFamily: FONTS.body, opacity: 0.6 }}>
-              Recorded — use J/K to navigate
+            <div style={{ fontSize: 10, color: decColor.text, marginTop: 4, fontFamily: FONTS.body, opacity: 0.85 }}>
+              {/denial|partial/i.test(decided.determination)
+                ? "→ Pending Medical Director Co-Sign"
+                : "Recorded — use J/K to navigate"}
             </div>
             {auditState && (
               <div style={{ marginTop: 6 }}>
@@ -1843,9 +1845,10 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           engineConfidence:      rec?.confidence             || null,
           autoApprovalEligible:  rec?.autoApprovalEligible  ?? null,
           isOverride,
-          discipline:  kase.discipline  || null,
-          reviewType:  kase.reviewType  || null,
-          isSynthetic: !kase.isLive,
+          discipline:    kase.discipline  || null,
+          reviewType:    kase.reviewType  || null,
+          isSynthetic:   !kase.isLive,
+          reviewerNotes: extras.denyNote || "",
         }),
       })
         .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })

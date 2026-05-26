@@ -2994,6 +2994,234 @@ function MasterShell({ user, token, onLogout }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MEDICAL DIRECTOR SHELL
+// ─────────────────────────────────────────────────────────────────────────────
+function MDShell({ user, token, onLogout }) {
+  const [queue, setQueue]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [action, setAction]   = useState(null); // "uphold"|"override"|"revision"
+  const [mdNotes, setMdNotes] = useState("");
+  const [overrideDet, setOverrideDet] = useState("Approved");
+  const [overrideVisits, setOverrideVisits] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast]     = useState(null);
+
+  const NAVY  = "#1a2e4a";
+  const CREAM = "#faf8f3";
+
+  const fetchQueue = () => {
+    setLoading(true);
+    fetch(`${API_BASE}/v1/md-queue`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { setQueue(d.cases || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchQueue(); }, []); // eslint-disable-line
+
+  const handleSubmit = () => {
+    if (!selected || !action) return;
+    if (action === "override" && !overrideDet) return;
+    setSubmitting(true);
+    fetch(`${API_BASE}/v1/md-review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        submissionId:           selected.submission_id,
+        action,
+        mdNotes,
+        overrideDetermination:  action === "override" ? overrideDet    : undefined,
+        overrideApprovedVisits: action === "override" ? parseInt(overrideVisits, 10) || undefined : undefined,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        setSubmitting(false);
+        if (d.ok) {
+          setToast(`${action.charAt(0).toUpperCase() + action.slice(1)} recorded for ${selected.member_name}.`);
+          setSelected(null);
+          setAction(null);
+          setMdNotes("");
+          setOverrideVisits("");
+          fetchQueue();
+          setTimeout(() => setToast(null), 4000);
+        } else {
+          setToast("Error: " + (d.error || "Unknown error"));
+          setTimeout(() => setToast(null), 5000);
+        }
+      })
+      .catch(() => { setSubmitting(false); setToast("Network error."); setTimeout(() => setToast(null), 5000); });
+  };
+
+  const tatColor = (s) => s === "breached" ? "#fca5a5" : s === "at_risk" ? "#fcd34d" : "#86efac";
+  const tatText  = (s) => s === "breached" ? "#7f1d1d" : s === "at_risk" ? "#78350f" : "#14532d";
+
+  return (
+    <div style={{ minHeight: "100vh", background: CREAM, fontFamily: "'Public Sans', sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: NAVY, color: "#fff", padding: "0 32px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700 }}>CogentCR</span>
+          <span style={{ fontSize: 11, fontWeight: 700, background: "#7c3aed", color: "#fff", borderRadius: 4, padding: "2px 8px", letterSpacing: 1 }}>MEDICAL DIRECTOR</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 13, opacity: 0.75 }}>{user.full_name || user.email}</span>
+          <button onClick={onLogout} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontSize: 12 }}>Sign Out</button>
+        </div>
+      </div>
+
+      {toast && (
+        <div style={{ position: "fixed", top: 16, right: 16, background: NAVY, color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>{toast}</div>
+      )}
+
+      <div style={{ display: "flex", height: "calc(100vh - 56px)" }}>
+        {/* Queue Panel */}
+        <div style={{ width: 340, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
+          <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 700, color: NAVY }}>MD Review Queue</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{queue.length} case{queue.length !== 1 ? "s" : ""} pending co-sign</div>
+          </div>
+          {loading ? (
+            <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Loading queue...</div>
+          ) : queue.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center" }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>Queue cleared</div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>No cases pending MD review</div>
+            </div>
+          ) : queue.map((c, i) => {
+            const tat = c.tat || {};
+            const isSel = selected?.submission_id === c.submission_id;
+            return (
+              <div key={c.submission_id} onClick={() => { setSelected(c); setAction(null); setMdNotes(""); setOverrideVisits(""); }}
+                style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #3b82f6" : "3px solid transparent" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: NAVY }}>{c.member_name || "Unknown Patient"}</div>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: tatColor(tat.status), color: tatText(tat.status) }}>
+                    {tat.status === "breached" ? "⚠ SLA" : `${tat.hoursLeft?.toFixed(0)}h left`}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{c.discipline} · {c.plan_id}</div>
+                <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 700, marginTop: 4 }}>
+                  Reviewer: {c.reviewer_determination}
+                </div>
+                <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{c.reviewer_name || "Reviewer"}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Review Panel */}
+        <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
+          {!selected ? (
+            <div style={{ maxWidth: 480, margin: "80px auto", textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>⚕</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: NAVY, marginBottom: 8 }}>Medical Director Review</div>
+              <div style={{ fontSize: 14, color: "#64748b" }}>Select a case from the queue to begin co-signature review. All adverse determinations require MD sign-off before the provider is notified.</div>
+            </div>
+          ) : (
+            <div style={{ maxWidth: 720, margin: "0 auto" }}>
+              {/* Case Header */}
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: NAVY }}>{selected.member_name}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>ID: {selected.member_id} · DOB: {selected.dob || "N/A"} · {selected.discipline} · {selected.plan_id}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>Case ID</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, fontFamily: "monospace" }}>{selected.submission_id?.slice(0, 12)}...</div>
+                  </div>
+                </div>
+                {/* Reviewer Finding */}
+                <div style={{ background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa", padding: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9a3412", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>Reviewer Finding</div>
+                  <div style={{ display: "flex", gap: 24 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#92400e" }}>Determination</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#c2410c" }}>{selected.reviewer_determination}</div>
+                    </div>
+                    {selected.reviewer_approved_visits != null && (
+                      <div>
+                        <div style={{ fontSize: 11, color: "#92400e" }}>Approved Visits</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#c2410c" }}>{selected.reviewer_approved_visits}</div>
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontSize: 11, color: "#92400e" }}>Engine Recommendation</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>{selected.engine_determination || "N/A"} ({selected.engine_confidence || "—"})</div>
+                    </div>
+                  </div>
+                  {selected.reviewer_notes && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: "#7c2d12" }}>
+                      <span style={{ fontWeight: 700 }}>Reviewer rationale: </span>{selected.reviewer_notes}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* MD Action Panel */}
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 700, color: NAVY, marginBottom: 16 }}>MD Co-Signature Action</div>
+
+                {/* Action Selector */}
+                <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                  {[
+                    { key: "uphold",   label: "Uphold",          desc: "Agree with reviewer",     color: "#dc2626" },
+                    { key: "override", label: "Override",         desc: "Change determination",    color: "#d97706" },
+                    { key: "revision", label: "Request Revision", desc: "Return to reviewer",      color: "#2563eb" },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => { setAction(opt.key); setMdNotes(""); }}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 8, border: `2px solid ${action === opt.key ? opt.color : "#e2e8f0"}`, background: action === opt.key ? opt.color : "#fff", color: action === opt.key ? "#fff" : "#374151", cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{opt.label}</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {action === "override" && (
+                  <div style={{ background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa", padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>Override Determination</div>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                      {["Approved", "Partial Denial", "Full Denial", "Pend"].map(det => (
+                        <button key={det} onClick={() => setOverrideDet(det)}
+                          style={{ padding: "6px 12px", borderRadius: 6, border: `1.5px solid ${overrideDet === det ? "#d97706" : "#e2e8f0"}`, background: overrideDet === det ? "#fef3c7" : "#fff", fontSize: 12, cursor: "pointer", fontWeight: overrideDet === det ? 700 : 400 }}>
+                          {det}
+                        </button>
+                      ))}
+                    </div>
+                    <label style={{ fontSize: 12, color: "#7c2d12" }}>Approved visits (if applicable)
+                      <input type="number" min={0} value={overrideVisits} onChange={e => setOverrideVisits(e.target.value)}
+                        placeholder="e.g. 12" style={{ display: "block", marginTop: 4, width: 120, padding: "6px 10px", borderRadius: 6, border: "1px solid #fed7aa", fontSize: 13 }} />
+                    </label>
+                  </div>
+                )}
+
+                {action && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>MD Notes {action === "revision" ? "(required — explain what needs revision)" : "(optional — will appear in audit trail)"}</div>
+                      <textarea value={mdNotes} onChange={e => setMdNotes(e.target.value)} rows={4}
+                        placeholder={action === "revision" ? "Describe what the reviewer should reconsider or document..." : "Clinical rationale or co-signature notes..."}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                    </div>
+                    <button onClick={handleSubmit} disabled={submitting || (action === "revision" && !mdNotes.trim())}
+                      style={{ background: action === "revision" ? "#2563eb" : action === "override" ? "#d97706" : "#dc2626", color: "#fff", border: "none", borderRadius: 8, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1 }}>
+                      {submitting ? "Recording..." : action === "uphold" ? "Co-Sign & Uphold" : action === "override" ? "Co-Sign & Override" : "Send Back for Revision"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -3072,6 +3300,9 @@ function App() {
   }
   if (user.role === "master" || user.role === "admin") {
     return <MasterShell user={user} token={token} onLogout={handleLogout} />;
+  }
+  if (user.role === "medical_director") {
+    return <MDShell user={user} token={token} onLogout={handleLogout} />;
   }
   // legacy / unknown role → existing UI below
 
