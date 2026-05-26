@@ -1584,7 +1584,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1610,7 +1610,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1636,7 +1636,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1662,7 +1662,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1675,6 +1675,32 @@ function ReviewerShell({ user, token, onLogout }) {
           <ReviewerScheduleSettings token={token} />
         </div>
         <P2PQueueView token={token} />
+      </div>
+    );
+  }
+
+  // ── Appeals view ──
+  if (revView === "appeals") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <AppealsQueueView token={token} />
       </div>
     );
   }
@@ -1701,7 +1727,7 @@ function ReviewerShell({ user, token, onLogout }) {
 
       {/* Tab bar */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
           <button key={v} onClick={() => setRevView(v)} style={{
             padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
             color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2957,6 +2983,239 @@ function P2PQueueView({ token }) {
   );
 }
 
+// ── AppealModal: provider files an appeal ────────────────────────────────────
+function AppealModal({ submission, token, onClose, onSuccess }) {
+  const GROUNDS_OPTIONS = [
+    "Determination not supported by clinical evidence",
+    "Documentation was complete; re-review requested",
+    "Incorrect application of MCG/clinical criteria",
+    "Benefit coverage dispute",
+    "Other",
+  ];
+  const [grounds, setGrounds]         = useState("");
+  const [notes, setNotes]             = useState("");
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState("");
+
+  const handleSubmit = async () => {
+    if (!grounds) { setError("Please select grounds for the appeal."); return; }
+    setSubmitting(true);
+    setError("");
+    try {
+      await axios.post(`${API_BASE}/v1/appeals`, {
+        submissionId: submission.submission_id,
+        grounds,
+        supportingNotes: notes,
+        level: 1,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to file appeal.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 520, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>File Level 1 Appeal</div>
+          <div style={{ fontSize: 12, color: "#64748b", fontFamily: "'Public Sans', sans-serif" }}>{submission.member_name} · {submission.discipline}</div>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>Grounds for Appeal *</div>
+          {GROUNDS_OPTIONS.map(g => (
+            <label key={g} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, cursor: "pointer" }}>
+              <input type="radio" name="grounds" value={g} checked={grounds === g} onChange={() => setGrounds(g)} />
+              <span style={{ fontSize: 13, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{g}</span>
+            </label>
+          ))}
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>Supporting Clinical Notes (optional)</div>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
+            placeholder="Provide additional clinical context, citations, or documentation references..."
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+        </div>
+        {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, color: "#dc2626" }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Cancel</button>
+          <button onClick={handleSubmit} disabled={submitting}
+            style={{ padding: "10px 20px", borderRadius: 8, background: "#1a3a5c", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "'Public Sans', sans-serif" }}>
+            {submitting ? "Filing…" : "Submit Appeal"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AppealsQueueView: reviewer sees L1 appeals assigned to them ───────────────
+function AppealsQueueView({ token }) {
+  const [appeals, setAppeals]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [decision, setDecision] = useState("");
+  const [decNotes, setDecNotes] = useState("");
+  const [newDet, setNewDet]     = useState("Approved");
+  const [newVisits, setNewVisits] = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [toast, setToast]       = useState(null);
+
+  const fetchAppeals = () => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/appeals`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setAppeals(r.data.appeals || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAppeals(); }, [token]); // eslint-disable-line
+
+  const handleDecide = async () => {
+    if (!selected || !decision) return;
+    setSaving(true);
+    try {
+      await axios.post(`${API_BASE}/v1/appeals/${selected.appeal_id}/decide`, {
+        decision,
+        decisionNotes:      decNotes,
+        newDetermination:   decision !== "upheld" ? newDet : undefined,
+        newApprovedVisits:  decision !== "upheld" ? (parseInt(newVisits, 10) || undefined) : undefined,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setToast("Decision recorded and provider notified.");
+      setSelected(null); setDecision(""); setDecNotes(""); setNewVisits("");
+      fetchAppeals();
+      setTimeout(() => setToast(null), 4000);
+    } catch (err) {
+      setToast(err.response?.data?.error || "Failed to record decision.");
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const statusChip = (s) => {
+    const map = { filed: ["#eff6ff","#1d4ed8"], under_review: ["#fef3c7","#b45309"], decided: ["#f0fdf4","#15803d"], withdrawn: ["#f1f5f9","#64748b"] };
+    const [bg, text] = map[s] || ["#f1f5f9","#374151"];
+    return <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: bg, color: text }}>{s.replace("_"," ").toUpperCase()}</span>;
+  };
+
+  return (
+    <div style={{ display: "flex", height: "calc(100vh - 110px)", overflow: "hidden" }}>
+      {toast && <div style={{ position: "fixed", top: 16, right: 16, background: "#1a3a5c", color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>{toast}</div>}
+      {/* Left: appeal list */}
+      <div style={{ width: 320, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
+        <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Appeals Queue</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Level 1 appeals assigned to you</div>
+        </div>
+        {loading ? <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+        : appeals.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
+            <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>No active appeals</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Appeals assigned to you will appear here.</div>
+          </div>
+        ) : appeals.map((a, i) => {
+          const isSel = selected?.appeal_id === a.appeal_id;
+          const deadline = a.deadline_at ? new Date(a.deadline_at) : null;
+          const daysLeft = deadline ? Math.ceil((deadline - Date.now()) / 86400000) : null;
+          return (
+            <div key={a.appeal_id} onClick={() => { setSelected(a); setDecision(""); setDecNotes(""); setNewVisits(""); }}
+              style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #1a3a5c" : "3px solid transparent" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{a.member_name || "Unknown Member"}</span>
+                {statusChip(a.status)}
+              </div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>{a.discipline} · Level {a.level}</div>
+              <div style={{ fontSize: 11, color: "#374151", marginTop: 3 }}>Grounds: {a.grounds?.slice(0, 45)}{a.grounds?.length > 45 ? "…" : ""}</div>
+              {daysLeft !== null && <div style={{ fontSize: 10, color: daysLeft <= 5 ? "#dc2626" : "#94a3b8", marginTop: 3, fontWeight: daysLeft <= 5 ? 700 : 400 }}>{daysLeft > 0 ? `${daysLeft}d until deadline` : "PAST DEADLINE"}</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Right: decision panel */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 28, background: "#f8fafc" }}>
+        {!selected ? (
+          <div style={{ maxWidth: 420, margin: "80px auto", textAlign: "center" }}>
+            <div style={{ fontSize: 36, marginBottom: 14 }}>⚖️</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 8 }}>Level 1 Appeal Review</div>
+            <div style={{ fontSize: 13, color: "#64748b" }}>Select an appeal from the queue to review and issue a decision. The provider will be notified of the outcome.</div>
+          </div>
+        ) : (
+          <div style={{ maxWidth: 640, margin: "0 auto" }}>
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginBottom: 20 }}>
+              <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 17, fontWeight: 700, color: "#1a3a5c", marginBottom: 4 }}>{selected.member_name}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>{selected.discipline} · {selected.plan_id} · Level {selected.level} Appeal</div>
+              <div style={{ background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", padding: 16, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6 }}>Original Determination</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>{selected.original_determination || "—"}</div>
+              </div>
+              <div style={{ background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a", padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6 }}>Provider Grounds</div>
+                <div style={{ fontSize: 13, color: "#78350f" }}>{selected.grounds}</div>
+                {selected.supporting_notes && <div style={{ fontSize: 12, color: "#78350f", marginTop: 8, borderTop: "1px solid #fde68a", paddingTop: 8 }}>{selected.supporting_notes}</div>}
+              </div>
+            </div>
+
+            {selected.status === "decided" ? (
+              <div style={{ background: "#f0fdf4", borderRadius: 12, border: "1px solid #86efac", padding: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#15803d", marginBottom: 4 }}>Decision: {selected.decision?.toUpperCase()}</div>
+                {selected.decision_notes && <div style={{ fontSize: 13, color: "#166534" }}>{selected.decision_notes}</div>}
+                {selected.new_determination && <div style={{ fontSize: 12, color: "#166534", marginTop: 6 }}>New determination: {selected.new_determination} {selected.new_approved_visits ? `(${selected.new_approved_visits} visits)` : ""}</div>}
+              </div>
+            ) : (
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24 }}>
+                <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 15, fontWeight: 700, color: "#1a3a5c", marginBottom: 16 }}>Issue Decision</div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+                  {[
+                    { key: "upheld",     label: "Uphold",     color: "#dc2626", desc: "Maintain original denial" },
+                    { key: "overturned", label: "Overturn",   color: "#16a34a", desc: "Reverse in favor of provider" },
+                    { key: "modified",   label: "Modify",     color: "#d97706", desc: "Partial reversal" },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => setDecision(opt.key)}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 8, border: `2px solid ${decision === opt.key ? opt.color : "#e2e8f0"}`, background: decision === opt.key ? opt.color : "#fff", color: decision === opt.key ? "#fff" : "#374151", cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{opt.label}</div>
+                      <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2 }}>{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                {decision !== "upheld" && decision && (
+                  <div style={{ background: "#f0fdf4", borderRadius: 8, border: "1px solid #86efac", padding: 14, marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d", marginBottom: 10 }}>New Determination</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                      {["Approved", "Partial Denial", "Pend"].map(d => (
+                        <button key={d} onClick={() => setNewDet(d)}
+                          style={{ padding: "5px 12px", borderRadius: 6, border: `1.5px solid ${newDet === d ? "#16a34a" : "#e2e8f0"}`, background: newDet === d ? "#dcfce7" : "#fff", fontSize: 12, cursor: "pointer", fontWeight: newDet === d ? 700 : 400 }}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="number" min={0} value={newVisits} onChange={e => setNewVisits(e.target.value)}
+                      placeholder="Approved visits (optional)" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #86efac", fontSize: 13, width: 180 }} />
+                  </div>
+                )}
+                {decision && (
+                  <>
+                    <textarea value={decNotes} onChange={e => setDecNotes(e.target.value)} rows={3}
+                      placeholder="Decision rationale (will be sent to provider)..."
+                      style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: 14 }} />
+                    <button onClick={handleDecide} disabled={saving}
+                      style={{ background: "#1a3a5c", color: "#fff", border: "none", borderRadius: 8, padding: "11px 28px", fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+                      {saving ? "Recording…" : "Record Decision & Notify Provider"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MyCasesView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -2964,6 +3223,8 @@ function MyCasesView({ token }) {
   const [decisions, setDecisions]     = useState({});
   const [p2pModal, setP2pModal]       = useState(null);
   const [p2pSuccess, setP2pSuccess]   = useState({});
+  const [appealModal, setAppealModal] = useState(null);
+  const [appealSuccess, setAppealSuccess] = useState({});
 
   useEffect(() => {
     axios.get(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } })
@@ -2997,6 +3258,9 @@ function MyCasesView({ token }) {
   const canRequestP2P = (sub) =>
     ["denied", "pending_md_review"].includes(sub.status) && !p2pSuccess[sub.submission_id];
 
+  const canFileAppeal = (sub) =>
+    ["denied", "partial_denial"].includes(sub.status) && !appealSuccess[sub.submission_id];
+
   return (
     <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
       {p2pModal && (
@@ -3011,17 +3275,34 @@ function MyCasesView({ token }) {
           }}
         />
       )}
+      {appealModal && (
+        <AppealModal
+          submission={appealModal}
+          token={token}
+          onClose={() => setAppealModal(null)}
+          onSuccess={() => {
+            setAppealSuccess(prev => ({ ...prev, [appealModal.submission_id]: true }));
+            setAppealModal(null);
+          }}
+        />
+      )}
       {submissions.map(sub => {
         const isOpen = expanded === sub.submission_id;
         return (
           <div key={sub.submission_id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14, overflow: "hidden" }}>
             <div onClick={() => handleExpand(sub)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{sub.member_name || "Unknown Member"}</span>
                   <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id}</span>
                   {canRequestP2P(sub) && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>P2P AVAILABLE</span>
+                  )}
+                  {canFileAppeal(sub) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#fef2f2", color: "#dc2626", borderRadius: 5, padding: "2px 7px" }}>APPEAL AVAILABLE</span>
+                  )}
+                  {appealSuccess[sub.submission_id] && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#d1fae5", color: "#065f46", borderRadius: 5, padding: "2px 7px" }}>APPEAL FILED</span>
                   )}
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>
@@ -3064,7 +3345,25 @@ function MyCasesView({ token }) {
                     ✓ P2P request submitted — you will be notified when a time is confirmed.
                   </div>
                 )}
-                {!["approved","denied","pended","pending_md_review"].includes(sub.status) && (
+                {/* Appeal filing */}
+                {canFileAppeal(sub) && (
+                  <div style={{ marginTop: 10, padding: "14px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fca5a5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", fontFamily: "'Public Sans', sans-serif" }}>Not satisfied with this outcome?</div>
+                      <div style={{ fontSize: 12, color: "#7f1d1d", marginTop: 2 }}>You may file a formal Level 1 appeal within 60 days of this determination.</div>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); setAppealModal(sub); }}
+                      style={{ flexShrink: 0, marginLeft: 16, padding: "8px 16px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                      File Appeal
+                    </button>
+                  </div>
+                )}
+                {appealSuccess[sub.submission_id] && (
+                  <div style={{ marginTop: 10, padding: "12px 16px", background: "#d1fae5", borderRadius: 8, border: "1px solid #6ee7b7", fontSize: 13, color: "#065f46", fontFamily: "'Public Sans', sans-serif" }}>
+                    ✓ Level 1 appeal filed — you will be notified of the decision within 30 days.
+                  </div>
+                )}
+                {!["approved","denied","pended","pending_md_review","partial_denial"].includes(sub.status) && (
                   <div style={{ marginTop: 12, padding: "12px 16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                     <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>
                       Your case is in queue. You will be notified once a determination is made.
@@ -3536,6 +3835,274 @@ function MasterQueueView({ token }) {
   );
 }
 
+// ── MasterAppealsView: master sees all appeals + can assign reviewers ────────
+function MasterAppealsView({ token }) {
+  const [appeals, setAppeals]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [reviewers, setReviewers]     = useState([]);
+  const [selected, setSelected]       = useState(null);
+  const [assignTo, setAssignTo]       = useState("");
+  const [assigning, setAssigning]     = useState(false);
+  const [toast, setToast]             = useState(null);
+
+  const fetchAppeals = () => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/appeals`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setAppeals(r.data.appeals || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchAppeals();
+    axios.get(`${API_BASE}/v1/search-cases?reviewersOnly=1`, { headers: { Authorization: `Bearer ${token}` } })
+      .catch(() => {});
+    // Fetch reviewer list from users (we'll use a simple approach)
+    fetch(`${API_BASE}/v1/admin/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .catch(() => {});
+  }, [token]); // eslint-disable-line
+
+  const handleAssign = async () => {
+    if (!selected || !assignTo) return;
+    setAssigning(true);
+    try {
+      await axios.post(`${API_BASE}/v1/appeals/${selected.appeal_id}/assign`, { reviewerId: assignTo }, { headers: { Authorization: `Bearer ${token}` } });
+      setToast("Reviewer assigned and notified.");
+      setSelected(null); setAssignTo("");
+      fetchAppeals();
+      setTimeout(() => setToast(null), 4000);
+    } catch (err) {
+      setToast(err.response?.data?.error || "Failed to assign.");
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const levelColor = (l) => l === 1 ? "#1d4ed8" : l === 2 ? "#7c3aed" : "#dc2626";
+  const statusColor = (s) => {
+    const map = { filed: "#d97706", under_review: "#2563eb", decided: "#16a34a", withdrawn: "#94a3b8" };
+    return map[s] || "#94a3b8";
+  };
+
+  return (
+    <div style={{ padding: "24px 28px", maxWidth: 960, margin: "0 auto" }}>
+      {toast && <div style={{ position: "fixed", top: 16, right: 16, background: "#0d1b2a", color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>{toast}</div>}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif" }}>Appeals Management</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>All active and decided appeals across all levels</div>
+      </div>
+      {loading ? <div style={{ color: "#94a3b8", fontSize: 13 }}>Loading appeals…</div> : appeals.length === 0 ? (
+        <div style={{ background: "#fff", borderRadius: 12, padding: "40px 24px", textAlign: "center", border: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No appeals filed yet</div>
+          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Appeal filings from providers will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                {["Member", "Discipline", "Level", "Status", "Grounds", "Deadline", "Decision", "Action"].map(h => (
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {appeals.map((a, i) => {
+                const deadline = a.deadline_at ? new Date(a.deadline_at) : null;
+                const daysLeft = deadline ? Math.ceil((deadline - Date.now()) / 86400000) : null;
+                return (
+                  <tr key={a.appeal_id} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1e293b" }}>{a.member_name || "—"}</td>
+                    <td style={{ padding: "12px 16px", color: "#6b7280" }}>{a.discipline || "—"}</td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: "#eff6ff", color: levelColor(a.level) }}>L{a.level}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: statusColor(a.status) }}>{a.status?.replace("_"," ").toUpperCase()}</span>
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "#374151", maxWidth: 200 }}>{a.grounds?.slice(0, 40)}{a.grounds?.length > 40 ? "…" : ""}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 12, color: daysLeft !== null && daysLeft <= 5 ? "#dc2626" : "#64748b", fontWeight: daysLeft !== null && daysLeft <= 5 ? 700 : 400 }}>
+                      {daysLeft !== null ? (daysLeft > 0 ? `${daysLeft}d` : "PAST") : "—"}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 12, color: a.decision === "overturned" ? "#16a34a" : a.decision === "upheld" ? "#dc2626" : "#64748b" }}>
+                      {a.decision?.toUpperCase() || "—"}
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      {a.status === "filed" && a.level === 1 && (
+                        <button onClick={() => setSelected(a)} style={{ padding: "5px 12px", borderRadius: 6, background: "#1a3a5c", color: "#fff", border: "none", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Assign</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 8000 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Assign Appeal Reviewer</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20 }}>{selected.member_name} · Level {selected.level}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Enter Reviewer User ID</div>
+            <input value={assignTo} onChange={e => setAssignTo(e.target.value)}
+              placeholder="reviewer user_id UUID"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, marginBottom: 20, boxSizing: "border-box" }} />
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 16 }}>Tip: Find reviewer IDs in the All Cases tab.</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => { setSelected(null); setAssignTo(""); }} style={{ padding: "9px 18px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleAssign} disabled={!assignTo || assigning} style={{ padding: "9px 18px", borderRadius: 7, background: "#1a3a5c", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: !assignTo || assigning ? "not-allowed" : "pointer", opacity: !assignTo || assigning ? 0.6 : 1 }}>
+                {assigning ? "Assigning…" : "Assign Reviewer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AdminConsole: master manages plans + white-label config ──────────────────
+function AdminConsole({ token }) {
+  const [plans, setPlans]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null);  // null | plan object | "new"
+  const [form, setForm]       = useState({});
+  const [saving, setSaving]   = useState(false);
+  const [toast, setToast]     = useState(null);
+
+  const fetchPlans = () => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/admin/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setPlans(r.data.plans || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchPlans(); }, [token]); // eslint-disable-line
+
+  const openEdit = (plan) => {
+    setEditing(plan);
+    setForm({
+      planName:            plan.plan_name || "",
+      autoApproveThreshold: plan.auto_approve_threshold || 18,
+      brandColor:          plan.brand_color || "#1a3a5c",
+      logoUrl:             plan.logo_url || "",
+      contactEmail:        plan.contact_email || "",
+    });
+  };
+
+  const openNew = () => {
+    setEditing("new");
+    setForm({ planId: "", planName: "", autoApproveThreshold: 18, brandColor: "#1a3a5c", logoUrl: "", contactEmail: "" });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (editing === "new") {
+        await axios.post(`${API_BASE}/v1/admin/plans`, {
+          planId: form.planId, planName: form.planName,
+          autoApproveThreshold: parseInt(form.autoApproveThreshold, 10),
+          brandColor: form.brandColor, logoUrl: form.logoUrl, contactEmail: form.contactEmail,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      } else {
+        await axios.patch(`${API_BASE}/v1/admin/plans/${editing.plan_id}`, {
+          planName: form.planName,
+          autoApproveThreshold: parseInt(form.autoApproveThreshold, 10),
+          brandColor: form.brandColor, logoUrl: form.logoUrl, contactEmail: form.contactEmail,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      setToast(editing === "new" ? "Plan created." : "Plan updated.");
+      setEditing(null);
+      fetchPlans();
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setToast(err.response?.data?.error || "Save failed.");
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  return (
+    <div style={{ padding: "24px 28px", maxWidth: 900, margin: "0 auto" }}>
+      {toast && <div style={{ position: "fixed", top: 16, right: 16, background: "#0d1b2a", color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>{toast}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif" }}>Payer Plan Console</div>
+          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Configure payer plans, branding, and review rules</div>
+        </div>
+        <button onClick={openNew} style={{ padding: "10px 20px", background: "#0d1b2a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ New Plan</button>
+      </div>
+
+      {loading ? <div style={{ color: "#94a3b8", fontSize: 13 }}>Loading plans…</div> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          {plans.map(plan => (
+            <div key={plan.plan_id} style={{ background: "#fff", borderRadius: 12, border: "2px solid", borderColor: plan.brand_color || "#1a3a5c", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}>
+              <div style={{ background: plan.brand_color || "#1a3a5c", padding: "16px 20px" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>{plan.plan_name}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2, fontFamily: "monospace" }}>{plan.plan_id}</div>
+              </div>
+              <div style={{ padding: "14px 20px" }}>
+                <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>
+                  <span style={{ fontWeight: 600, color: "#374151" }}>Auto-approve threshold: </span>{plan.auto_approve_threshold || 18} visits
+                </div>
+                {plan.contact_email && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}><span style={{ fontWeight: 600, color: "#374151" }}>Contact: </span>{plan.contact_email}</div>}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: 4, background: plan.brand_color || "#1a3a5c", border: "1px solid rgba(0,0,0,0.1)" }} />
+                  <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{plan.brand_color || "#1a3a5c"}</span>
+                </div>
+                <button onClick={() => openEdit(plan)} style={{ marginTop: 14, width: "100%", padding: "8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#374151" }}>Edit Plan Config</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 8000, padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 480, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 20 }}>
+              {editing === "new" ? "Create New Plan" : `Edit ${editing.plan_name}`}
+            </div>
+            {[
+              editing === "new" && { key: "planId", label: "Plan ID *", placeholder: "e.g. UHC-GOLD", type: "text" },
+              { key: "planName", label: "Plan Name *", placeholder: "e.g. United Health Gold", type: "text" },
+              { key: "autoApproveThreshold", label: "Auto-Approve Threshold (visits)", placeholder: "18", type: "number" },
+              { key: "brandColor", label: "Brand Color (hex)", placeholder: "#005a8b", type: "text" },
+              { key: "logoUrl", label: "Logo URL (optional)", placeholder: "https://...", type: "text" },
+              { key: "contactEmail", label: "Contact Email", placeholder: "ur@payer.com", type: "email" },
+            ].filter(Boolean).map(field => (
+              <div key={field.key} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>{field.label}</div>
+                <input type={field.type} value={form[field.key] || ""} onChange={e => f(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
+                {field.key === "brandColor" && form.brandColor && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 6, background: form.brandColor, border: "1px solid rgba(0,0,0,0.1)" }} />
+                    <span style={{ fontSize: 11, color: "#9ca3af" }}>Preview</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+              <button onClick={() => setEditing(null)} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving}
+                style={{ padding: "10px 20px", borderRadius: 8, background: "#0d1b2a", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+                {saving ? "Saving…" : editing === "new" ? "Create Plan" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MasterShell({ user, token, onLogout }) {
   const [masterView, setMasterView] = useState("dashboard");
 
@@ -3563,6 +4130,8 @@ function MasterShell({ user, token, onLogout }) {
     ["queue",     "All Cases"],
     ["ur_form",   "UR Form"],
     ["cockpit",   "Cockpit"],
+    ["appeals",   "Appeals"],
+    ["admin",     "Admin"],
   ];
 
   return (
@@ -3598,6 +4167,8 @@ function MasterShell({ user, token, onLogout }) {
           <URFormEmbed user={user} token={token} />
         </div>
       )}
+      {masterView === "appeals"   && <MasterAppealsView token={token} />}
+      {masterView === "admin"     && <AdminConsole token={token} />}
     </div>
   );
 }
@@ -3605,7 +4176,151 @@ function MasterShell({ user, token, onLogout }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MEDICAL DIRECTOR SHELL
 // ─────────────────────────────────────────────────────────────────────────────
+// MD-specific L2 appeals component
+function MDAppealsView({ token }) {
+  const [appeals, setAppeals]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [decision, setDecision] = useState("");
+  const [decNotes, setDecNotes] = useState("");
+  const [newDet, setNewDet]     = useState("Approved");
+  const [newVisits, setNewVisits] = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [toast, setToast]       = useState(null);
+
+  const fetchAppeals = () => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/appeals`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setAppeals(r.data.appeals || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAppeals(); }, [token]); // eslint-disable-line
+
+  const handleDecide = async () => {
+    if (!selected || !decision) return;
+    setSaving(true);
+    try {
+      await axios.post(`${API_BASE}/v1/appeals/${selected.appeal_id}/decide`, {
+        decision, decisionNotes: decNotes,
+        newDetermination:  decision !== "upheld" ? newDet   : undefined,
+        newApprovedVisits: decision !== "upheld" ? (parseInt(newVisits, 10) || undefined) : undefined,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setToast("L2 appeal decision recorded. Provider notified.");
+      setSelected(null); setDecision(""); setDecNotes(""); setNewVisits("");
+      fetchAppeals();
+      setTimeout(() => setToast(null), 4000);
+    } catch (err) {
+      setToast(err.response?.data?.error || "Failed.");
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const NAVY = "#1a2e4a";
+  return (
+    <div style={{ display: "flex", height: "calc(100vh - 110px)" }}>
+      {toast && <div style={{ position: "fixed", top: 16, right: 16, background: NAVY, color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>{toast}</div>}
+      <div style={{ width: 300, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
+        <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: NAVY, fontFamily: "'Fraunces', serif" }}>Level 2 Appeals</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Requires MD decision</div>
+        </div>
+        {loading ? <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+        : appeals.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>No L2 appeals pending</div>
+          </div>
+        ) : appeals.map((a, i) => {
+          const isSel = selected?.appeal_id === a.appeal_id;
+          return (
+            <div key={a.appeal_id} onClick={() => { setSelected(a); setDecision(""); setDecNotes(""); setNewVisits(""); }}
+              style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#f5f0ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #7c3aed" : "3px solid transparent" }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{a.member_name}</div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>{a.discipline} · Level {a.level}</div>
+              <div style={{ fontSize: 11, color: "#7c3aed", fontWeight: 600, marginTop: 3 }}>Original: {a.original_determination}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: 28, background: "#faf8f3" }}>
+        {!selected ? (
+          <div style={{ maxWidth: 400, margin: "80px auto", textAlign: "center" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>⚖️</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: NAVY }}>Level 2 Appeal Review</div>
+            <div style={{ fontSize: 13, color: "#64748b", marginTop: 8 }}>Level 1 uphold decisions escalated here for MD co-signature.</div>
+          </div>
+        ) : (
+          <div style={{ maxWidth: 600, margin: "0 auto" }}>
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginBottom: 20 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 700, color: NAVY }}>{selected.member_name}</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>{selected.discipline} · Level {selected.level} Appeal</div>
+              <div style={{ background: "#f5f0ff", borderRadius: 8, padding: 14, marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#6d28d9", textTransform: "uppercase", marginBottom: 5 }}>Provider Grounds</div>
+                <div style={{ fontSize: 13, color: "#4c1d95" }}>{selected.grounds}</div>
+                {selected.supporting_notes && <div style={{ fontSize: 12, color: "#5b21b6", marginTop: 6 }}>{selected.supporting_notes}</div>}
+              </div>
+              <div style={{ background: "#fff7ed", borderRadius: 8, padding: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9a3412", textTransform: "uppercase", marginBottom: 4 }}>Original Determination</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#c2410c" }}>{selected.original_determination}</div>
+              </div>
+            </div>
+            {selected.status === "decided" ? (
+              <div style={{ background: "#f0fdf4", borderRadius: 12, border: "1px solid #86efac", padding: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#15803d" }}>Decision: {selected.decision?.toUpperCase()}</div>
+                {selected.decision_notes && <div style={{ fontSize: 13, color: "#166534", marginTop: 6 }}>{selected.decision_notes}</div>}
+              </div>
+            ) : (
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>MD Decision</div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { key: "upheld",     label: "Uphold",   color: "#dc2626" },
+                    { key: "overturned", label: "Overturn", color: "#16a34a" },
+                    { key: "modified",   label: "Modify",   color: "#d97706" },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => setDecision(opt.key)}
+                      style={{ flex: 1, padding: "11px 8px", borderRadius: 8, border: `2px solid ${decision === opt.key ? opt.color : "#e2e8f0"}`, background: decision === opt.key ? opt.color : "#fff", color: decision === opt.key ? "#fff" : "#374151", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {decision !== "upheld" && decision && (
+                  <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 12, marginBottom: 14 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                      {["Approved", "Partial Denial", "Pend"].map(d => (
+                        <button key={d} onClick={() => setNewDet(d)}
+                          style={{ padding: "5px 12px", borderRadius: 6, border: `1.5px solid ${newDet === d ? "#16a34a" : "#e2e8f0"}`, background: newDet === d ? "#dcfce7" : "#fff", fontSize: 12, cursor: "pointer", fontWeight: newDet === d ? 700 : 400 }}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="number" value={newVisits} onChange={e => setNewVisits(e.target.value)} placeholder="Approved visits" style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #86efac", fontSize: 13, width: 160 }} />
+                  </div>
+                )}
+                {decision && (
+                  <>
+                    <textarea value={decNotes} onChange={e => setDecNotes(e.target.value)} rows={3}
+                      placeholder="MD rationale for the record…"
+                      style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: 14 }} />
+                    <button onClick={handleDecide} disabled={saving}
+                      style={{ background: NAVY, color: "#fff", border: "none", borderRadius: 8, padding: "11px 28px", fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1 }}>
+                      {saving ? "Recording…" : "Record L2 Decision"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MDShell({ user, token, onLogout }) {
+  const [mdTab, setMdTab]     = useState("md_queue"); // "md_queue" | "l2_appeals"
   const [queue, setQueue]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -3680,11 +4395,24 @@ function MDShell({ user, token, onLogout }) {
         </div>
       </div>
 
+      {/* MD Tab bar */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+        {[["md_queue","Co-Sign Queue"], ["l2_appeals","L2 Appeals"]].map(([v, label]) => (
+          <button key={v} onClick={() => setMdTab(v)} style={{
+            padding: "11px 20px", fontSize: 13, fontWeight: mdTab === v ? 700 : 500,
+            color: mdTab === v ? NAVY : "#6b7280", background: "none", border: "none",
+            borderBottom: mdTab === v ? `2.5px solid ${NAVY}` : "2.5px solid transparent",
+            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+          }}>{label}</button>
+        ))}
+      </div>
+
       {toast && (
         <div style={{ position: "fixed", top: 16, right: 16, background: NAVY, color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>{toast}</div>
       )}
 
-      <div style={{ display: "flex", height: "calc(100vh - 56px)" }}>
+      {mdTab === "l2_appeals" && <MDAppealsView token={token} />}
+      {mdTab === "md_queue" && <div style={{ display: "flex", height: "calc(100vh - 110px)" }}>
         {/* Queue Panel */}
         <div style={{ width: 340, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
           <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
@@ -3825,7 +4553,7 @@ function MDShell({ user, token, onLogout }) {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
