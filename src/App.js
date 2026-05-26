@@ -498,7 +498,8 @@ function AuthPage({ onAuthSuccess }) {
   const [confirmPw, setConfirmPw] = useState("");
   const [fullName, setFullName]   = useState("");
   const [error, setError]         = useState("");
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [slowConnection, setSlowConnection] = useState(false);
 
   const inputBase = {
     width: "100%",
@@ -517,6 +518,8 @@ function AuthPage({ onAuthSuccess }) {
     e.preventDefault();
     setError("");
     setLoading(true);
+    setSlowConnection(false);
+    const slowTimer = setTimeout(() => setSlowConnection(true), 5000);
     try {
       const res = await axios.post(`${API_BASE}/api/auth/login`, { email, password });
       onAuthSuccess(res.data.token, res.data.user);
@@ -529,6 +532,8 @@ function AuthPage({ onAuthSuccess }) {
         setError(err?.response?.data?.error || "Login failed. Please try again.");
       }
     } finally {
+      clearTimeout(slowTimer);
+      setSlowConnection(false);
       setLoading(false);
     }
   };
@@ -545,6 +550,8 @@ function AuthPage({ onAuthSuccess }) {
       return;
     }
     setLoading(true);
+    setSlowConnection(false);
+    const slowTimer = setTimeout(() => setSlowConnection(true), 5000);
     try {
       const res = await axios.post(`${API_BASE}/api/auth/register`, {
         email,
@@ -561,6 +568,8 @@ function AuthPage({ onAuthSuccess }) {
         setError(err?.response?.data?.error || "Registration failed. Please try again.");
       }
     } finally {
+      clearTimeout(slowTimer);
+      setSlowConnection(false);
       setLoading(false);
     }
   };
@@ -718,7 +727,9 @@ function AuthPage({ onAuthSuccess }) {
                 boxShadow: loading ? "none" : "0 2px 10px rgba(26,58,92,0.25)",
               }}
             >
-              {loading ? "Please wait..." : view === "login" ? "Sign In" : "Create Account"}
+              {loading
+                ? (slowConnection ? "Waking up server… (up to 60 s)" : "Please wait…")
+                : view === "login" ? "Sign In" : "Create Account"}
             </button>
           </form>
 
