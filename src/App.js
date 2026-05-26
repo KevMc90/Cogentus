@@ -1476,6 +1476,277 @@ function NotificationBell({ token }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CRITERIA LIBRARY (Phase 20)
+// ─────────────────────────────────────────────────────────────────────────────
+function CriteriaLibraryView({ token }) {
+  const [query,      setQuery]      = useState("");
+  const [discipline, setDisc]       = useState("");
+  const [results,    setResults]    = useState(null);
+  const [selected,   setSelected]   = useState(null);
+  const [detail,     setDetail]     = useState(null);
+  const [loading,    setLoading]    = useState(false);
+
+  const search = async () => {
+    setLoading(true);
+    setSelected(null);
+    setDetail(null);
+    try {
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (discipline) params.set("discipline", discipline);
+      const res = await axios.get(`${API_BASE}/v1/criteria?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      setResults(res.data);
+    } catch { setResults([]); }
+    finally { setLoading(false); }
+  };
+
+  const loadDetail = async (row) => {
+    setSelected(row);
+    setDetail(null);
+    try {
+      const res = await axios.get(`${API_BASE}/v1/criteria/${row.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      setDetail(res.data);
+    } catch { setDetail(row); }
+  };
+
+  useEffect(() => { search(); }, []); // eslint-disable-line
+
+  const DISC_TABS = [["","All"], ["PT","PT"], ["OT","OT"], ["ST","ST"]];
+
+  const ex = detail?.criteria_json || {};
+  const mcg = ex.mcg || {};
+  const cpg = ex.cpg || {};
+  const freqBySev = ex.frequency_by_severity || {};
+  const severityRows = Object.entries(freqBySev);
+
+  return (
+    <div style={{ display: "flex", height: "calc(100vh - 49px)", overflow: "hidden" }}>
+
+      {/* ── Left: search + list ── */}
+      <div style={{ width: 360, borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", background: "#fff", flexShrink: 0 }}>
+        {/* Search bar */}
+        <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && search()}
+              placeholder="ICD-10 code or keyword…"
+              style={{ flex: 1, border: "1px solid #d1d5db", borderRadius: 7, padding: "7px 11px", fontSize: 13, fontFamily: "'Public Sans', sans-serif", outline: "none" }}
+            />
+            <button onClick={search} disabled={loading}
+              style={{ padding: "7px 14px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+              {loading ? "…" : "Search"}
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {DISC_TABS.map(([v, label]) => (
+              <button key={v} onClick={() => { setDisc(v); }}
+                style={{ padding: "4px 11px", borderRadius: 20, fontSize: 11, fontWeight: 600, border: "1.5px solid", fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                  background: discipline === v ? "#1a3a5c" : "transparent",
+                  color: discipline === v ? "#fff" : "#64748b",
+                  borderColor: discipline === v ? "#1a3a5c" : "#d1d5db" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Results list */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {results === null && <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading…</div>}
+          {results?.length === 0 && <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>No results. Try a different search.</div>}
+          {results?.map(row => {
+            const discColor = row.discipline === "OT" ? "#c2410c" : row.discipline === "ST" ? "#15803d" : "#1a3a5c";
+            const isActive = selected?.id === row.id;
+            return (
+              <div key={row.id} onClick={() => loadDetail(row)}
+                style={{ padding: "10px 16px", borderBottom: "1px solid #f1f5f9", cursor: "pointer",
+                  background: isActive ? "#eff6ff" : "transparent",
+                  borderLeft: isActive ? "3px solid #1a3a5c" : "3px solid transparent" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                  <span style={{ background: discColor, color: "#fff", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, fontFamily: "'DM Sans', sans-serif" }}>{row.discipline}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#1a3a5c", fontFamily: "'DM Sans', sans-serif" }}>{row.code}</span>
+                  {row.is_custom && <span style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", background: "#ede9fe", padding: "1px 5px", borderRadius: 4, fontFamily: "'DM Sans', sans-serif" }}>CUSTOM</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.4 }}>{row.condition_label || row.description}</div>
+                {(row.typical_visits_min || row.typical_visits_max) && (
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontFamily: "'Public Sans', sans-serif" }}>
+                    Typical: {row.typical_visits_min}–{row.typical_visits_max} visits
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {results !== null && <div style={{ padding: "8px 16px", fontSize: 11, color: "#9ca3af", borderTop: "1px solid #f1f5f9", fontFamily: "'Public Sans', sans-serif" }}>{results.length} result{results.length !== 1 ? "s" : ""}</div>}
+      </div>
+
+      {/* ── Right: detail panel ── */}
+      <div style={{ flex: 1, overflowY: "auto", background: "#f8fafc", padding: selected ? "24px 28px" : 0 }}>
+        {!selected && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
+            <div style={{ fontSize: 36 }}>📋</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#94a3b8", fontFamily: "'Fraunces', Georgia, serif" }}>Select a criteria entry</div>
+            <div style={{ fontSize: 13, color: "#cbd5e1", fontFamily: "'Public Sans', sans-serif" }}>Search for a diagnosis code or condition</div>
+          </div>
+        )}
+        {selected && !detail && <div style={{ padding: 32, color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading…</div>}
+        {selected && detail && (() => {
+          const discColor = selected.discipline === "OT" ? "#c2410c" : selected.discipline === "ST" ? "#15803d" : "#1a3a5c";
+          const SectionHead = ({ children }) => (
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#6b7280", fontFamily: "'DM Sans', sans-serif", marginBottom: 8, marginTop: 20 }}>{children}</div>
+          );
+          const Card = ({ children, style }) => (
+            <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "14px 18px", ...style }}>{children}</div>
+          );
+          return (
+            <div style={{ maxWidth: 760 }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ background: discColor, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 5, fontFamily: "'DM Sans', sans-serif" }}>{selected.discipline}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'DM Sans', sans-serif" }}>{selected.code}</span>
+                    <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>{selected.source}</span>
+                    {selected.is_custom && <span style={{ fontSize: 10, color: "#7c3aed", background: "#ede9fe", padding: "1px 6px", borderRadius: 4, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>CUSTOM</span>}
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: "#1e293b", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.2 }}>{selected.condition_label || selected.description}</div>
+                  {ex.description && ex.description !== selected.condition_label && (
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontFamily: "'Public Sans', sans-serif" }}>{ex.description}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* MCG benchmarks */}
+              {(mcg.typical_visits || mcg.median_visits) && (
+                <>
+                  <SectionHead>MCG Visit Benchmarks</SectionHead>
+                  <Card>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 0" }}>
+                      {[
+                        ["Typical", mcg.typical_visits],
+                        ["Median",  mcg.median_visits],
+                        ["P75",     mcg.p75_visits],
+                        ["Episode Max", mcg.max_visits_episode],
+                      ].filter(([,v]) => v).map(([label, val]) => (
+                        <div key={label} style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>{val}</div>
+                          <div style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {mcg.notes && <div style={{ marginTop: 12, fontSize: 12, color: "#4b5563", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.6, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>{mcg.notes}</div>}
+                  </Card>
+                </>
+              )}
+
+              {/* Frequency by severity */}
+              {severityRows.length > 0 && (
+                <>
+                  <SectionHead>Frequency by Severity</SectionHead>
+                  <Card style={{ padding: 0, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "'Public Sans', sans-serif" }}>
+                      <thead>
+                        <tr style={{ background: "#f8fafc" }}>
+                          {["Severity","Frequency","Duration","Total Visits"].map(h => (
+                            <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {severityRows.map(([sev, data], i) => (
+                          <tr key={sev} style={{ borderBottom: i < severityRows.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                            <td style={{ padding: "8px 14px", fontWeight: 600, color: "#374151", textTransform: "capitalize" }}>{sev.replace(/_/g, " ")}</td>
+                            <td style={{ padding: "8px 14px", color: "#1a3a5c", fontWeight: 600 }}>{data.max_freq} {data.unit}</td>
+                            <td style={{ padding: "8px 14px", color: "#374151" }}>{data.duration_weeks} wks</td>
+                            <td style={{ padding: "8px 14px", color: "#374151" }}>{data.total_visits}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </Card>
+                </>
+              )}
+
+              {/* CPG info */}
+              {(cpg.primary || cpg.key_recommendations) && (
+                <>
+                  <SectionHead>Clinical Practice Guideline</SectionHead>
+                  <Card>
+                    {cpg.primary && <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif", marginBottom: 6 }}>{cpg.primary}</div>}
+                    {cpg.evidence_level && <span style={{ fontSize: 11, background: "#dcfce7", color: "#15803d", borderRadius: 5, padding: "2px 8px", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{cpg.evidence_level}</span>}
+                    {cpg.key_recommendations?.length > 0 && (
+                      <ul style={{ margin: "10px 0 0", padding: "0 0 0 18px" }}>
+                        {cpg.key_recommendations.map((r, i) => <li key={i} style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif", marginBottom: 4, lineHeight: 1.5 }}>{r}</li>)}
+                      </ul>
+                    )}
+                    {cpg.citation && <div style={{ marginTop: 10, fontSize: 11, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif", fontStyle: "italic" }}>{cpg.citation}</div>}
+                  </Card>
+                </>
+              )}
+
+              {/* Red flags */}
+              {ex.red_flags?.length > 0 && (
+                <>
+                  <SectionHead>Red Flags</SectionHead>
+                  <Card style={{ background: "#fff7ed", borderColor: "#fed7aa" }}>
+                    <ul style={{ margin: 0, padding: "0 0 0 18px" }}>
+                      {ex.red_flags.map((f, i) => <li key={i} style={{ fontSize: 12, color: "#c2410c", fontFamily: "'Public Sans', sans-serif", marginBottom: 4, lineHeight: 1.5, fontWeight: 500 }}>{f}</li>)}
+                    </ul>
+                  </Card>
+                </>
+              )}
+
+              {/* Skilled care indicators */}
+              {ex.skilled_care_indicators?.length > 0 && (
+                <>
+                  <SectionHead>Skilled Care Indicators</SectionHead>
+                  <Card>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {ex.skilled_care_indicators.map((s, i) => (
+                        <span key={i} style={{ background: "#eff6ff", color: "#1a3a5c", borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{s}</span>
+                      ))}
+                    </div>
+                  </Card>
+                </>
+              )}
+
+              {/* LOS triggers */}
+              {ex.los_triggers?.length > 0 && (
+                <>
+                  <SectionHead>Discharge / LOS Triggers</SectionHead>
+                  <Card>
+                    <ul style={{ margin: 0, padding: "0 0 0 18px" }}>
+                      {ex.los_triggers.map((t, i) => <li key={i} style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif", marginBottom: 4, lineHeight: 1.5 }}>{t}</li>)}
+                    </ul>
+                  </Card>
+                </>
+              )}
+
+              {/* Special considerations */}
+              {ex.special_considerations?.length > 0 && (
+                <>
+                  <SectionHead>Special Considerations</SectionHead>
+                  <Card>
+                    <ul style={{ margin: 0, padding: "0 0 0 18px" }}>
+                      {ex.special_considerations.map((s, i) => <li key={i} style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif", marginBottom: 4, lineHeight: 1.5 }}>{s}</li>)}
+                    </ul>
+                  </Card>
+                </>
+              )}
+
+              <div style={{ height: 40 }} />
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REVIEWER SHELL
 // ─────────────────────────────────────────────────────────────────────────────
 function ReviewerShell({ user, token, onLogout }) {
@@ -1584,7 +1855,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1610,7 +1881,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1636,7 +1907,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1662,7 +1933,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1691,7 +1962,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1701,6 +1972,32 @@ function ReviewerShell({ user, token, onLogout }) {
           ))}
         </div>
         <AppealsQueueView token={token} />
+      </div>
+    );
+  }
+
+  // ── Criteria view ──
+  if (revView === "criteria") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <CriteriaLibraryView token={token} />
       </div>
     );
   }
@@ -1727,7 +2024,7 @@ function ReviewerShell({ user, token, onLogout }) {
 
       {/* Tab bar */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"]].map(([v, label]) => (
+        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
           <button key={v} onClick={() => setRevView(v)} style={{
             padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
             color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -4563,6 +4860,7 @@ function MasterShell({ user, token, onLogout }) {
     ["appeals",   "Appeals"],
     ["reports",   "Reports"],
     ["admin",     "Admin"],
+    ["criteria",  "Criteria"],
   ];
 
   return (
@@ -4601,6 +4899,7 @@ function MasterShell({ user, token, onLogout }) {
       {masterView === "appeals"   && <MasterAppealsView token={token} />}
       {masterView === "reports"   && <ReportsView token={token} />}
       {masterView === "admin"     && <AdminConsole token={token} />}
+      {masterView === "criteria"  && <CriteriaLibraryView token={token} />}
     </div>
   );
 }
