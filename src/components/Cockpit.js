@@ -2012,6 +2012,22 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: FONTS.body }}>
             submitted {fmtTime(kase.submittedAt)}
           </span>
+          {kase.receivedAt && (() => {
+            const priority     = kase.reviewPriority || "standard";
+            const hoursAllowed = priority === "urgent" ? 24 : priority === "expedited" ? 8 : 72;
+            const elapsedMs    = Date.now() - new Date(kase.receivedAt);
+            const elapsedH     = Math.max(0, elapsedMs / 3600000);
+            const pct          = Math.min(100, (elapsedH / hoursAllowed) * 100);
+            const hoursLeft    = Math.max(0, hoursAllowed - elapsedH);
+            const tatStatus    = pct >= 100 ? "breached" : pct >= 70 ? "at_risk" : "on_track";
+            const tatColor     = tatStatus === "breached" ? "#fca5a5" : tatStatus === "at_risk" ? "#fcd34d" : "#86efac";
+            const tatTextColor = tatStatus === "breached" ? "#7f1d1d" : tatStatus === "at_risk" ? "#78350f" : "#14532d";
+            return (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: tatColor, color: tatTextColor, fontFamily: FONTS.body }}>
+                {tatStatus === "breached" ? "⚠ SLA BREACHED" : `${priority === "urgent" ? "⚡" : "⏱"} ${hoursLeft.toFixed(0)}h / ${hoursAllowed}h`}
+              </span>
+            );
+          })()}
           {kase.isLive && (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,

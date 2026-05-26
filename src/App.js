@@ -7,6 +7,59 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
   "https://cogentus-backend.onrender.com";
 
+// ── TAT helpers (mirrors backend computeTatStatus) ───────────────────────────
+function computeTat(sub) {
+  if (!sub) return null;
+  const priority     = sub.review_priority || sub.reviewPriority || "standard";
+  const hoursAllowed = priority === "urgent" ? 24 : priority === "expedited" ? 8 : 72;
+  const receivedAt   = new Date(sub.received_at || sub.receivedAt || sub.submitted_at || sub.submittedAt || Date.now());
+  const now          = new Date();
+  let   elapsedMs    = now - receivedAt;
+  if (sub.rmi_sent_at || sub.rmiSentAt) {
+    const sentAt    = new Date(sub.rmi_sent_at || sub.rmiSentAt);
+    const pauseEnd  = (sub.rmi_responded_at || sub.rmiRespondedAt) ? new Date(sub.rmi_responded_at || sub.rmiRespondedAt) : now;
+    elapsedMs      -= Math.max(0, pauseEnd - sentAt);
+  }
+  const elapsedHours = Math.max(0, elapsedMs / 3600000);
+  const pct          = Math.min(100, (elapsedHours / hoursAllowed) * 100);
+  const hoursLeft    = Math.max(0, hoursAllowed - elapsedHours);
+  return {
+    status:       pct >= 100 ? "breached" : pct >= 70 ? "at_risk" : "on_track",
+    elapsedHours: Math.round(elapsedHours * 10) / 10,
+    hoursLeft:    Math.round(hoursLeft * 10) / 10,
+    pct:          Math.round(pct),
+    hoursAllowed,
+    priority,
+  };
+}
+
+function TatBadge({ sub, style = {} }) {
+  const tat = computeTat(sub);
+  if (!tat) return null;
+  const isBreached = tat.status === "breached";
+  const isAtRisk   = tat.status === "at_risk";
+  const colors = isBreached
+    ? { bg: "#fef2f2", text: "#dc2626", border: "#fca5a5" }
+    : isAtRisk
+    ? { bg: "#fffbeb", text: "#d97706", border: "#fcd34d" }
+    : { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" };
+  const label = isBreached
+    ? `⚠ SLA BREACHED`
+    : `${tat.priority === "urgent" ? "⚡" : "⏱"} ${tat.hoursLeft.toFixed(0)}h left`;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "2px 8px", borderRadius: 20,
+      background: colors.bg, border: `1px solid ${colors.border}`,
+      fontSize: 10, fontWeight: 700, color: colors.text,
+      fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
+      ...style,
+    }}>
+      {label}
+    </span>
+  );
+}
+
 // Section definitions -- order matters for display
 const SECTION_KEYS = [
   { key: "hpiCareHistory",         label: "HPI/Care History" },
@@ -1448,14 +1501,18 @@ function ReviewerShell({ user, token, onLogout }) {
         const sub = res.data.case;
         const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
         setAssignedCase({
-          caseId:      sub.submission_id,
-          memberName:  sub.member_name || "Unknown Member",
-          memberId:    sub.member_id   || "—",
-          dob:         sub.dob         || "—",
-          discipline:  sub.discipline  || user.discipline || "PT",
-          reviewType:  "initial",
-          submittedAt: sub.submitted_at,
-          documents:   sub.document_list || [],
+          caseId:         sub.submission_id,
+          memberName:     sub.member_name || "Unknown Member",
+          memberId:       sub.member_id   || "—",
+          dob:            sub.dob         || "—",
+          discipline:     sub.discipline  || user.discipline || "PT",
+          reviewType:     "initial",
+          submittedAt:    sub.submitted_at,
+          receivedAt:     sub.received_at || sub.submitted_at,
+          reviewPriority: sub.review_priority || "standard",
+          rmiSentAt:      sub.rmi_sent_at     || null,
+          rmiRespondedAt: sub.rmi_responded_at || null,
+          documents:      sub.document_list || [],
           metrics: {
             primaryDiagnosisCode: diags[0] || null,
             diagnosisCodes:       diags,
@@ -2520,15 +2577,22 @@ function ProviderPortal({ user, token, onLogout }) {
 // MASTER DASHBOARD (Phase 12)
 // ─────────────────────────────────────────────────────────────────────────────
 function MasterDashboard({ token }) {
-  const [stats, setStats]     = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [period, setPeriod]   = useState("today");
-  const [error, setError]     = useState("");
+  const [stats, setStats]       = useState(null);
+  const [tatStats, setTatStats] = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [period, setPeriod]     = useState("today");
+  const [error, setError]       = useState("");
 
   useEffect(() => {
-    axios.get(`${API_BASE}/v1/master-stats`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => { setStats(r.data); setLoading(false); })
-      .catch(() => { setError("Failed to load stats."); setLoading(false); });
+    const h = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      axios.get(`${API_BASE}/v1/master-stats`, { headers: h }),
+      axios.get(`${API_BASE}/v1/tat-stats`,    { headers: h }).catch(() => null),
+    ]).then(([r1, r2]) => {
+      setStats(r1.data);
+      if (r2) setTatStats(r2.data);
+      setLoading(false);
+    }).catch(() => { setError("Failed to load stats."); setLoading(false); });
   }, [token]);
 
   const PERIODS = [
@@ -2659,6 +2723,58 @@ function MasterDashboard({ token }) {
         </div>
       </div>
 
+      {/* SLA Compliance Panel */}
+      {tatStats && (
+        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden", marginBottom: 20 }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>SLA Compliance</span>
+            {tatStats.summary.breached > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>
+                {tatStats.summary.breached} BREACHED
+              </span>
+            )}
+          </div>
+          <div style={{ padding: "16px 20px" }}>
+            {/* Summary row */}
+            <div style={{ display: "flex", gap: 14, marginBottom: tatStats.atRiskCases.length > 0 ? 16 : 0 }}>
+              {[
+                { label: "Compliance Rate",  value: tatStats.summary.complianceRate + "%",  color: tatStats.summary.complianceRate >= 90 ? "#15803d" : tatStats.summary.complianceRate >= 75 ? "#d97706" : "#dc2626" },
+                { label: "On Track",         value: tatStats.summary.onTrack,                color: "#15803d" },
+                { label: "At Risk",          value: tatStats.summary.atRisk,                 color: "#d97706" },
+                { label: "Breached",         value: tatStats.summary.breached,               color: tatStats.summary.breached > 0 ? "#dc2626" : "#9ca3af" },
+                { label: "Avg Elapsed (h)",  value: tatStats.summary.avgElapsedHours,        color: "#374151" },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, background: "#f8fafc", borderRadius: 8, padding: "12px 14px", border: "1px solid #f1f5f9", textAlign: "center" }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 4, fontFamily: "'DM Sans', sans-serif" }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {/* Compliance bar */}
+            <div style={{ background: "#f1f5f9", borderRadius: 4, height: 6, overflow: "hidden", marginBottom: tatStats.atRiskCases.length > 0 ? 16 : 0 }}>
+              <div style={{ width: tatStats.summary.complianceRate + "%", height: "100%", background: tatStats.summary.complianceRate >= 90 ? "#22c55e" : tatStats.summary.complianceRate >= 75 ? "#f59e0b" : "#ef4444", borderRadius: 4, transition: "width 0.6s" }} />
+            </div>
+            {/* At-risk cases list */}
+            {tatStats.atRiskCases.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Cases Needing Attention</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {tatStats.atRiskCases.slice(0, 5).map(c => (
+                    <div key={c.submissionId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 6, background: c.tatStatus === "breached" ? "#fef2f2" : "#fffbeb", border: `1px solid ${c.tatStatus === "breached" ? "#fca5a5" : "#fcd34d"}` }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: c.tatStatus === "breached" ? "#dc2626" : "#d97706", minWidth: 60 }}>{c.tatStatus === "breached" ? "BREACHED" : `${c.hoursLeft.toFixed(0)}h left`}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", fontFamily: "'Public Sans', sans-serif", flex: 1 }}>{c.memberName}</span>
+                      <span style={{ fontSize: 10, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{c.submissionId}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#eff6ff", color: "#1a3a5c" }}>{c.discipline}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: c.priority === "urgent" ? "#fef2f2" : "#f8fafc", color: c.priority === "urgent" ? "#dc2626" : "#9ca3af" }}>{c.priority.toUpperCase()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Per-reviewer performance table */}
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>
@@ -2708,15 +2824,16 @@ function MasterDashboard({ token }) {
 function MasterQueueView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [discFilter, setDiscFilter]     = useState("all");
+  const [statusFilter, setStatusFilter]     = useState("all");
+  const [discFilter, setDiscFilter]         = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (discFilter  !== "all") params.set("discipline", discFilter);
+      if (statusFilter   !== "all") params.set("status", statusFilter);
+      if (discFilter     !== "all") params.set("discipline", discFilter);
       const r = await axios.get(`${API_BASE}/v1/submissions?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setSubmissions(r.data.submissions || []);
     } catch {}
@@ -2735,9 +2852,18 @@ function MasterQueueView({ token }) {
 
   const selS = { padding: "7px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none", background: "#fff", cursor: "pointer" };
 
+  // Client-side priority filter + sort breached → at_risk → on_track
+  const visible = submissions
+    .filter(s => priorityFilter === "all" || (s.review_priority || "standard") === priorityFilter)
+    .map(s => ({ ...s, _tat: computeTat(s) }))
+    .sort((a, b) => {
+      const rank = { breached: 0, at_risk: 1, on_track: 2 };
+      return (rank[a._tat?.status] ?? 2) - (rank[b._tat?.status] ?? 2);
+    });
+
   return (
-    <div style={{ maxWidth: 1000, margin: "28px auto", padding: "0 24px" }}>
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+    <div style={{ maxWidth: 1100, margin: "28px auto", padding: "0 24px" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selS}>
           <option value="all">All Statuses</option>
           <option value="submitted">Submitted</option>
@@ -2752,33 +2878,47 @@ function MasterQueueView({ token }) {
           <option value="OT">OT</option>
           <option value="ST">ST</option>
         </select>
+        <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} style={selS}>
+          <option value="all">All Priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="expedited">Expedited</option>
+          <option value="standard">Standard</option>
+        </select>
         <button onClick={load} style={{ padding: "7px 16px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Refresh</button>
-        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>{submissions.length} case{submissions.length !== 1 ? "s" : ""}</span>
+        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>{visible.length} case{visible.length !== 1 ? "s" : ""}</span>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 60px 130px 90px 110px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-          {["Member","Case ID","Disc.","Status","Visits","Submitted"].map(h => (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 120px 100px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+          {["Member","Case ID","Disc.","Status","Visits","TAT / SLA","Submitted"].map(h => (
             <span key={h} style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
           ))}
         </div>
         {loading ? (
           <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading...</div>
-        ) : submissions.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No submissions match the current filters.</div>
-        ) : submissions.map((s, i) => {
-          const sb = statusBadge(s.status);
+        ) : visible.map((s, i) => {
+          const sb    = statusBadge(s.status);
           const discC = s.discipline === "OT" ? "#c2410c" : s.discipline === "ST" ? "#15803d" : "#1a3a5c";
+          const tat   = s._tat;
+          const rowBg = tat?.status === "breached" ? "#fffafa" : tat?.status === "at_risk" ? "#fffef5" : "#fff";
           return (
-            <div key={s.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 60px 130px 90px 110px", gap: 0, padding: "12px 20px", borderBottom: i < submissions.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+            <div key={s.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 120px 100px", gap: 0, padding: "12px 20px", borderBottom: i < visible.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: rowBg }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{s.member_name || "—"}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{s.member_name || "—"}</span>
+                  {s.review_priority === "urgent" && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>⚡ URGENT</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{s.member_id || "—"}</div>
               </div>
-              <span style={{ fontSize: 10, fontFamily: "monospace", color: "#374151" }}>{s.submission_id}</span>
+              <span style={{ fontSize: 10, fontFamily: "monospace", color: "#374151" }}>{s.submission_id?.substring(0, 10) || "—"}</span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: "#eff6ff", color: discC, fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{s.discipline || "—"}</span>
               <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: sb.bg, color: sb.text, textTransform: "capitalize", fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{(s.status || "—").replace(/_/g," ")}</span>
               <span style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{s.requested_visits || "—"}</span>
+              <TatBadge sub={s} />
               <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}</span>
             </div>
           );
