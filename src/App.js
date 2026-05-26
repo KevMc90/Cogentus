@@ -1834,11 +1834,302 @@ function ReviewerDashboard({ token, user }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROVIDER PORTAL STUB (Phase 10 will build this out)
+// PROVIDER PORTAL (Phase 10)
 // ─────────────────────────────────────────────────────────────────────────────
-function ProviderPortalStub({ user, token, onLogout }) {
+
+const STATUS_STEPS = ["submitted", "pending_review", "under_review", "decision"];
+function statusStep(s) {
+  if (s === "approved" || s === "denied" || s === "pended") return 3;
+  if (s === "under_review")   return 2;
+  if (s === "pending_review") return 1;
+  return 0;
+}
+function StatusProgressBar({ status }) {
+  const step = statusStep(status);
+  const isDecision = step === 3;
+  const decisionColor = status === "approved" ? "#15803d" : status === "denied" ? "#991b1b" : "#1d4ed8";
+  const LABELS = ["Submitted", "In Queue", "Under Review", status === "approved" ? "Approved" : status === "denied" ? "Denied" : status === "pended" ? "Pended" : "Decision"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginTop: 8 }}>
+      {LABELS.map((label, i) => {
+        const done    = i < step;
+        const current = i === step;
+        const dotColor = current && isDecision ? decisionColor : (done || current) ? "#1a3a5c" : "#d1d5db";
+        return (
+          <React.Fragment key={i}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+              <div style={{
+                width: 12, height: 12, borderRadius: "50%",
+                background: dotColor,
+                border: current && !isDecision ? "2px solid #1a3a5c" : "none",
+                boxShadow: current ? "0 0 0 3px rgba(26,58,92,0.15)" : "none",
+                transition: "all 0.2s",
+              }} />
+              <span style={{ fontSize: 9, color: current ? dotColor : done ? "#1a3a5c" : "#9ca3af", fontWeight: current ? 700 : 500, marginTop: 3, fontFamily: "'DM Sans', sans-serif", textAlign: "center", lineHeight: 1.2 }}>{label}</span>
+            </div>
+            {i < LABELS.length - 1 && (
+              <div style={{ flex: 1, height: 2, background: i < step ? "#1a3a5c" : "#e2e8f0", marginBottom: 12, transition: "background 0.3s" }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function DecisionLetter({ submission, decision }) {
+  const isApproved = submission.status === "approved";
+  const isDenied   = submission.status === "denied";
+  const isPended   = submission.status === "pended";
+  if (!isApproved && !isDenied && !isPended) return null;
+
+  const decColor = isApproved ? "#15803d" : isDenied ? "#991b1b" : "#1d4ed8";
+  const decBg    = isApproved ? "#f0fdf4" : isDenied ? "#fef2f2" : "#eff6ff";
+  const decLabel = isApproved ? "APPROVED" : isDenied ? "DENIED" : "PENDED FOR ADDITIONAL INFORMATION";
+
+  const approvedVisits = decision?.approved_visits ?? null;
+  const rationale      = decision?.rationale       ?? null;
+  const decidedAt      = decision?.recorded_at     ?? submission.updated_at;
+
+  return (
+    <div style={{ marginTop: 20, border: `1.5px solid ${decColor}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+      {/* Letterhead */}
+      <div style={{ background: "#1a3a5c", padding: "14px 20px", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginLeft: 4 }}>|</span>
+        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>Utilization Management Decision</span>
+      </div>
+
+      <div style={{ padding: "20px 24px" }}>
+        {/* Decision badge */}
+        <div style={{ display: "inline-block", padding: "6px 16px", borderRadius: 8, background: decBg, border: `1px solid ${decColor}`, color: decColor, fontSize: 13, fontWeight: 800, letterSpacing: "0.05em", marginBottom: 16, fontFamily: "'Public Sans', sans-serif" }}>
+          {decLabel}
+        </div>
+
+        {/* Member info */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 20px", marginBottom: 16 }}>
+          {[
+            ["Member",      submission.member_name || "—"],
+            ["Member ID",   submission.member_id   || "—"],
+            ["Date of Birth",submission.dob        || "—"],
+            ["Discipline",  submission.discipline  || "PT"],
+            ["Case ID",     submission.submission_id],
+            ["Decision Date", decidedAt ? new Date(decidedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>{k}</span>
+              <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 500, fontFamily: "'Public Sans', sans-serif" }}>{v}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Approved visits */}
+        {isApproved && approvedVisits != null && (
+          <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "12px 16px", marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>Authorized Visits</span>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#15803d", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1, marginTop: 2 }}>
+              {approvedVisits} <span style={{ fontSize: 14, fontWeight: 600 }}>visits</span>
+            </div>
+          </div>
+        )}
+
+        {/* Rationale */}
+        {rationale && (
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>Clinical Rationale</span>
+            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.65, marginTop: 4, fontFamily: "'Public Sans', sans-serif" }}>{rationale}</div>
+          </div>
+        )}
+
+        {/* Footer note */}
+        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, fontSize: 11, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
+          {isApproved
+            ? "This authorization is valid for the services and dates specified. Contact CogentCR if clinical circumstances change."
+            : isDenied
+            ? "This determination is subject to appeal within 60 calendar days of receipt. Contact your case coordinator for appeal instructions."
+            : "Additional clinical documentation has been requested. Please respond within 5 business days to avoid case closure."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewSubmissionForm({ token, onSubmitted }) {
+  const [providerName,    setProviderName]    = useState("");
+  const [providerNpi,     setProviderNpi]     = useState("");
+  const [memberName,      setMemberName]      = useState("");
+  const [memberId,        setMemberId]        = useState("");
+  const [dob,             setDob]             = useState("");
+  const [discipline,      setDiscipline]      = useState("PT");
+  const [diagInput,       setDiagInput]       = useState("");
+  const [diagnosisCodes,  setDiagnosisCodes]  = useState([]);
+  const [requestedVisits, setRequestedVisits] = useState("");
+  const [planId,          setPlanId]          = useState("");
+  const [documentNames,   setDocumentNames]   = useState([""]);
+  const [providerNotes,   setProviderNotes]   = useState("");
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState("");
+  const [plans,           setPlans]           = useState([]);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setPlans(r.data.plans || [])).catch(() => {});
+  }, [token]);
+
+  const docList = documentNames.filter(d => d.trim());
+  const fields = [
+    !!providerName.trim(),
+    !!memberName.trim(),
+    !!memberId.trim(),
+    !!dob,
+    !!discipline,
+    diagnosisCodes.length > 0,
+    parseInt(requestedVisits) > 0,
+    docList.length > 0,
+  ];
+  const completeness = Math.round(fields.filter(Boolean).length / 8 * 100);
+
+  const addDiagCode = () => {
+    const code = diagInput.trim().toUpperCase();
+    if (code && !diagnosisCodes.includes(code)) {
+      setDiagnosisCodes(prev => [...prev, code]);
+    }
+    setDiagInput("");
+  };
+
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/v1/submit`, {
+        providerName, providerNpi, memberName, memberId, dob,
+        discipline, diagnosisCodes,
+        requestedVisits: parseInt(requestedVisits) || 0,
+        planId: planId || null,
+        documentList: docList,
+        providerNotes,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      onSubmitted(res.data);
+    } catch (err) {
+      setError(err.response?.data?.error || "Submission failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputS = { width: "100%", padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box", background: "#fff" };
+  const labelS = (t) => <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>{t}</div>;
+
+  return (
+    <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+      {/* Completeness meter */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Public Sans', sans-serif" }}>Submission Completeness</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: completeness >= 85 ? "#15803d" : completeness >= 50 ? "#92400e" : "#6b7280", fontFamily: "'Fraunces', Georgia, serif" }}>{completeness}%</span>
+        </div>
+        <div style={{ background: "#f1f5f9", borderRadius: 6, height: 8, overflow: "hidden" }}>
+          <div style={{ width: completeness + "%", height: "100%", background: completeness >= 85 ? "#15803d" : completeness >= 50 ? "#f59e0b" : "#94a3b8", borderRadius: 6, transition: "width 0.3s ease" }} />
+        </div>
+        {completeness >= 85 && (
+          <div style={{ fontSize: 11, color: "#15803d", marginTop: 6, fontFamily: "'DM Sans', sans-serif" }}>
+            Complete — eligible for auto-review on submission
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 12, padding: "24px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+        {/* Provider info */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Provider Information</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
+          <div>{labelS("Practice / Provider Name")}<input value={providerName} onChange={e => setProviderName(e.target.value)} placeholder="e.g. Springfield PT Clinic" style={inputS} /></div>
+          <div>{labelS("NPI (optional)")}<input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="1234567890" style={inputS} /></div>
+        </div>
+
+        {/* Member info */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Member Information</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
+          <div style={{ gridColumn: "1 / 3" }}>{labelS("Member Name")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last" style={inputS} /></div>
+          <div>{labelS("Date of Birth")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
+          <div>{labelS("Member ID")}<input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="e.g. XYZ123456" style={inputS} /></div>
+          <div>{labelS("Plan / Payer")}<select value={planId} onChange={e => setPlanId(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
+            <option value="">Select plan...</option>
+            {plans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>)}
+          </select></div>
+          <div style={{ gridColumn: "3 / 4" }}>{labelS("Discipline")}<select value={discipline} onChange={e => setDiscipline(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
+            <option value="PT">PT — Physical Therapy</option>
+            <option value="OT">OT — Occupational Therapy</option>
+            <option value="ST">ST — Speech Therapy</option>
+          </select></div>
+        </div>
+
+        {/* Clinical info */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Clinical Request</div>
+        <div style={{ marginBottom: 14 }}>
+          {labelS("Diagnosis Codes (ICD-10)")}
+          <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+            <input value={diagInput} onChange={e => setDiagInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addDiagCode()}
+              placeholder="e.g. M54.5 then Enter" style={{ ...inputS, flex: 1 }} />
+            <button onClick={addDiagCode} style={{ padding: "8px 14px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "'Public Sans', sans-serif" }}>Add</button>
+          </div>
+          {diagnosisCodes.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {diagnosisCodes.map(c => (
+                <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 6, background: "#eff6ff", color: "#1a3a5c", fontSize: 12, fontWeight: 600, fontFamily: "monospace" }}>
+                  {c}
+                  <button onClick={() => setDiagnosisCodes(prev => prev.filter(x => x !== c))} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", padding: 0, lineHeight: 1, fontSize: 13 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 14 }}>
+          <div>{labelS("Requested Visits")}<input type="number" min="1" value={requestedVisits} onChange={e => setRequestedVisits(e.target.value)} placeholder="e.g. 16" style={inputS} /></div>
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          {labelS("Clinical Notes (optional)")}
+          <textarea value={providerNotes} onChange={e => setProviderNotes(e.target.value)} rows={3} placeholder="Brief clinical context or special circumstances..." style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+
+        {/* Documents */}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Supporting Documents</div>
+        <div style={{ marginBottom: 20 }}>
+          {labelS("Document Names")}
+          {documentNames.map((d, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+              <input value={d} onChange={e => { const next = [...documentNames]; next[i] = e.target.value; setDocumentNames(next); }}
+                placeholder={`e.g. Initial Evaluation Report ${i > 0 ? i + 1 : ""}`} style={{ ...inputS, flex: 1 }} />
+              {documentNames.length > 1 && (
+                <button onClick={() => setDocumentNames(prev => prev.filter((_, j) => j !== i))}
+                  style={{ padding: "8px 10px", borderRadius: 7, background: "#fee2e2", color: "#991b1b", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer" }}>×</button>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setDocumentNames(prev => [...prev, ""])}
+            style={{ fontSize: 12, color: "#1a3a5c", background: "none", border: "1px dashed #93c5fd", borderRadius: 7, padding: "6px 14px", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", marginTop: 2 }}>
+            + Add document
+          </button>
+        </div>
+
+        {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 7, fontSize: 13, color: "#991b1b", fontFamily: "'DM Sans', sans-serif" }}>{error}</div>}
+
+        <button onClick={handleSubmit} disabled={loading} style={{
+          width: "100%", padding: "13px 0", borderRadius: 9, background: loading ? "#94a3b8" : "#1a3a5c",
+          color: "#fff", fontSize: 14, fontWeight: 700, border: "none", cursor: loading ? "not-allowed" : "pointer",
+          fontFamily: "'Public Sans', sans-serif", boxShadow: loading ? "none" : "0 4px 14px rgba(26,58,92,0.25)",
+        }}>
+          {loading ? "Submitting..." : `Submit Authorization Request (${completeness}% complete)`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MyCasesView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
+  const [expanded, setExpanded]       = useState(null);
+  const [decisions, setDecisions]     = useState({});
 
   useEffect(() => {
     axios.get(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1846,55 +2137,177 @@ function ProviderPortalStub({ user, token, onLogout }) {
       .catch(() => setLoading(false));
   }, [token]);
 
-  const statusColor = (s) => {
-    if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
-    if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
-    if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
-    if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
-    return { bg: "#f3f4f6", text: "#374151" };
+  const handleExpand = async (sub) => {
+    const id = sub.submission_id;
+    if (expanded === id) { setExpanded(null); return; }
+    setExpanded(id);
+    if (!decisions[id]) {
+      try {
+        const r = await axios.get(`${API_BASE}/v1/submissions/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        setDecisions(prev => ({ ...prev, [id]: r.data.decision }));
+      } catch {}
+    }
   };
+
+  if (loading) return <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading...</div>;
+
+  if (submissions.length === 0) return (
+    <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "48px 24px", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>No submissions yet</div>
+        <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>Use "New Submission" to request authorization.</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+      {submissions.map(sub => {
+        const isOpen = expanded === sub.submission_id;
+        return (
+          <div key={sub.submission_id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14, overflow: "hidden" }}>
+            <div onClick={() => handleExpand(sub)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{sub.member_name || "Unknown Member"}</span>
+                  <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>
+                  {sub.discipline || "PT"} · {sub.requested_visits} visits requested · {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : "—"}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <StatusProgressBar status={sub.status} />
+                </div>
+              </div>
+              <span style={{ fontSize: 16, color: "#9ca3af", flexShrink: 0, marginTop: 2 }}>{isOpen ? "▲" : "▼"}</span>
+            </div>
+            {isOpen && (
+              <div style={{ borderTop: "1px solid #f1f5f9", padding: "16px 20px" }}>
+                {/* Diagnosis codes */}
+                {Array.isArray(sub.diagnosis_codes) && sub.diagnosis_codes.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>Diagnosis Codes</span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
+                      {sub.diagnosis_codes.map(c => (
+                        <span key={c} style={{ padding: "2px 8px", borderRadius: 5, background: "#eff6ff", color: "#1a3a5c", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Decision letter */}
+                <DecisionLetter submission={sub} decision={decisions[sub.submission_id]} />
+                {!["approved","denied","pended"].includes(sub.status) && (
+                  <div style={{ marginTop: 12, padding: "12px 16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>
+                      Your case is in queue. You will be notified once a determination is made.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProviderPortal({ user, token, onLogout }) {
+  const [provView, setProvView] = useState("my_cases"); // "new_submission" | "my_cases"
+  const [confirmation, setConfirmation] = useState(null);
+
+  const handleSubmitted = (data) => {
+    setConfirmation(data);
+    setProvView("confirmation");
+  };
+
+  const HEADER = (
+    <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
+      <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "'Public Sans', sans-serif" }}>Provider Portal</span>
+      <span style={{ flex: 1 }} />
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+      <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+    </div>
+  );
+
+  const TABS = (
+    <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+      {[["new_submission","New Submission"], ["my_cases","My Cases"]].map(([v, label]) => (
+        <button key={v} onClick={() => { setProvView(v); setConfirmation(null); }} style={{
+          padding: "12px 20px", fontSize: 13, fontWeight: provView === v ? 700 : 500,
+          color: provView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+          borderBottom: provView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+          cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+        }}>{label}</button>
+      ))}
+    </div>
+  );
+
+  // Confirmation / auto-approval result view
+  if (provView === "confirmation" && confirmation) {
+    const auto = confirmation.autoApproval;
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
+        {HEADER}{TABS}
+        <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: "32px 28px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+            {auto?.eligible ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>✓</div>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d", fontFamily: "'Fraunces', Georgia, serif" }}>Auto-Approved</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>Your request met all criteria for automatic authorization.</div>
+                  </div>
+                </div>
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "16px 20px", marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>Authorized</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: "#15803d", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1 }}>{auto.approvedVisits} <span style={{ fontSize: 15, fontWeight: 600 }}>visits</span></div>
+                  {auto.rationale && <div style={{ fontSize: 12, color: "#374151", marginTop: 8, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.6 }}>{auto.rationale}</div>}
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>⏳</div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Submitted for Review</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>A reviewer will process your request. You can track status in My Cases.</div>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px 16px", marginBottom: 20 }}>
+              {[
+                ["Case ID", confirmation.submissionId],
+                ["Completeness", confirmation.completenessScore + "%"],
+                ["Submitted", confirmation.submittedAt ? new Date(confirmation.submittedAt).toLocaleDateString() : "—"],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>{k}</div>
+                  <div style={{ fontSize: 13, color: "#1e293b", fontWeight: 600, fontFamily: "'Public Sans', sans-serif", marginTop: 2 }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => { setProvView("my_cases"); setConfirmation(null); }}
+              style={{ padding: "10px 24px", borderRadius: 8, background: "#1a3a5c", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+              View My Cases
+            </button>
+            <button onClick={() => { setProvView("new_submission"); setConfirmation(null); }}
+              style={{ marginLeft: 10, padding: "10px 24px", borderRadius: 8, background: "none", color: "#1a3a5c", fontSize: 13, fontWeight: 600, border: "1px solid #d1d5db", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+              Submit Another
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
-      <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>Provider Portal</span>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{user.name || user.email}</span>
-        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-      </div>
-
-      <div style={{ maxWidth: 760, margin: "32px auto", padding: "0 24px" }}>
-        <div style={{ background: "#fff8ed", border: "1px solid #fed7aa", borderRadius: 12, padding: "20px 24px", marginBottom: 28 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#c2410c", marginBottom: 6, fontFamily: "'Fraunces', Georgia, serif" }}>Provider Portal — Coming Soon</div>
-          <div style={{ fontSize: 13, color: "#92400e" }}>The full provider submission experience is under development. Your previous submissions are shown below.</div>
-        </div>
-
-        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>
-            Your Submissions
-          </div>
-          {loading ? (
-            <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading...</div>
-          ) : submissions.length === 0 ? (
-            <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>No submissions yet.</div>
-          ) : submissions.map(s => {
-            const sc = statusColor(s.status);
-            return (
-              <div key={s.submission_id} style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{s.member_name || "Unknown Member"}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{s.submission_id} · {s.discipline || "PT"} · {s.requested_visits} visits requested</div>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: sc.bg, color: sc.text, textTransform: "capitalize" }}>
-                  {(s.status || "submitted").replace(/_/g, " ")}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {HEADER}{TABS}
+      {provView === "new_submission" && <NewSubmissionForm token={token} onSubmitted={handleSubmitted} />}
+      {provView === "my_cases"       && <MyCasesView token={token} />}
     </div>
   );
 }
@@ -1973,7 +2386,7 @@ function App() {
     return <ReviewerShell user={user} token={token} onLogout={handleLogout} />;
   }
   if (user.role === "provider") {
-    return <ProviderPortalStub user={user} token={token} onLogout={handleLogout} />;
+    return <ProviderPortal user={user} token={token} onLogout={handleLogout} />;
   }
   // master / admin / legacy → existing UI below
 
