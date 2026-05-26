@@ -1696,6 +1696,179 @@ function EpisodeContextBar({ memberId, discipline, token }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INTEGRATIONS VIEW (Phase 24)
+// ─────────────────────────────────────────────────────────────────────────────
+const WEBHOOK_EVENTS = ['case.submitted', 'determination.made', 'appeal.filed', 'md.cosigned'];
+
+function IntegrationsView({ token }) {
+  const [endpoints,  setEndpoints]  = React.useState([]);
+  const [deliveries, setDeliveries] = React.useState([]);
+  const [apiKeys,    setApiKeys]    = React.useState([]);
+  const [newKey,     setNewKey]     = React.useState(null);
+  const [copied,     setCopied]     = React.useState(false);
+  const [loading,    setLoading]    = React.useState(true);
+  const [whForm,     setWhForm]     = React.useState({ name: '', url: '', secret: '', events: [] });
+  const [keyName,    setKeyName]    = React.useState('');
+  const [toast,      setToast]      = React.useState(null);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
+  const fetchAll = () => {
+    setLoading(true);
+    Promise.all([
+      axios.get(`${API_BASE}/v1/webhooks`,           { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${API_BASE}/v1/webhook-deliveries`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${API_BASE}/v1/api-keys`,           { headers: { Authorization: `Bearer ${token}` } }),
+    ]).then(([w, d, k]) => {
+      setEndpoints(w.data.endpoints || []);
+      setDeliveries(d.data.deliveries || []);
+      setApiKeys(k.data.keys || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  };
+
+  React.useEffect(() => { fetchAll(); }, [token]); // eslint-disable-line
+
+  const handleAddWebhook = async (e) => {
+    e.preventDefault();
+    if (!whForm.events.length) return showToast('Select at least one event.');
+    try {
+      await axios.post(`${API_BASE}/v1/webhooks`, whForm, { headers: { Authorization: `Bearer ${token}` } });
+      setWhForm({ name: '', url: '', secret: '', events: [] });
+      fetchAll(); showToast('Webhook endpoint registered.');
+    } catch (err) { showToast(err.response?.data?.error || 'Failed to add webhook.'); }
+  };
+
+  const handleDeleteWebhook = async (id) => {
+    await axios.delete(`${API_BASE}/v1/webhooks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+    fetchAll(); showToast('Endpoint removed.');
+  };
+
+  const handleGenerateKey = async (e) => {
+    e.preventDefault();
+    if (!keyName.trim()) return;
+    try {
+      const r = await axios.post(`${API_BASE}/v1/api-keys`, { name: keyName }, { headers: { Authorization: `Bearer ${token}` } });
+      setNewKey(r.data.key); setKeyName(''); fetchAll();
+    } catch (err) { showToast(err.response?.data?.error || 'Failed to generate key.'); }
+  };
+
+  const handleRevokeKey = async (id) => {
+    await axios.delete(`${API_BASE}/v1/api-keys/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+    fetchAll(); showToast('API key revoked.');
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(newKey).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+
+  const inputS = { width: '100%', padding: '8px 12px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, fontFamily: "'DM Sans', sans-serif", boxSizing: 'border-box' };
+  const secHead = (t) => <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>{t}</div>;
+
+  return (
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px' }}>
+      {toast && <div style={{ position: 'fixed', top: 20, right: 24, background: '#1e293b', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 9999, fontFamily: "'Public Sans', sans-serif" }}>{toast}</div>}
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Integrations</div>
+        <div style={{ fontSize: 12, color: '#6b7280', fontFamily: "'Public Sans', sans-serif" }}>Outbound webhooks and inbound API gateway for external system integration</div>
+      </div>
+
+      {/* Webhook Endpoints */}
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '20px 24px', marginBottom: 24 }}>
+        {secHead('Webhook Endpoints')}
+        {loading ? <div style={{ color: '#9ca3af', fontSize: 13 }}>Loading…</div> : endpoints.length === 0 ? (
+          <div style={{ color: '#9ca3af', fontSize: 13, marginBottom: 16, fontFamily: "'Public Sans', sans-serif" }}>No endpoints registered yet.</div>
+        ) : endpoints.map(ep => (
+          <div key={ep.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', fontFamily: "'Public Sans', sans-serif" }}>{ep.name}</div>
+              <div style={{ fontSize: 11, color: '#6b7280', fontFamily: 'monospace', marginTop: 2 }}>{ep.url}</div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                {(ep.events || []).map(ev => <span key={ev} style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 10, background: '#eff6ff', color: '#1d4ed8', fontFamily: "'DM Sans', sans-serif" }}>{ev}</span>)}
+              </div>
+            </div>
+            <button onClick={() => handleDeleteWebhook(ep.id)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Remove</button>
+          </div>
+        ))}
+
+        <form onSubmit={handleAddWebhook} style={{ marginTop: 18, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Name</div><input value={whForm.name} onChange={e => setWhForm(f => ({...f, name: e.target.value}))} placeholder="e.g. EHR Webhook" style={inputS} required /></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>URL</div><input value={whForm.url} onChange={e => setWhForm(f => ({...f, url: e.target.value}))} placeholder="https://your-system.com/webhook" style={inputS} required /></div>
+          <div><div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Secret</div><input value={whForm.secret} onChange={e => setWhForm(f => ({...f, secret: e.target.value}))} placeholder="Signing secret" style={inputS} required /></div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>Events</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {WEBHOOK_EVENTS.map(ev => (
+                <label key={ev} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                  <input type="checkbox" checked={whForm.events.includes(ev)} onChange={e => setWhForm(f => ({ ...f, events: e.target.checked ? [...f.events, ev] : f.events.filter(x => x !== ev) }))} />
+                  {ev}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ gridColumn: '1 / 3', display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" style={{ padding: '8px 18px', background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Public Sans', sans-serif" }}>Register Endpoint</button>
+          </div>
+        </form>
+
+        {/* Recent deliveries */}
+        {deliveries.length > 0 && (
+          <div style={{ marginTop: 18, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Recent Deliveries</div>
+            {deliveries.slice(0, 5).map(d => (
+              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#6b7280', fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>
+                <span style={{ fontWeight: 700, color: d.status === 'delivered' ? '#16a34a' : '#dc2626' }}>{d.status === 'delivered' ? '✓' : '✗'}</span>
+                <span style={{ fontFamily: 'monospace', color: '#374151' }}>{d.event_type}</span>
+                <span>{d.endpoint_name}</span>
+                <span style={{ marginLeft: 'auto' }}>{d.response_code || '—'} · {d.delivered_at ? new Date(d.delivered_at).toLocaleTimeString() : '—'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* API Keys */}
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '20px 24px' }}>
+        {secHead('API Keys')}
+        <div style={{ marginBottom: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Gateway Endpoint</div>
+          <code style={{ fontSize: 11, color: '#1e293b' }}>POST https://rapidnote-backend.onrender.com/v1/gateway/submit</code>
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3, fontFamily: 'monospace' }}>Header: X-API-Key: {'<your-key>'}</div>
+        </div>
+
+        {newKey && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#15803d', marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>New API Key — copy now, it won't be shown again</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <code style={{ fontSize: 11, color: '#166534', wordBreak: 'break-all', flex: 1 }}>{newKey}</code>
+              <button onClick={copyKey} style={{ flexShrink: 0, padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{copied ? 'Copied!' : 'Copy'}</button>
+              <button onClick={() => setNewKey(null)} style={{ flexShrink: 0, padding: '4px 10px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>Dismiss</button>
+            </div>
+          </div>
+        )}
+
+        {apiKeys.map(k => (
+          <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', fontFamily: "'Public Sans', sans-serif" }}>{k.name}</div>
+              <div style={{ fontSize: 11, color: '#9ca3af', fontFamily: "'DM Sans', sans-serif" }}>Created {new Date(k.created_at).toLocaleDateString()} · Last used: {k.last_used ? new Date(k.last_used).toLocaleDateString() : 'never'}</div>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: k.is_active ? '#f0fdf4' : '#f1f5f9', color: k.is_active ? '#16a34a' : '#9ca3af' }}>{k.is_active ? 'Active' : 'Revoked'}</span>
+            {k.is_active && <button onClick={() => handleRevokeKey(k.id)} style={{ padding: '4px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Revoke</button>}
+          </div>
+        ))}
+
+        <form onSubmit={handleGenerateKey} style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <input value={keyName} onChange={e => setKeyName(e.target.value)} placeholder="Key name (e.g. EHR System)" style={{ ...inputS, flex: 1 }} required />
+          <button type="submit" style={{ flexShrink: 0, padding: '8px 16px', background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Public Sans', sans-serif" }}>Generate Key</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATE RULES BAR + VIEW (Phase 23)
 // ─────────────────────────────────────────────────────────────────────────────
 const RULE_TYPE_META = {
@@ -5244,7 +5417,8 @@ function MasterShell({ user, token, onLogout }) {
     ["admin",      "Admin"],
     ["criteria",    "Criteria"],
     ["providers",   "Providers"],
-    ["state_rules", "State Rules"],
+    ["state_rules",    "State Rules"],
+    ["integrations",   "Integrations"],
   ];
 
   return (
@@ -5285,7 +5459,8 @@ function MasterShell({ user, token, onLogout }) {
       {masterView === "admin"     && <AdminConsole token={token} />}
       {masterView === "criteria"   && <CriteriaLibraryView token={token} />}
       {masterView === "providers"   && <ProviderDirectoryView token={token} />}
-      {masterView === "state_rules" && <StateRulesView token={token} />}
+      {masterView === "state_rules"  && <StateRulesView token={token} />}
+      {masterView === "integrations" && <IntegrationsView token={token} />}
     </div>
   );
 }
