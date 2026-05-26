@@ -1671,6 +1671,9 @@ function ReviewerShell({ user, token, onLogout }) {
             }}>{label}</button>
           ))}
         </div>
+        <div style={{ padding: "18px 24px 0" }}>
+          <ReviewerScheduleSettings token={token} />
+        </div>
         <P2PQueueView token={token} />
       </div>
     );
@@ -2415,67 +2418,268 @@ function NewSubmissionForm({ token, onSubmitted }) {
 // P2P REQUEST MODAL (provider)
 // ─────────────────────────────────────────────────────────────────────────────
 function P2PRequestModal({ submissionId, memberName, token, onClose, onSuccess }) {
-  const [slots, setSlots]   = useState(["", "", ""]);
-  const [notes, setNotes]   = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr]       = useState(null);
+  const [slots, setSlots]       = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [noSchedule, setNoSchedule] = useState(false);
+  const [primarySlot, setPrimary]   = useState(null);
+  const [secondarySlot, setSecondary] = useState(null);
+  const [notes, setNotes]         = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [err, setErr]             = useState(null);
 
-  const updateSlot = (i, v) => setSlots(prev => { const n = [...prev]; n[i] = v; return n; });
-  const filledSlots = slots.filter(s => s.trim());
+  const NAVY = "#1a2e4a";
+
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/p2p-slots/${submissionId}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => {
+        setLoadingSlots(false);
+        if (!d.hasSchedule || !d.slots?.length) { setNoSchedule(true); return; }
+        setSlots(d.slots);
+      })
+      .catch(() => { setLoadingSlots(false); setNoSchedule(true); });
+  }, [submissionId, token]); // eslint-disable-line
+
+  // Group ISO slots by local date label
+  const grouped = slots.reduce((acc, iso) => {
+    const d = new Date(iso);
+    const key = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(iso);
+    return acc;
+  }, {});
+
+  const handleSlotClick = (iso) => {
+    if (iso === primarySlot) { setPrimary(null); setSecondary(null); return; }
+    if (iso === secondarySlot) { setSecondary(null); return; }
+    if (!primarySlot) { setPrimary(iso); return; }
+    setSecondary(iso);
+  };
+
+  const slotLabel = (iso) =>
+    new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
   const submit = () => {
-    if (!filledSlots.length) { setErr("Please enter at least one preferred time slot."); return; }
+    if (!primarySlot) { setErr("Please select a primary time slot."); return; }
     setSaving(true); setErr(null);
     fetch(`${API_BASE}/v1/p2p-request`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ submissionId, preferredSlots: filledSlots, clinicalNotes: notes }),
+      body: JSON.stringify({ submissionId, primarySlot, secondarySlot: secondarySlot || undefined, clinicalNotes: notes }),
     })
       .then(r => r.json())
       .then(d => {
         setSaving(false);
-        if (d.p2pId) { onSuccess(); }
-        else { setErr(d.error || "Request failed."); }
+        if (d.p2pId) onSuccess();
+        else setErr(d.error || "Request failed.");
       })
       .catch(() => { setSaving(false); setErr("Network error."); });
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 14, width: 500, maxWidth: "95vw", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-          <div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 700, color: "#1a2e4a" }}>Request Peer-to-Peer Review</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{memberName}</div>
+      <div style={{ background: "#fff", borderRadius: 14, width: 560, maxWidth: "95vw", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid #e2e8f0", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 700, color: NAVY }}>Request Peer-to-Peer Review</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{memberName}</div>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#94a3b8", padding: 0, lineHeight: 1 }}>×</button>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94a3b8", padding: 0 }}>×</button>
+          <div style={{ fontSize: 12, color: "#475569", background: "#eff6ff", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
+            You will speak directly with the reviewing clinician. Select a time from their available schedule — their identity remains confidential.
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: "#475569", background: "#eff6ff", borderRadius: 8, padding: "10px 14px", marginBottom: 18 }}>
-          A peer-to-peer call lets you speak directly with the reviewing clinician to discuss the clinical basis for the determination. You will be contacted to confirm a time.
+
+        {/* Scrollable body */}
+        <div style={{ overflowY: "auto", padding: "18px 24px", flex: 1 }}>
+          {loadingSlots ? (
+            <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8", fontSize: 13 }}>Loading available times...</div>
+          ) : noSchedule ? (
+            <div style={{ textAlign: "center", padding: "32px 16px" }}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 6 }}>No schedule available</div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>The reviewing clinician has not posted their availability yet. Contact your clinical coordinator to request a peer-to-peer review.</div>
+            </div>
+          ) : (
+            <>
+              {/* Selected summary */}
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                <div style={{ flex: 1, padding: "10px 14px", borderRadius: 8, border: `2px solid ${primarySlot ? "#1a2e4a" : "#e2e8f0"}`, background: primarySlot ? "#eff6ff" : "#fafafa" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 }}>Primary (required)</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: primarySlot ? NAVY : "#94a3b8" }}>
+                    {primarySlot ? new Date(primarySlot).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Not selected"}
+                  </div>
+                </div>
+                <div style={{ flex: 1, padding: "10px 14px", borderRadius: 8, border: `2px solid ${secondarySlot ? "#059669" : "#e2e8f0"}`, background: secondarySlot ? "#f0fdf4" : "#fafafa" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 }}>Secondary (optional)</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: secondarySlot ? "#059669" : "#94a3b8" }}>
+                    {secondarySlot ? new Date(secondarySlot).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Not selected"}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>
+                Click a time to set as primary · Click a second time to set as secondary fallback · Click again to deselect
+              </div>
+              {/* Slot grid by day */}
+              {Object.entries(grouped).map(([date, daySlots]) => (
+                <div key={date} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>{date}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {daySlots.map(iso => {
+                      const isPrimary   = iso === primarySlot;
+                      const isSecondary = iso === secondarySlot;
+                      return (
+                        <button key={iso} onClick={() => handleSlotClick(iso)} style={{
+                          padding: "5px 13px", borderRadius: 20, fontSize: 12, fontWeight: isPrimary || isSecondary ? 700 : 400,
+                          border: `1.5px solid ${isPrimary ? NAVY : isSecondary ? "#059669" : "#d1d5db"}`,
+                          background: isPrimary ? NAVY : isSecondary ? "#059669" : "#fff",
+                          color: isPrimary || isSecondary ? "#fff" : "#374151",
+                          cursor: "pointer",
+                        }}>
+                          {slotLabel(iso)}{isPrimary ? " ★" : isSecondary ? " ✓" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {/* Clinical notes */}
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Clinical Argument (optional but recommended)</div>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                  placeholder="Summarize the clinical evidence supporting medical necessity..."
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+            </>
+          )}
+          {err && <div style={{ marginTop: 10, fontSize: 12, color: "#dc2626" }}>{err}</div>}
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Preferred Time Slots (provide up to 3)</div>
-          {slots.map((s, i) => (
-            <input key={i} type="text" value={s} onChange={e => updateSlot(i, e.target.value)}
-              placeholder={`Option ${i + 1} — e.g., Mon 6/3 10–11 AM EST`}
-              style={{ display: "block", width: "100%", marginBottom: 8, padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
-          ))}
-        </div>
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Clinical Argument (optional but recommended)</div>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
-            placeholder="Summarize the clinical evidence supporting medical necessity..."
-            style={{ width: "100%", padding: "10px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
-        </div>
-        {err && <div style={{ marginBottom: 12, fontSize: 12, color: "#dc2626" }}>{err}</div>}
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", cursor: "pointer", fontSize: 13 }}>Cancel</button>
-          <button onClick={submit} disabled={saving || !filledSlots.length}
-            style={{ padding: "9px 20px", borderRadius: 7, border: "none", background: "#1a2e4a", color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
-            {saving ? "Submitting..." : "Submit P2P Request"}
-          </button>
-        </div>
+
+        {/* Footer */}
+        {!noSchedule && !loadingSlots && (
+          <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", gap: 10, justifyContent: "flex-end", flexShrink: 0 }}>
+            <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", cursor: "pointer", fontSize: 13 }}>Cancel</button>
+            <button onClick={submit} disabled={saving || !primarySlot}
+              style={{ padding: "9px 20px", borderRadius: 7, border: "none", background: NAVY, color: "#fff", cursor: saving || !primarySlot ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving || !primarySlot ? 0.6 : 1 }}>
+              {saving ? "Submitting..." : "Submit P2P Request"}
+            </button>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWER SCHEDULE SETTINGS
+// ─────────────────────────────────────────────────────────────────────────────
+const TZ_OPTIONS = [
+  { value: "America/New_York",    label: "Eastern (ET)" },
+  { value: "America/Chicago",     label: "Central (CT)" },
+  { value: "America/Denver",      label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Phoenix",     label: "Arizona (no DST)" },
+  { value: "America/Anchorage",   label: "Alaska (AKT)" },
+  { value: "Pacific/Honolulu",    label: "Hawaii (HST)" },
+];
+const HOURS = Array.from({ length: 13 }, (_, i) => i + 7); // 7 AM–7 PM
+const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+function ReviewerScheduleSettings({ token }) {
+  const [avail, setAvail]     = useState([]);
+  const [tz, setTz]           = useState("America/New_York");
+  const [saved, setSaved]     = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [open, setOpen]       = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/v1/reviewer-schedule`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { setAvail(d.availability || []); setTz(d.timezone || "America/New_York"); })
+      .catch(() => {});
+  }, [token]); // eslint-disable-line
+
+  const toggleDay = (day) => {
+    setAvail(prev => {
+      const has = prev.find(a => a.day === day);
+      return has ? prev.filter(a => a.day !== day) : [...prev, { day, startHour: 9, endHour: 17 }];
+    });
+  };
+  const updateHour = (day, field, val) => {
+    setAvail(prev => prev.map(a => a.day === day ? { ...a, [field]: parseInt(val) } : a));
+  };
+
+  const save = () => {
+    setSaving(true);
+    fetch(`${API_BASE}/v1/reviewer-schedule`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ availability: avail, timezone: tz }),
+    })
+      .then(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000); })
+      .catch(() => setSaving(false));
+  };
+
+  const NAVY = "#1a2e4a";
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 18, overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: "14px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>My Availability Schedule</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+            {avail.length === 0 ? "No schedule set — providers cannot book P2P calls until you add availability" : `${avail.length} day${avail.length !== 1 ? "s" : ""} set · ${TZ_OPTIONS.find(t => t.value === tz)?.label || tz}`}
+          </div>
+        </div>
+        <span style={{ fontSize: 14, color: "#94a3b8" }}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 20px 20px", borderTop: "1px solid #f1f5f9" }}>
+          <div style={{ marginTop: 14, marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Your Timezone
+              <select value={tz} onChange={e => setTz(e.target.value)}
+                style={{ display: "block", marginTop: 4, padding: "7px 10px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, background: "#fff" }}>
+                {TZ_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </label>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Available Days + Hours</div>
+          {[1,2,3,4,5,6,0].map(day => {
+            const entry = avail.find(a => a.day === day);
+            return (
+              <div key={day} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, width: 90, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" checked={!!entry} onChange={() => toggleDay(day)} />
+                  {DAY_NAMES[day].slice(0, 3)}
+                </label>
+                {entry && (
+                  <>
+                    <select value={entry.startHour} onChange={e => updateHour(day, "startHour", e.target.value)}
+                      style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12 }}>
+                      {HOURS.map(h => <option key={h} value={h}>{h % 12 || 12} {h < 12 ? "AM" : "PM"}</option>)}
+                    </select>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>to</span>
+                    <select value={entry.endHour} onChange={e => updateHour(day, "endHour", e.target.value)}
+                      style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12 }}>
+                      {HOURS.filter(h => h > entry.startHour).map(h => <option key={h} value={h}>{h % 12 || 12} {h < 12 ? "AM" : "PM"}</option>)}
+                    </select>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={save} disabled={saving}
+              style={{ padding: "9px 22px", borderRadius: 8, background: NAVY, color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "Saving..." : "Save Schedule"}
+            </button>
+            {saved && <span style={{ fontSize: 12, color: "#059669", fontWeight: 600 }}>✓ Saved — available slots will update immediately</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2487,9 +2691,7 @@ function P2PQueueView({ token }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
-  const [panel, setPanel]       = useState(null); // "schedule" | "complete"
-  const [schedSlot, setSchedSlot] = useState("");
-  const [schedNote, setSchedNote] = useState("");
+  const [panel, setPanel]       = useState(null); // "complete"
   const [outcome, setOutcome]   = useState("upheld");
   const [outcomeNotes, setOutcomeNotes] = useState("");
   const [newDet, setNewDet]     = useState("Approved");
@@ -2511,18 +2713,17 @@ function P2PQueueView({ token }) {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
-  const handleSchedule = () => {
-    if (!schedSlot.trim()) return;
+  const handleAccept = (slotType) => {
     setSaving(true);
-    fetch(`${API_BASE}/v1/p2p-requests/${selected.p2p_id}/schedule`, {
-      method: "PATCH",
+    fetch(`${API_BASE}/v1/p2p-requests/${selected.p2p_id}/accept`, {
+      method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ scheduledSlot: schedSlot, scheduleNote: schedNote }),
+      body: JSON.stringify({ slot: slotType }),
     })
       .then(r => r.json())
       .then(d => {
         setSaving(false);
-        if (d.ok) { showToast("Call scheduled — provider notified."); setSelected(null); setPanel(null); fetchQueue(); }
+        if (d.ok) { showToast("Call confirmed — provider notified."); setSelected(null); fetchQueue(); }
         else showToast("Error: " + d.error);
       })
       .catch(() => { setSaving(false); showToast("Network error."); });
@@ -2549,114 +2750,160 @@ function P2PQueueView({ token }) {
       .catch(() => { setSaving(false); showToast("Network error."); });
   };
 
+  const fmtSlot = (iso) => iso ? new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+
+  const pending   = requests.filter(r => r.status === "pending");
+  const confirmed = requests.filter(r => r.status === "confirmed");
+
   return (
     <div style={{ display: "flex", height: "calc(100vh - 110px)" }}>
       {toast && (
         <div style={{ position: "fixed", top: 16, right: 16, background: NAVY, color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>{toast}</div>
       )}
-      {/* List */}
+
+      {/* Sidebar list */}
       <div style={{ width: 340, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
-        <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY }}>P2P Queue</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{requests.length} open request{requests.length !== 1 ? "s" : ""}</div>
-        </div>
         {loading ? (
           <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Loading...</div>
-        ) : requests.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
-            <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>No open P2P requests</div>
-          </div>
-        ) : requests.map((r, i) => {
-          const isSel = selected?.p2p_id === r.p2p_id;
-          return (
-            <div key={r.p2p_id} onClick={() => { setSelected(r); setPanel(null); setSchedSlot(""); setSchedNote(""); setOutcomeNotes(""); setNewVisits(""); }}
-              style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #3b82f6" : "3px solid transparent" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: NAVY }}>{r.member_name || "Unknown"}</div>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: r.status === "scheduled" ? "#d1fae5" : "#fee2e2", color: r.status === "scheduled" ? "#065f46" : "#991b1b" }}>
-                  {r.status === "scheduled" ? "SCHEDULED" : "PENDING"}
-                </span>
+        ) : (
+          <>
+            {pending.length > 0 && (
+              <>
+                <div style={{ padding: "12px 20px 6px", fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, background: "#fafafa", borderBottom: "1px solid #f1f5f9" }}>
+                  Awaiting Your Response · {pending.length}
+                </div>
+                {pending.map((r, i) => {
+                  const isSel = selected?.p2p_id === r.p2p_id;
+                  return (
+                    <div key={r.p2p_id} onClick={() => { setSelected(r); setPanel(null); setOutcomeNotes(""); setNewVisits(""); }}
+                      style={{ padding: "13px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #3b82f6" : "3px solid transparent" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: NAVY }}>{r.member_name || "Unknown"}</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "#fee2e2", color: "#991b1b" }}>PENDING</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{r.discipline} · {r.plan_id}</div>
+                      <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginTop: 3 }}>Det: {r.last_determination || "—"}</div>
+                      <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>Primary: {fmtSlot(r.primary_slot)}</div>
+                      {r.secondary_slot && <div style={{ fontSize: 10, color: "#94a3b8" }}>Secondary: {fmtSlot(r.secondary_slot)}</div>}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {confirmed.length > 0 && (
+              <>
+                <div style={{ padding: "12px 20px 6px", fontSize: 10, fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: 1, background: "#f0fdf4", borderBottom: "1px solid #d1fae5" }}>
+                  Upcoming Calls · {confirmed.length}
+                </div>
+                {confirmed.map((r, i) => {
+                  const isSel = selected?.p2p_id === r.p2p_id;
+                  return (
+                    <div key={r.p2p_id} onClick={() => { setSelected(r); setPanel(null); setOutcomeNotes(""); setNewVisits(""); }}
+                      style={{ padding: "13px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#f0fdf4" : "#fff", borderLeft: isSel ? "3px solid #059669" : "3px solid transparent" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: NAVY }}>{r.member_name || "Unknown"}</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "#d1fae5", color: "#065f46" }}>CONFIRMED</span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#059669", marginTop: 4 }}>{fmtSlot(r.confirmed_slot)}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{r.discipline} · {r.plan_id}</div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {requests.length === 0 && (
+              <div style={{ padding: 32, textAlign: "center" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
+                <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>No P2P requests</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Set your schedule above so providers can book times</div>
               </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{r.discipline} · {r.plan_id}</div>
-              <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginTop: 3 }}>Last det: {r.last_determination || "—"}</div>
-              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{r.requestor_email}</div>
-            </div>
-          );
-        })}
+            )}
+          </>
+        )}
       </div>
 
       {/* Detail Panel */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 28 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {!selected ? (
-          <div style={{ maxWidth: 440, margin: "60px auto", textAlign: "center" }}>
+          <div style={{ maxWidth: 440, margin: "40px auto", textAlign: "center" }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>📞</div>
             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: NAVY, marginBottom: 8 }}>Peer-to-Peer Reviews</div>
-            <div style={{ fontSize: 13, color: "#64748b" }}>Select a request to schedule the call or record the outcome.</div>
+            <div style={{ fontSize: 13, color: "#64748b" }}>Select a request from the list to accept a time or record the call outcome.</div>
           </div>
         ) : (
-          <div style={{ maxWidth: 660, margin: "0 auto" }}>
+          <div style={{ maxWidth: 680, margin: "0 auto" }}>
+            {/* Confirmed call banner */}
+            {selected.status === "confirmed" && (
+              <div style={{ background: "#d1fae5", borderRadius: 12, border: "1px solid #6ee7b7", padding: "18px 22px", marginBottom: 18 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#065f46", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Confirmed Call</div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: "#065f46" }}>{fmtSlot(selected.confirmed_slot)}</div>
+                <div style={{ fontSize: 12, color: "#065f46", marginTop: 4, opacity: 0.8 }}>Provider has been notified of this time</div>
+              </div>
+            )}
+
             {/* Case info */}
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22, marginBottom: 18 }}>
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22, marginBottom: 16 }}>
               <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 700, color: NAVY, marginBottom: 4 }}>{selected.member_name}</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>{selected.discipline} · {selected.plan_id} · Last determination: <strong style={{ color: "#dc2626" }}>{selected.last_determination || "—"}</strong></div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                {selected.discipline} · {selected.plan_id} · Requested {selected.requested_visits} visits
+              </div>
+              {Array.isArray(selected.diagnosis_codes) && selected.diagnosis_codes.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                  {selected.diagnosis_codes.map(c => (
+                    <span key={c} style={{ padding: "2px 8px", borderRadius: 5, background: "#eff6ff", color: NAVY, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{c}</span>
+                  ))}
+                </div>
+              )}
+              {/* Prior determination summary */}
+              <div style={{ marginTop: 14, background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa", padding: "12px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9a3412", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>Your Determination</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#c2410c" }}>{selected.last_determination || "—"}</div>
+                {selected.last_approved_visits != null && <div style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>{selected.last_approved_visits} visits approved</div>}
+                {selected.last_reviewer_notes && <div style={{ fontSize: 12, color: "#7c2d12", marginTop: 6, fontStyle: "italic" }}>"{selected.last_reviewer_notes}"</div>}
+              </div>
               {selected.clinical_notes && (
-                <div style={{ marginTop: 14, background: "#f8fafc", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#374151" }}>
+                <div style={{ marginTop: 12, background: "#f8fafc", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#374151" }}>
                   <div style={{ fontWeight: 700, fontSize: 11, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.7 }}>Provider Clinical Argument</div>
                   {selected.clinical_notes}
                 </div>
               )}
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: 11, color: "#64748b", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.7 }}>Preferred Time Slots</div>
-                {(selected.preferred_slots || []).map((s, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#1e293b", padding: "4px 0", borderBottom: i < selected.preferred_slots.length - 1 ? "1px solid #f1f5f9" : "none" }}>{s}</div>
-                ))}
-              </div>
-              {selected.scheduled_slot && (
-                <div style={{ marginTop: 12, background: "#d1fae5", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#065f46" }}>
-                  <strong>Scheduled:</strong> {selected.scheduled_slot}
-                  {selected.schedule_note && <span> — {selected.schedule_note}</span>}
-                </div>
-              )}
             </div>
 
-            {/* Action Buttons */}
-            {!panel && (
-              <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-                {selected.status === "pending" && (
-                  <button onClick={() => setPanel("schedule")} style={{ flex: 1, padding: "12px 0", borderRadius: 8, background: NAVY, color: "#fff", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                    Schedule Call
-                  </button>
-                )}
-                <button onClick={() => setPanel("complete")} style={{ flex: 1, padding: "12px 0", borderRadius: 8, background: "#059669", color: "#fff", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                  Record Outcome
-                </button>
-              </div>
-            )}
-
-            {/* Schedule Panel */}
-            {panel === "schedule" && (
-              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22 }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>Confirm Call Time</div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Selected Time Slot
-                  <input value={schedSlot} onChange={e => setSchedSlot(e.target.value)} placeholder="e.g., Mon 6/3 10–11 AM EST"
-                    style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
-                </label>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginTop: 12 }}>Note to provider (optional)
-                  <input value={schedNote} onChange={e => setSchedNote(e.target.value)} placeholder="e.g., Dial-in: 555-0100"
-                    style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
-                </label>
-                <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-                  <button onClick={() => setPanel(null)} style={{ padding: "9px 18px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
-                  <button onClick={handleSchedule} disabled={saving || !schedSlot.trim()}
-                    style={{ padding: "9px 18px", borderRadius: 7, background: NAVY, color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-                    {saving ? "Saving..." : "Confirm & Notify Provider"}
-                  </button>
+            {/* Accept slot (pending only) */}
+            {selected.status === "pending" && !panel && (
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22, marginBottom: 16 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>Provider's Requested Times</div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                  <div style={{ flex: 1, padding: "14px 16px", background: "#eff6ff", borderRadius: 10, border: "1.5px solid #bfdbfe" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#1e40af", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Primary</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>{fmtSlot(selected.primary_slot)}</div>
+                    <button onClick={() => handleAccept("primary")} disabled={saving}
+                      style={{ marginTop: 10, width: "100%", padding: "8px 0", background: NAVY, color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                      Accept Primary
+                    </button>
+                  </div>
+                  {selected.secondary_slot && (
+                    <div style={{ flex: 1, padding: "14px 16px", background: "#f0fdf4", borderRadius: 10, border: "1.5px solid #bbf7d0" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#065f46", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Secondary</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: NAVY }}>{fmtSlot(selected.secondary_slot)}</div>
+                      <button onClick={() => handleAccept("secondary")} disabled={saving}
+                        style={{ marginTop: 10, width: "100%", padding: "8px 0", background: "#059669", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                        Accept Secondary
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Complete Panel */}
+            {/* Record Outcome */}
+            {!panel && (
+              <button onClick={() => setPanel("complete")}
+                style={{ width: "100%", padding: "12px 0", borderRadius: 8, background: "#059669", color: "#fff", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
+                Record Call Outcome
+              </button>
+            )}
+
             {panel === "complete" && (
               <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22 }}>
                 <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>Record P2P Outcome</div>
@@ -2674,8 +2921,8 @@ function P2PQueueView({ token }) {
                 </div>
                 {outcome !== "upheld" && (
                   <div style={{ background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa", padding: 14, marginBottom: 14 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>Updated Determination</div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 8 }}>Updated Determination</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                       {["Approved", "Partial Denial", "Full Denial", "Pend"].map(d => (
                         <button key={d} onClick={() => setNewDet(d)}
                           style={{ padding: "6px 12px", borderRadius: 6, border: `1.5px solid ${newDet === d ? "#d97706" : "#e2e8f0"}`, background: newDet === d ? "#fef3c7" : "#fff", fontSize: 12, cursor: "pointer", fontWeight: newDet === d ? 700 : 400 }}>
@@ -2689,9 +2936,9 @@ function P2PQueueView({ token }) {
                     </label>
                   </div>
                 )}
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 14 }}>Call notes (for audit trail)
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 14 }}>Call notes (audit trail)
                   <textarea value={outcomeNotes} onChange={e => setOutcomeNotes(e.target.value)} rows={3}
-                    placeholder="Summarize the clinical points discussed and rationale for outcome..."
+                    placeholder="Summarize clinical points discussed and rationale..."
                     style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
                 </label>
                 <div style={{ display: "flex", gap: 10 }}>
