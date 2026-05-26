@@ -1135,7 +1135,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   onPendNoteChange, onPendSubmit,
   onApproveChecksChange, onApproveSubmit,
   onDenyNoteChange, onDenySignoffSubmit,
-  onCancelAction, onNavigate }) {
+  onCancelAction, onNavigate, hideQueueNav }) {
 
   const decided    = decisions[kase.caseId];
   const rec        = kase.contract?.recommendation;
@@ -1407,9 +1407,10 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
           </div>
         )}
 
-        <div style={{ borderTop: "1px solid #f1f5f9" }} />
+        {!hideQueueNav && <div style={{ borderTop: "1px solid #f1f5f9" }} />}
 
-        {/* Queue list */}
+        {/* Queue list — hidden in single-case reviewer mode */}
+        {!hideQueueNav && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>
             Queue ({total}) · J prev · K next
@@ -1459,6 +1460,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             })}
           </div>
         </div>
+        )}
 
       </div>
     </div>
@@ -1701,7 +1703,7 @@ function SubmissionsPanel({ submissions, onClose, onForward, onRefresh }) {
 }
 
 // ── COCKPIT ROOT ───────────────────────────────────────────────────────────────
-export default function Cockpit({ user, onBack, liveCase }) {
+export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDone }) {
   const [cursor, setCursor]               = useState(0);
   const [decisions, setDecisions]         = useState({});
   const [actionState, setActionState]     = useState("idle");
@@ -1816,6 +1818,11 @@ export default function Cockpit({ user, onBack, liveCase }) {
     setApproveChecks([]);
     setDenyNote("");
 
+    // When reviewer is working a single assigned live case, signal done after audit fires
+    if (hideQueueNav && onCaseDone && kase.isLive) {
+      setTimeout(onCaseDone, 1800);
+    }
+
     // Fire audit event best-effort
     const token = localStorage.getItem("cogentus_token") || "";
     if (token) {
@@ -1906,8 +1913,8 @@ export default function Cockpit({ user, onBack, liveCase }) {
       const key = e.key.toLowerCase();
       if (key === "escape") { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
       if (key === "v") { setShowDocs(s => !s); return; }
-      if (key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
-      if (key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
+      if (!hideQueueNav && key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
+      if (!hideQueueNav && key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
       if (!kase.contract || decisions[kase.caseId]) return;
       if (key === "a" && actionState === "idle") { handleAction("approve"); return; }
       if (key === "p" && actionState === "idle") { handleAction("partial"); return; }
@@ -2077,6 +2084,7 @@ export default function Cockpit({ user, onBack, liveCase }) {
             onDenySignoffSubmit={handleDenySignoffSubmit}
             onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); }}
             onNavigate={handleNavigate}
+            hideQueueNav={!!hideQueueNav}
           />
         </div>
       </div>

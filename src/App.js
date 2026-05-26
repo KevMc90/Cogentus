@@ -1239,6 +1239,332 @@ function SubmitCaseView({ user, token, plans, onBack }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWER SHELL
+// ─────────────────────────────────────────────────────────────────────────────
+function ReviewerShell({ user, token, onLogout }) {
+  const [revView, setRevView]               = useState("home"); // "home"|"cockpit"|"ur_form"
+  const [assignedCase, setAssignedCase]     = useState(null);
+  const [queueStats, setQueueStats]         = useState(null);
+  const [getCaseLoading, setGetCaseLoading] = useState(false);
+  const [getCaseError, setGetCaseError]     = useState("");
+  const DISC_COLOR = user.discipline === "OT" ? "#c2410c" : user.discipline === "ST" ? "#15803d" : "#1a3a5c";
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/queue-stats`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setQueueStats(r.data))
+      .catch(() => {});
+  }, [token, revView]);
+
+  const handleGetCase = async () => {
+    setGetCaseLoading(true);
+    setGetCaseError("");
+    try {
+      const res = await axios.get(`${API_BASE}/v1/get-case`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.case) {
+        const sub = res.data.case;
+        const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
+        setAssignedCase({
+          caseId:      sub.submission_id,
+          memberName:  sub.member_name || "Unknown Member",
+          memberId:    sub.member_id   || "—",
+          dob:         sub.dob         || "—",
+          discipline:  sub.discipline  || user.discipline || "PT",
+          reviewType:  "initial",
+          submittedAt: sub.submitted_at,
+          documents:   sub.document_list || [],
+          metrics: {
+            primaryDiagnosisCode: diags[0] || null,
+            diagnosisCodes:       diags,
+            requestedVisits:      sub.requested_visits || 0,
+            therapyType:          sub.discipline || user.discipline || "PT",
+            functionalLimitations: [],
+            sopIndicators: [],
+            documentationQuality: {},
+          },
+          planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
+        });
+        setRevView("cockpit");
+      } else {
+        setGetCaseError(res.data.message || "No cases available.");
+      }
+    } catch (err) {
+      setGetCaseError("Failed to reach server. Please try again.");
+    } finally {
+      setGetCaseLoading(false);
+    }
+  };
+
+  const handleCaseDone = () => {
+    setAssignedCase(null);
+    setRevView("home");
+  };
+
+  // ── Cockpit view ──
+  if (revView === "cockpit" && assignedCase) {
+    return (
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{
+          background: "#1a3a5c", padding: "8px 20px", display: "flex", alignItems: "center",
+          gap: 12, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.01em" }}>CogentCR</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: 6 }}>|</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>Reviewing case</span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={handleCaseDone}
+            style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >
+            Back to Queue
+          </button>
+        </div>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <Cockpit
+            user={user}
+            liveCase={assignedCase}
+            hideQueueNav={true}
+            onCaseDone={handleCaseDone}
+            onBack={handleCaseDone}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── UR Form view ── (reuses the full App logic — we render App with forceRole="master")
+  if (revView === "ur_form") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{
+          background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={() => setRevView("home")} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>
+            Back
+          </button>
+        </div>
+        <URFormEmbed user={user} token={token} />
+      </div>
+    );
+  }
+
+  // ── Home view ──
+  const discLabel   = user.discipline || "PT";
+  const pendingCount = queueStats
+    ? (queueStats.byDiscipline || []).filter(d => d.discipline === discLabel).reduce((s, r) => s + parseInt(r.count), 0)
+    : null;
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "'Public Sans', sans-serif" }}>Reviewer Portal</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: DISC_COLOR, color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }}>{discLabel}</span>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+        {[["home","Get Case"], ["ur_form","UR Form"]].map(([v, label]) => (
+          <button key={v} onClick={() => setRevView(v)} style={{
+            padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+            color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+            borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Home content */}
+      <div style={{ maxWidth: 560, margin: "60px auto", padding: "0 24px" }}>
+        {/* Stats row */}
+        <div style={{ display: "flex", gap: 14, marginBottom: 40 }}>
+          {[
+            { label: "Pending in your queue", value: pendingCount !== null ? pendingCount : "—", color: pendingCount > 0 ? "#1a3a5c" : "#9ca3af" },
+            { label: "Completed today", value: queueStats?.casesToday ?? "—", color: "#15803d" },
+          ].map(s => (
+            <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6, fontFamily: "'Public Sans', sans-serif" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Get Case button */}
+        <div style={{ background: "#fff", borderRadius: 16, padding: "40px 32px", boxShadow: "0 2px 12px rgba(26,58,92,0.1)", border: "1px solid #e2e8f0", textAlign: "center" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#374151", marginBottom: 8, fontFamily: "'Public Sans', sans-serif" }}>Ready to review?</div>
+          <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 28, fontFamily: "'Public Sans', sans-serif" }}>
+            Cases are assigned by priority and submission age.
+          </div>
+          <button
+            onClick={handleGetCase}
+            disabled={getCaseLoading}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 10,
+              padding: "14px 40px", borderRadius: 10,
+              background: getCaseLoading ? "#94a3b8" : "#1a3a5c",
+              color: "#fff", fontSize: 16, fontWeight: 700,
+              border: "none", cursor: getCaseLoading ? "not-allowed" : "pointer",
+              fontFamily: "'Public Sans', sans-serif",
+              boxShadow: getCaseLoading ? "none" : "0 4px 14px rgba(26,58,92,0.35)",
+              transition: "all 0.15s",
+            }}
+          >
+            {getCaseLoading ? "Finding case..." : "Get Case"}
+          </button>
+          {getCaseError && (
+            <div style={{ marginTop: 16, fontSize: 13, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>
+              {getCaseError}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Thin wrapper: lets ReviewerShell embed the existing form logic without full App state
+function URFormEmbed({ user, token }) {
+  const [reviewType, setReviewType]   = useState("initial");
+  const [therapyType, setTherapyType] = useState(user.discipline || "PT");
+  const [hpi, setHpi]                 = useState("");
+  const [requestedVisits, setRequestedVisits] = useState("");
+  const [files, setFiles]             = useState([]);
+  const [review, setReview]           = useState("");
+  const [ruling, setRuling]           = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState("");
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  const handleSubmit = async () => {
+    setError(""); setReview(""); setRuling(null);
+    if (files.length === 0) { setError("Please attach at least one PDF."); return; }
+    if (!requestedVisits)   { setError("Requested Visits is required."); return; }
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      files.forEach(f => fd.append("pdfs", f));
+      fd.append("reviewType", reviewType);
+      fd.append("therapyType", therapyType);
+      fd.append("hpi", hpi.trim());
+      fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
+      const res = await axios.post(`${API_BASE}/api/generate-review`, fd, { headers: { "Content-Type": "multipart/form-data", ...authHeaders } });
+      setReview(res.data.review || "");
+      setRuling(res.data.ruling || null);
+    } catch (err) {
+      setError(err.response?.data?.error || "Review generation failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputS = { width: "100%", padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" };
+  const labelS = (t) => <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>{t}</div>;
+
+  return (
+    <div style={{ maxWidth: 640, margin: "32px auto", padding: "0 24px" }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "28px 28px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#1a3a5c", marginBottom: 20, fontFamily: "'Fraunces', Georgia, serif" }}>UR Review Form</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div>{labelS("Review Type")}<select value={reviewType} onChange={e => setReviewType(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="initial">Initial</option><option value="subsequent">Subsequent</option></select></div>
+          <div>{labelS("Discipline")}<select value={therapyType} onChange={e => setTherapyType(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="PT">PT</option><option value="OT">OT</option><option value="ST">ST</option></select></div>
+          <div>{labelS("Requested Visits")}<input type="number" min="0" value={requestedVisits} onChange={e => setRequestedVisits(e.target.value)} placeholder="e.g. 16" style={inputS} /></div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          {labelS("HPI / Clinical Context")}
+          <textarea value={hpi} onChange={e => setHpi(e.target.value)} rows={3} placeholder="Brief clinical context..." style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          {labelS("Clinical PDFs")}
+          <input type="file" accept=".pdf" multiple onChange={e => setFiles(Array.from(e.target.files))} style={{ fontSize: 13, fontFamily: "'DM Sans', sans-serif" }} />
+          {files.length > 0 && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{files.length} file(s) selected</div>}
+        </div>
+        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "11px 0", borderRadius: 8, background: loading ? "#94a3b8" : "#1a3a5c", color: "#fff", fontSize: 14, fontWeight: 700, border: "none", cursor: loading ? "not-allowed" : "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+          {loading ? "Processing..." : "Generate Review"}
+        </button>
+        {error && <div style={{ marginTop: 12, color: "#dc2626", fontSize: 13 }}>{error}</div>}
+        {review && (
+          <div style={{ marginTop: 20, padding: "16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap", color: "#1e293b" }}>
+            {review}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVIDER PORTAL STUB (Phase 10 will build this out)
+// ─────────────────────────────────────────────────────────────────────────────
+function ProviderPortalStub({ user, token, onLogout }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading]         = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setSubmissions(r.data.submissions || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [token]);
+
+  const statusColor = (s) => {
+    if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
+    if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
+    if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
+    if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#374151" };
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
+      <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>Provider Portal</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>{user.name || user.email}</span>
+        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+      </div>
+
+      <div style={{ maxWidth: 760, margin: "32px auto", padding: "0 24px" }}>
+        <div style={{ background: "#fff8ed", border: "1px solid #fed7aa", borderRadius: 12, padding: "20px 24px", marginBottom: 28 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#c2410c", marginBottom: 6, fontFamily: "'Fraunces', Georgia, serif" }}>Provider Portal — Coming Soon</div>
+          <div style={{ fontSize: 13, color: "#92400e" }}>The full provider submission experience is under development. Your previous submissions are shown below.</div>
+        </div>
+
+        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>
+            Your Submissions
+          </div>
+          {loading ? (
+            <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading...</div>
+          ) : submissions.length === 0 ? (
+            <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>No submissions yet.</div>
+          ) : submissions.map(s => {
+            const sc = statusColor(s.status);
+            return (
+              <div key={s.submission_id} style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>{s.member_name || "Unknown Member"}</div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{s.submission_id} · {s.discipline || "PT"} · {s.requested_visits} visits requested</div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: sc.bg, color: sc.text, textTransform: "capitalize" }}>
+                  {(s.status || "submitted").replace(/_/g, " ")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- App --------------------------------------------------------------------
 function App() {
   // Auth state — initialised from localStorage
@@ -1307,6 +1633,15 @@ function App() {
   if (!token || !user) {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
+
+  // Role-based shell routing
+  if (user.role === "reviewer") {
+    return <ReviewerShell user={user} token={token} onLogout={handleLogout} />;
+  }
+  if (user.role === "provider") {
+    return <ProviderPortalStub user={user} token={token} onLogout={handleLogout} />;
+  }
+  // master / admin / legacy → existing UI below
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
