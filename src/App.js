@@ -2127,15 +2127,19 @@ function AuditExportView({ token }) {
 
   React.useEffect(() => { fetchSummary('', ''); }, [token]); // eslint-disable-line
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const params = new URLSearchParams({ ...(startDate ? { startDate } : {}), ...(endDate ? { endDate } : {}) });
-    const url = `${API_BASE}/v1/audit-export?${params}`;
+    const r = await axios.get(`${API_BASE}/v1/audit-export?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+    const blob = new Blob([r.data], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.setAttribute('download', '');
-    document.body.appendChild(a);
+    a.download = `cogentcr-audit-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
-    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const inputS = { padding: '7px 12px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, fontFamily: "'DM Sans', sans-serif" };
