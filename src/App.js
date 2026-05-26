@@ -1166,6 +1166,7 @@ function SubmitCaseView({ user, token, plans, onBack }) {
   const [memberName, setMemberName]       = useState("");
   const [memberId, setMemberId]           = useState("");
   const [dob, setDob]                     = useState("");
+  const [memberState, setMemberState]     = useState("");
   const [discipline, setDiscipline]       = useState("PT");
   const [diagCodes, setDiagCodes]         = useState("");
   const [requestedVisits, setRequestedVisits] = useState("");
@@ -1191,7 +1192,7 @@ function SubmitCaseView({ user, token, plans, onBack }) {
       const res = await axios.post(`${API_BASE}/v1/submit`, {
         providerName: providerName.trim() || null, providerNpi: providerNpi.trim() || null,
         memberName: memberName.trim() || null, memberId: memberId.trim() || null,
-        dob: dob.trim() || null, discipline,
+        dob: dob.trim() || null, memberState: memberState.trim() || null, discipline,
         diagnosisCodes: parsedDiags, requestedVisits: parseInt(requestedVisits, 10) || null,
         planId: planId || null, documentList: parsedDocs,
         providerNotes: providerNotes.trim() || null,
@@ -1271,6 +1272,7 @@ function SubmitCaseView({ user, token, plans, onBack }) {
             <div style={fieldWrapS}>{labelS("Member Name *")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last" style={inputS} /></div>
             <div style={fieldWrapS}>{labelS("Member ID *")}<input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="MBR-XXXXX" style={inputS} /></div>
             <div style={fieldWrapS}>{labelS("Date of Birth *")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
+            <div style={fieldWrapS}>{labelS("Member State")}<input value={memberState} onChange={e => setMemberState(e.target.value.toUpperCase().slice(0,2))} placeholder="e.g. CA" maxLength={2} style={{ ...inputS, textTransform: "uppercase" }} /></div>
           </div>
         </div>
 
@@ -1683,6 +1685,127 @@ function EpisodeContextBar({ memberId, discipline, token }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// STATE RULES BAR + VIEW (Phase 23)
+// ─────────────────────────────────────────────────────────────────────────────
+const RULE_TYPE_META = {
+  direct_access:       { label: "Direct Access",    color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+  appeal_std_days:     { label: "Std Appeal",       color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" },
+  urgent_appeal_hours: { label: "Urgent Appeal",    color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd" },
+  autism_mandate:      { label: "Autism Mandate",   color: "#c2410c", bg: "#fff7ed", border: "#fdba74" },
+  telehealth_parity:   { label: "Telehealth",       color: "#0e7490", bg: "#ecfeff", border: "#67e8f9" },
+  visit_limit:         { label: "Visit Limit",      color: "#b45309", bg: "#fffbeb", border: "#fde68a" },
+};
+
+function StateRulesBar({ state, discipline, token }) {
+  const [rules, setRules] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!state || state === "—") return;
+    axios.get(`${API_BASE}/v1/state-rules`, {
+      params: { state, discipline },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => setRules(r.data.rules || []))
+      .catch(() => {});
+  }, [state, discipline, token]); // eslint-disable-line
+
+  if (!rules.length) return null;
+
+  // Show up to 3 most relevant rules
+  const priority = ["direct_access","appeal_std_days","urgent_appeal_hours","autism_mandate","telehealth_parity"];
+  const sorted = [...rules].sort((a, b) => {
+    const ai = priority.indexOf(a.rule_type); const bi = priority.indexOf(b.rule_type);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  }).slice(0, 3);
+
+  return (
+    <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "7px 20px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>{state} Rules</span>
+      {sorted.map(r => {
+        const m = RULE_TYPE_META[r.rule_type] || { label: r.rule_type, color: "#374151", bg: "#f1f5f9", border: "#cbd5e1" };
+        const detail = r.rule_type === "appeal_std_days" ? ` · ${r.value_days}d` : r.rule_type === "urgent_appeal_hours" ? ` · ${r.value_hours}h` : "";
+        return (
+          <span key={r.id} title={r.summary} style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, background: m.bg, color: m.color, border: `1px solid ${m.border}`, fontFamily: "'DM Sans', sans-serif", cursor: "default" }}>
+            {m.label}{detail}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function StateRulesView({ token }) {
+  const [stateFilter, setStateFilter] = React.useState("");
+  const [discFilter,  setDiscFilter]  = React.useState("");
+  const [rules,       setRules]       = React.useState([]);
+  const [loading,     setLoading]     = React.useState(false);
+
+  const STATES = ["AZ","CA","CO","FL","GA","IL","MA","MI","NC","NJ","NY","OH","PA","TX","WA"];
+
+  const fetchRules = (s, d) => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/state-rules`, {
+      params: { ...(s ? { state: s } : {}), ...(d ? { discipline: d } : {}) },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { setRules(r.data.rules || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  React.useEffect(() => { fetchRules("", ""); }, [token]); // eslint-disable-line
+
+  const handleState = (v) => { setStateFilter(v); fetchRules(v, discFilter); };
+  const handleDisc  = (v) => { setDiscFilter(v);  fetchRules(stateFilter, v); };
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px" }}>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>State-Specific Rules</div>
+        <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>Direct access laws, appeal timeframes, and coverage mandates by state</div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+        <select value={stateFilter} onChange={e => handleState(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif", cursor: "pointer" }}>
+          <option value="">All States</option>
+          {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={discFilter} onChange={e => handleDisc(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif", cursor: "pointer" }}>
+          <option value="">All Disciplines</option>
+          <option value="PT">PT</option>
+          <option value="OT">OT</option>
+          <option value="ST">ST</option>
+        </select>
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "50px 60px 140px 1fr 200px", padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>
+          <span>State</span><span>Disc.</span><span>Rule Type</span><span>Summary</span><span>Citation</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading…</div>
+        ) : rules.length === 0 ? (
+          <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No rules found — run POST /v1/_migrate-state-rules to seed data.</div>
+        ) : rules.map(r => {
+          const m = RULE_TYPE_META[r.rule_type] || { label: r.rule_type, color: "#374151", bg: "#f1f5f9", border: "#cbd5e1" };
+          return (
+            <div key={r.id} style={{ display: "grid", gridTemplateColumns: "50px 60px 140px 1fr 200px", padding: "11px 16px", borderBottom: "1px solid #f1f5f9", alignItems: "start", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+              <span style={{ fontWeight: 700, color: "#1e293b" }}>{r.state}</span>
+              <span style={{ padding: "2px 7px", borderRadius: 5, background: "#eff6ff", color: "#1a3a5c", fontSize: 10, fontWeight: 700, width: "fit-content" }}>{r.discipline}</span>
+              <span style={{ padding: "2px 8px", borderRadius: 10, background: m.bg, color: m.color, border: `1px solid ${m.border}`, fontSize: 10, fontWeight: 700, width: "fit-content" }}>{m.label}</span>
+              <span style={{ color: "#374151", lineHeight: 1.5 }}>{r.summary}</span>
+              <span style={{ color: "#9ca3af", fontSize: 11 }}>{r.citation || "—"}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CRITERIA LIBRARY (Phase 20)
 // ─────────────────────────────────────────────────────────────────────────────
 function CriteriaLibraryView({ token }) {
@@ -1982,6 +2105,7 @@ function ReviewerShell({ user, token, onLogout }) {
           caseId:         sub.submission_id,
           memberName:     sub.member_name || "Unknown Member",
           memberId:       sub.member_id   || "—",
+          memberState:    sub.member_state || null,
           dob:            sub.dob         || "—",
           discipline:     sub.discipline  || user.discipline || "PT",
           reviewType:     "initial",
@@ -2038,6 +2162,7 @@ function ReviewerShell({ user, token, onLogout }) {
           </button>
         </div>
         <EpisodeContextBar memberId={assignedCase.memberId} discipline={assignedCase.discipline} token={token} />
+        <StateRulesBar state={assignedCase.memberState} discipline={assignedCase.discipline} token={token} />
         <div style={{ flex: 1, overflow: "hidden" }}>
           <Cockpit
             user={user}
@@ -2063,7 +2188,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2089,7 +2214,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2115,7 +2240,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2141,7 +2266,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2170,7 +2295,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2196,7 +2321,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2206,6 +2331,31 @@ function ReviewerShell({ user, token, onLogout }) {
           ))}
         </div>
         <CriteriaLibraryView token={token} />
+      </div>
+    );
+  }
+
+  if (revView === "state_rules") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <StateRulesView token={token} />
       </div>
     );
   }
@@ -2232,7 +2382,7 @@ function ReviewerShell({ user, token, onLogout }) {
 
       {/* Tab bar */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"]].map(([v, label]) => (
+        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
           <button key={v} onClick={() => setRevView(v)} style={{
             padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
             color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2780,6 +2930,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
   const [memberName,      setMemberName]      = useState("");
   const [memberId,        setMemberId]        = useState("");
   const [dob,             setDob]             = useState("");
+  const [memberState,     setMemberState]     = useState("");
   const [discipline,      setDiscipline]      = useState("PT");
   const [diagInput,       setDiagInput]       = useState("");
   const [diagnosisCodes,  setDiagnosisCodes]  = useState([]);
@@ -2839,6 +2990,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
         fd.append("memberName",   memberName);
         fd.append("memberId",     memberId);
         fd.append("dob",          dob);
+        fd.append("memberState",  memberState);
         fd.append("discipline",   discipline);
         fd.append("diagnosisCodes", JSON.stringify(diagnosisCodes));
         fd.append("requestedVisits", requestedVisits);
@@ -2852,7 +3004,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
       } else {
         // Plain JSON path
         res = await axios.post(`${API_BASE}/v1/submit`, {
-          providerName, providerNpi, memberName, memberId, dob,
+          providerName, providerNpi, memberName, memberId, dob, memberState,
           discipline, diagnosisCodes,
           requestedVisits: parseInt(requestedVisits) || 0,
           planId: planId || null, documentList: docList, providerNotes,
@@ -2943,6 +3095,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
           <div style={{ gridColumn: "1 / 3" }}>{labelS("Member Name")}<input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="First Last (or let AI fill from document)" style={inputS} /></div>
           <div>{labelS("Date of Birth")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
           <div>{labelS("Member ID")}<input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="e.g. XYZ123456" style={inputS} /></div>
+          <div>{labelS("Member State")}<input value={memberState} onChange={e => setMemberState(e.target.value.toUpperCase().slice(0,2))} placeholder="e.g. CA" maxLength={2} style={{ ...inputS, textTransform: "uppercase" }} /></div>
           <div>{labelS("Plan / Payer")}<select value={planId} onChange={e => setPlanId(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
             <option value="">Select plan...</option>
             {plans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>)}
@@ -5078,8 +5231,9 @@ function MasterShell({ user, token, onLogout }) {
     ["appeals",    "Appeals"],
     ["reports",    "Reports"],
     ["admin",      "Admin"],
-    ["criteria",   "Criteria"],
-    ["providers",  "Providers"],
+    ["criteria",    "Criteria"],
+    ["providers",   "Providers"],
+    ["state_rules", "State Rules"],
   ];
 
   return (
@@ -5119,7 +5273,8 @@ function MasterShell({ user, token, onLogout }) {
       {masterView === "reports"   && <ReportsView token={token} />}
       {masterView === "admin"     && <AdminConsole token={token} />}
       {masterView === "criteria"   && <CriteriaLibraryView token={token} />}
-      {masterView === "providers"  && <ProviderDirectoryView token={token} />}
+      {masterView === "providers"   && <ProviderDirectoryView token={token} />}
+      {masterView === "state_rules" && <StateRulesView token={token} />}
     </div>
   );
 }
