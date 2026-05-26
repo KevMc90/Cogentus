@@ -1584,7 +1584,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1610,7 +1610,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1636,7 +1636,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
             <button key={v} onClick={() => setRevView(v)} style={{
               padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
               color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1646,6 +1646,32 @@ function ReviewerShell({ user, token, onLogout }) {
           ))}
         </div>
         <ReviewerDashboard token={token} user={user} />
+      </div>
+    );
+  }
+
+  // ── P2P view ──
+  if (revView === "p2p") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <P2PQueueView token={token} />
       </div>
     );
   }
@@ -1672,7 +1698,7 @@ function ReviewerShell({ user, token, onLogout }) {
 
       {/* Tab bar */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"]].map(([v, label]) => (
           <button key={v} onClick={() => setRevView(v)} style={{
             padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
             color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -2385,11 +2411,312 @@ function NewSubmissionForm({ token, onSubmitted }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// P2P REQUEST MODAL (provider)
+// ─────────────────────────────────────────────────────────────────────────────
+function P2PRequestModal({ submissionId, memberName, token, onClose, onSuccess }) {
+  const [slots, setSlots]   = useState(["", "", ""]);
+  const [notes, setNotes]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]       = useState(null);
+
+  const updateSlot = (i, v) => setSlots(prev => { const n = [...prev]; n[i] = v; return n; });
+  const filledSlots = slots.filter(s => s.trim());
+
+  const submit = () => {
+    if (!filledSlots.length) { setErr("Please enter at least one preferred time slot."); return; }
+    setSaving(true); setErr(null);
+    fetch(`${API_BASE}/v1/p2p-request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ submissionId, preferredSlots: filledSlots, clinicalNotes: notes }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        setSaving(false);
+        if (d.p2pId) { onSuccess(); }
+        else { setErr(d.error || "Request failed."); }
+      })
+      .catch(() => { setSaving(false); setErr("Network error."); });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: 500, maxWidth: "95vw", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 700, color: "#1a2e4a" }}>Request Peer-to-Peer Review</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{memberName}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94a3b8", padding: 0 }}>×</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#475569", background: "#eff6ff", borderRadius: 8, padding: "10px 14px", marginBottom: 18 }}>
+          A peer-to-peer call lets you speak directly with the reviewing clinician to discuss the clinical basis for the determination. You will be contacted to confirm a time.
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Preferred Time Slots (provide up to 3)</div>
+          {slots.map((s, i) => (
+            <input key={i} type="text" value={s} onChange={e => updateSlot(i, e.target.value)}
+              placeholder={`Option ${i + 1} — e.g., Mon 6/3 10–11 AM EST`}
+              style={{ display: "block", width: "100%", marginBottom: 8, padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
+          ))}
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Clinical Argument (optional but recommended)</div>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
+            placeholder="Summarize the clinical evidence supporting medical necessity..."
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+        </div>
+        {err && <div style={{ marginBottom: 12, fontSize: 12, color: "#dc2626" }}>{err}</div>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          <button onClick={submit} disabled={saving || !filledSlots.length}
+            style={{ padding: "9px 20px", borderRadius: 7, border: "none", background: "#1a2e4a", color: "#fff", cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Submitting..." : "Submit P2P Request"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P2P QUEUE VIEW (reviewer / master)
+// ─────────────────────────────────────────────────────────────────────────────
+function P2PQueueView({ token }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [panel, setPanel]       = useState(null); // "schedule" | "complete"
+  const [schedSlot, setSchedSlot] = useState("");
+  const [schedNote, setSchedNote] = useState("");
+  const [outcome, setOutcome]   = useState("upheld");
+  const [outcomeNotes, setOutcomeNotes] = useState("");
+  const [newDet, setNewDet]     = useState("Approved");
+  const [newVisits, setNewVisits] = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [toast, setToast]       = useState(null);
+
+  const NAVY = "#1a2e4a";
+
+  const fetchQueue = () => {
+    setLoading(true);
+    fetch(`${API_BASE}/v1/p2p-queue`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => { setRequests(d.requests || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchQueue(); }, []); // eslint-disable-line
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
+  const handleSchedule = () => {
+    if (!schedSlot.trim()) return;
+    setSaving(true);
+    fetch(`${API_BASE}/v1/p2p-requests/${selected.p2p_id}/schedule`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ scheduledSlot: schedSlot, scheduleNote: schedNote }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        setSaving(false);
+        if (d.ok) { showToast("Call scheduled — provider notified."); setSelected(null); setPanel(null); fetchQueue(); }
+        else showToast("Error: " + d.error);
+      })
+      .catch(() => { setSaving(false); showToast("Network error."); });
+  };
+
+  const handleComplete = () => {
+    if (outcome !== "upheld" && !newDet) return;
+    setSaving(true);
+    fetch(`${API_BASE}/v1/p2p-requests/${selected.p2p_id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        outcome, outcomeNotes,
+        newDetermination:  outcome !== "upheld" ? newDet    : undefined,
+        newApprovedVisits: outcome !== "upheld" ? parseInt(newVisits, 10) || undefined : undefined,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        setSaving(false);
+        if (d.ok) { showToast("P2P outcome recorded — provider notified."); setSelected(null); setPanel(null); fetchQueue(); }
+        else showToast("Error: " + d.error);
+      })
+      .catch(() => { setSaving(false); showToast("Network error."); });
+  };
+
+  return (
+    <div style={{ display: "flex", height: "calc(100vh - 110px)" }}>
+      {toast && (
+        <div style={{ position: "fixed", top: 16, right: 16, background: NAVY, color: "#fff", borderRadius: 8, padding: "12px 20px", fontSize: 13, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>{toast}</div>
+      )}
+      {/* List */}
+      <div style={{ width: 340, borderRight: "1px solid #e2e8f0", overflowY: "auto", background: "#fff" }}>
+        <div style={{ padding: "16px 20px 10px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY }}>P2P Queue</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{requests.length} open request{requests.length !== 1 ? "s" : ""}</div>
+        </div>
+        {loading ? (
+          <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Loading...</div>
+        ) : requests.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📞</div>
+            <div style={{ fontSize: 14, color: "#475569", fontWeight: 600 }}>No open P2P requests</div>
+          </div>
+        ) : requests.map((r, i) => {
+          const isSel = selected?.p2p_id === r.p2p_id;
+          return (
+            <div key={r.p2p_id} onClick={() => { setSelected(r); setPanel(null); setSchedSlot(""); setSchedNote(""); setOutcomeNotes(""); setNewVisits(""); }}
+              style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isSel ? "#eff6ff" : i % 2 === 0 ? "#fff" : "#fafafa", borderLeft: isSel ? "3px solid #3b82f6" : "3px solid transparent" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: NAVY }}>{r.member_name || "Unknown"}</div>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: r.status === "scheduled" ? "#d1fae5" : "#fee2e2", color: r.status === "scheduled" ? "#065f46" : "#991b1b" }}>
+                  {r.status === "scheduled" ? "SCHEDULED" : "PENDING"}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{r.discipline} · {r.plan_id}</div>
+              <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginTop: 3 }}>Last det: {r.last_determination || "—"}</div>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>{r.requestor_email}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Detail Panel */}
+      <div style={{ flex: 1, overflowY: "auto", padding: 28 }}>
+        {!selected ? (
+          <div style={{ maxWidth: 440, margin: "60px auto", textAlign: "center" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📞</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: NAVY, marginBottom: 8 }}>Peer-to-Peer Reviews</div>
+            <div style={{ fontSize: 13, color: "#64748b" }}>Select a request to schedule the call or record the outcome.</div>
+          </div>
+        ) : (
+          <div style={{ maxWidth: 660, margin: "0 auto" }}>
+            {/* Case info */}
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22, marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 700, color: NAVY, marginBottom: 4 }}>{selected.member_name}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{selected.discipline} · {selected.plan_id} · Last determination: <strong style={{ color: "#dc2626" }}>{selected.last_determination || "—"}</strong></div>
+              {selected.clinical_notes && (
+                <div style={{ marginTop: 14, background: "#f8fafc", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#374151" }}>
+                  <div style={{ fontWeight: 700, fontSize: 11, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.7 }}>Provider Clinical Argument</div>
+                  {selected.clinical_notes}
+                </div>
+              )}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#64748b", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.7 }}>Preferred Time Slots</div>
+                {(selected.preferred_slots || []).map((s, i) => (
+                  <div key={i} style={{ fontSize: 13, color: "#1e293b", padding: "4px 0", borderBottom: i < selected.preferred_slots.length - 1 ? "1px solid #f1f5f9" : "none" }}>{s}</div>
+                ))}
+              </div>
+              {selected.scheduled_slot && (
+                <div style={{ marginTop: 12, background: "#d1fae5", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#065f46" }}>
+                  <strong>Scheduled:</strong> {selected.scheduled_slot}
+                  {selected.schedule_note && <span> — {selected.schedule_note}</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {!panel && (
+              <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                {selected.status === "pending" && (
+                  <button onClick={() => setPanel("schedule")} style={{ flex: 1, padding: "12px 0", borderRadius: 8, background: NAVY, color: "#fff", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                    Schedule Call
+                  </button>
+                )}
+                <button onClick={() => setPanel("complete")} style={{ flex: 1, padding: "12px 0", borderRadius: 8, background: "#059669", color: "#fff", border: "none", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                  Record Outcome
+                </button>
+              </div>
+            )}
+
+            {/* Schedule Panel */}
+            {panel === "schedule" && (
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>Confirm Call Time</div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>Selected Time Slot
+                  <input value={schedSlot} onChange={e => setSchedSlot(e.target.value)} placeholder="e.g., Mon 6/3 10–11 AM EST"
+                    style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
+                </label>
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginTop: 12 }}>Note to provider (optional)
+                  <input value={schedNote} onChange={e => setSchedNote(e.target.value)} placeholder="e.g., Dial-in: 555-0100"
+                    style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, boxSizing: "border-box" }} />
+                </label>
+                <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                  <button onClick={() => setPanel(null)} style={{ padding: "9px 18px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={handleSchedule} disabled={saving || !schedSlot.trim()}
+                    style={{ padding: "9px 18px", borderRadius: 7, background: NAVY, color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                    {saving ? "Saving..." : "Confirm & Notify Provider"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Complete Panel */}
+            {panel === "complete" && (
+              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 22 }}>
+                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 15, fontWeight: 700, color: NAVY, marginBottom: 14 }}>Record P2P Outcome</div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { key: "upheld",         label: "Upheld",        color: "#dc2626" },
+                    { key: "reversed",       label: "Reversed",      color: "#059669" },
+                    { key: "partial_change", label: "Partial Change", color: "#d97706" },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => setOutcome(opt.key)}
+                      style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `2px solid ${outcome === opt.key ? opt.color : "#e2e8f0"}`, background: outcome === opt.key ? opt.color : "#fff", color: outcome === opt.key ? "#fff" : "#374151", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {outcome !== "upheld" && (
+                  <div style={{ background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa", padding: 14, marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>Updated Determination</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                      {["Approved", "Partial Denial", "Full Denial", "Pend"].map(d => (
+                        <button key={d} onClick={() => setNewDet(d)}
+                          style={{ padding: "6px 12px", borderRadius: 6, border: `1.5px solid ${newDet === d ? "#d97706" : "#e2e8f0"}`, background: newDet === d ? "#fef3c7" : "#fff", fontSize: 12, cursor: "pointer", fontWeight: newDet === d ? 700 : 400 }}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <label style={{ fontSize: 12, color: "#7c2d12" }}>Approved visits
+                      <input type="number" min={0} value={newVisits} onChange={e => setNewVisits(e.target.value)}
+                        style={{ display: "block", marginTop: 4, width: 100, padding: "6px 10px", borderRadius: 6, border: "1px solid #fed7aa", fontSize: 13 }} />
+                    </label>
+                  </div>
+                )}
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 14 }}>Call notes (for audit trail)
+                  <textarea value={outcomeNotes} onChange={e => setOutcomeNotes(e.target.value)} rows={3}
+                    placeholder="Summarize the clinical points discussed and rationale for outcome..."
+                    style={{ display: "block", marginTop: 4, width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                </label>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setPanel(null)} style={{ padding: "9px 18px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={handleComplete} disabled={saving}
+                    style={{ padding: "9px 18px", borderRadius: 7, background: "#059669", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                    {saving ? "Recording..." : "Record Outcome & Notify Provider"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MyCasesView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [expanded, setExpanded]       = useState(null);
   const [decisions, setDecisions]     = useState({});
+  const [p2pModal, setP2pModal]       = useState(null);
+  const [p2pSuccess, setP2pSuccess]   = useState({});
 
   useEffect(() => {
     axios.get(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } })
@@ -2420,8 +2747,23 @@ function MyCasesView({ token }) {
     </div>
   );
 
+  const canRequestP2P = (sub) =>
+    ["denied", "pending_md_review"].includes(sub.status) && !p2pSuccess[sub.submission_id];
+
   return (
     <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+      {p2pModal && (
+        <P2PRequestModal
+          submissionId={p2pModal.submission_id}
+          memberName={p2pModal.member_name}
+          token={token}
+          onClose={() => setP2pModal(null)}
+          onSuccess={() => {
+            setP2pSuccess(prev => ({ ...prev, [p2pModal.submission_id]: true }));
+            setP2pModal(null);
+          }}
+        />
+      )}
       {submissions.map(sub => {
         const isOpen = expanded === sub.submission_id;
         return (
@@ -2431,6 +2773,9 @@ function MyCasesView({ token }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{sub.member_name || "Unknown Member"}</span>
                   <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id}</span>
+                  {canRequestP2P(sub) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>P2P AVAILABLE</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>
                   {sub.discipline || "PT"} · {sub.requested_visits} visits requested · {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : "—"}
@@ -2443,7 +2788,6 @@ function MyCasesView({ token }) {
             </div>
             {isOpen && (
               <div style={{ borderTop: "1px solid #f1f5f9", padding: "16px 20px" }}>
-                {/* Diagnosis codes */}
                 {Array.isArray(sub.diagnosis_codes) && sub.diagnosis_codes.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
                     <span style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>Diagnosis Codes</span>
@@ -2454,9 +2798,26 @@ function MyCasesView({ token }) {
                     </div>
                   </div>
                 )}
-                {/* Decision letter */}
                 <DecisionLetter submission={sub} decision={decisions[sub.submission_id]} />
-                {!["approved","denied","pended"].includes(sub.status) && (
+                {/* P2P request */}
+                {canRequestP2P(sub) && (
+                  <div style={{ marginTop: 14, padding: "14px 16px", background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", fontFamily: "'Public Sans', sans-serif" }}>Disagree with this determination?</div>
+                      <div style={{ fontSize: 12, color: "#78350f", marginTop: 2 }}>You may request a peer-to-peer review call with the reviewing clinician.</div>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); setP2pModal(sub); }}
+                      style={{ flexShrink: 0, marginLeft: 16, padding: "8px 16px", background: "#d97706", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                      Request P2P
+                    </button>
+                  </div>
+                )}
+                {p2pSuccess[sub.submission_id] && (
+                  <div style={{ marginTop: 12, padding: "12px 16px", background: "#d1fae5", borderRadius: 8, border: "1px solid #6ee7b7", fontSize: 13, color: "#065f46", fontFamily: "'Public Sans', sans-serif" }}>
+                    ✓ P2P request submitted — you will be notified when a time is confirmed.
+                  </div>
+                )}
+                {!["approved","denied","pended","pending_md_review"].includes(sub.status) && (
                   <div style={{ marginTop: 12, padding: "12px 16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                     <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>
                       Your case is in queue. You will be notified once a determination is made.
