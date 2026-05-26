@@ -1240,6 +1240,189 @@ function SubmitCaseView({ user, token, plans, onBack }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PRINT DECISION LETTER (client-side, no auth header needed)
+// ─────────────────────────────────────────────────────────────────────────────
+function printDecisionLetter(submission, decision) {
+  const isApproved = submission.status === "approved";
+  const isDenied   = submission.status === "denied";
+  const decLabel   = isApproved ? "APPROVED" : isDenied ? "DENIED" : "PENDED";
+  const decColor   = isApproved ? "#15803d"  : isDenied ? "#991b1b" : "#1d4ed8";
+  const decBg      = isApproved ? "#f0fdf4"  : isDenied ? "#fef2f2" : "#eff6ff";
+  const approvedVisits = decision?.approved_visits ?? null;
+  const rationale      = decision?.rationale       ?? "";
+  const decidedAt      = decision?.recorded_at ?? submission.updated_at ?? new Date().toISOString();
+  const decidedStr     = new Date(decidedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const diags = Array.isArray(submission.diagnosis_codes) ? submission.diagnosis_codes : [];
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>CogentCR Decision Letter — ${submission.submission_id}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=Public+Sans:wght@400;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Public Sans', Arial, sans-serif; background: #f8fafc; padding: 32px; color: #1e293b; }
+  .page { max-width: 680px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,0.1); }
+  .header { background: #1a3a5c; padding: 20px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .header-brand { font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+  .header-sub { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .body { padding: 28px 32px; }
+  .det-badge { display: inline-block; padding: 8px 18px; border-radius: 8px; background: ${decBg}; border: 1.5px solid ${decColor}; color: ${decColor}; font-size: 14px; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 22px; }
+  .field-label { font-size: 9px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; }
+  .field-value { font-size: 13px; color: #1e293b; font-weight: 600; margin-top: 1px; }
+  .visits-box { background: ${decBg}; border: 1px solid ${decColor}; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; }
+  .visits-label { font-size: 9px; font-weight: 700; color: ${decColor}; text-transform: uppercase; letter-spacing: 0.1em; }
+  .visits-num { font-family: 'Fraunces', Georgia, serif; font-size: 36px; font-weight: 800; color: ${decColor}; line-height: 1; margin-top: 2px; }
+  .rationale { margin-bottom: 18px; }
+  .rationale-label { font-size: 9px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+  .rationale-text { font-size: 13px; line-height: 1.7; color: #374151; }
+  .footer-rule { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0 14px; }
+  .footer-text { font-size: 10px; color: #9ca3af; line-height: 1.6; }
+  .diag-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .diag-chip { padding: 2px 8px; background: #eff6ff; color: #1a3a5c; font-size: 11px; font-family: monospace; font-weight: 600; border-radius: 4px; }
+  @media print { body { background: #fff; padding: 0; } .page { box-shadow: none; border-radius: 0; } }
+</style>
+</head><body>
+<div class="page">
+  <div class="header">
+    <div>
+      <div class="header-brand">CogentCR</div>
+      <div class="header-sub">Utilization Management Decision Letter</div>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);text-align:right;">Generated ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</div>
+  </div>
+  <div class="body">
+    <div class="det-badge">${decLabel}</div>
+    <div class="grid">
+      <div><div class="field-label">Member Name</div><div class="field-value">${submission.member_name || "—"}</div></div>
+      <div><div class="field-label">Member ID</div><div class="field-value">${submission.member_id || "—"}</div></div>
+      <div><div class="field-label">Date of Birth</div><div class="field-value">${submission.dob || "—"}</div></div>
+      <div><div class="field-label">Discipline</div><div class="field-value">${submission.discipline || "PT"}</div></div>
+      <div><div class="field-label">Case ID</div><div class="field-value" style="font-family:monospace">${submission.submission_id}</div></div>
+      <div><div class="field-label">Decision Date</div><div class="field-value">${decidedStr}</div></div>
+    </div>
+    ${diags.length > 0 ? `<div style="margin-bottom:18px"><div class="field-label">Diagnosis Codes</div><div class="diag-chips">${diags.map(c => `<span class="diag-chip">${c}</span>`).join("")}</div></div>` : ""}
+    ${isApproved && approvedVisits != null ? `<div class="visits-box"><div class="visits-label">Authorized Visits</div><div class="visits-num">${approvedVisits} <span style="font-size:16px;font-weight:600">visits</span></div></div>` : ""}
+    ${rationale ? `<div class="rationale"><div class="rationale-label">Clinical Rationale</div><div class="rationale-text">${rationale}</div></div>` : ""}
+    <hr class="footer-rule">
+    <div class="footer-text">
+      ${isApproved
+        ? "This authorization is valid for the services and dates specified above. Contact CogentCR if clinical circumstances change materially prior to initiation of services."
+        : isDenied
+        ? "This determination is subject to appeal within 60 calendar days of receipt. To initiate an appeal, contact your CogentCR case coordinator. This determination was made in accordance with established clinical criteria and the member's benefit plan."
+        : "Additional clinical documentation has been requested. Please respond within 5 business days to avoid automatic case closure. Contact your case coordinator with questions."}
+    </div>
+  </div>
+</div>
+<script>setTimeout(() => window.print(), 400);<\/script>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICATION BELL
+// ─────────────────────────────────────────────────────────────────────────────
+function NotificationBell({ token }) {
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread]               = useState(0);
+  const [open, setOpen]                   = useState(false);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const r = await axios.get(`${API_BASE}/v1/notifications`, { headers: { Authorization: `Bearer ${token}` } });
+      setNotifications(r.data.notifications || []);
+      setUnread(r.data.unread || 0);
+    } catch {}
+  }, [token]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const id = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(id);
+  }, [fetchNotifications]);
+
+  const markAllRead = async () => {
+    try {
+      await axios.post(`${API_BASE}/v1/notifications/read-all`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnread(0);
+    } catch {}
+  };
+
+  const toggleOpen = () => {
+    if (!open && unread > 0) markAllRead();
+    setOpen(o => !o);
+  };
+
+  const typeColor = (type) => {
+    if (type === "determination") return "#1a3a5c";
+    return "#6b7280";
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        onClick={toggleOpen}
+        style={{
+          position: "relative", background: open ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.2)", borderRadius: 7, padding: "5px 10px",
+          cursor: "pointer", color: "#fff", fontSize: 15, lineHeight: 1, display: "flex", alignItems: "center", gap: 6,
+        }}
+        title="Notifications"
+      >
+        <span>🔔</span>
+        {unread > 0 && (
+          <span style={{
+            position: "absolute", top: -5, right: -5, background: "#dc2626", color: "#fff",
+            fontSize: 9, fontWeight: 800, borderRadius: "50%", width: 16, height: 16,
+            display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif",
+          }}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", right: 0, top: "calc(100% + 8px)", width: 300, zIndex: 200,
+          background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", border: "1px solid #e2e8f0",
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Notifications</span>
+            {notifications.some(n => !n.is_read) && (
+              <button onClick={markAllRead} style={{ fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Mark all read</button>
+            )}
+          </div>
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: "20px 14px", fontSize: 12, color: "#9ca3af", textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No notifications yet.</div>
+            ) : notifications.map(n => (
+              <div key={n.id} style={{
+                padding: "10px 14px", borderBottom: "1px solid #f8fafc",
+                background: n.is_read ? "#fff" : "#eff6ff",
+                display: "flex", gap: 8, alignItems: "flex-start",
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: n.is_read ? "#d1d5db" : typeColor(n.type), marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: "#1e293b", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.4 }}>{n.message}</div>
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
+                    {n.created_at ? new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REVIEWER SHELL
 // ─────────────────────────────────────────────────────────────────────────────
 function ReviewerShell({ user, token, onLogout }) {
@@ -1340,6 +1523,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
@@ -1365,6 +1549,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
@@ -1390,6 +1575,7 @@ function ReviewerShell({ user, token, onLogout }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
           <span style={{ flex: 1 }} />
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <NotificationBell token={token} />
           <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
         </div>
         <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
@@ -1423,6 +1609,7 @@ function ReviewerShell({ user, token, onLogout }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: DISC_COLOR, color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }}>{discLabel}</span>
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+        <NotificationBell token={token} />
         <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
       </div>
 
@@ -1941,13 +2128,21 @@ function DecisionLetter({ submission, decision }) {
           </div>
         )}
 
-        {/* Footer note */}
-        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, fontSize: 11, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
-          {isApproved
-            ? "This authorization is valid for the services and dates specified. Contact CogentCR if clinical circumstances change."
-            : isDenied
-            ? "This determination is subject to appeal within 60 calendar days of receipt. Contact your case coordinator for appeal instructions."
-            : "Additional clinical documentation has been requested. Please respond within 5 business days to avoid case closure."}
+        {/* Footer note + print */}
+        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, flex: 1 }}>
+            {isApproved
+              ? "This authorization is valid for the services and dates specified. Contact CogentCR if clinical circumstances change."
+              : isDenied
+              ? "This determination is subject to appeal within 60 calendar days of receipt. Contact your case coordinator for appeal instructions."
+              : "Additional clinical documentation has been requested. Please respond within 5 business days to avoid case closure."}
+          </div>
+          <button
+            onClick={() => printDecisionLetter(submission, decision)}
+            style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap" }}
+          >
+            Print / PDF
+          </button>
         </div>
       </div>
     </div>
@@ -2228,6 +2423,7 @@ function ProviderPortal({ user, token, onLogout }) {
       <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "'Public Sans', sans-serif" }}>Provider Portal</span>
       <span style={{ flex: 1 }} />
       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+      <NotificationBell token={token} />
       <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
     </div>
   );
