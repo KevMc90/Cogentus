@@ -4103,6 +4103,318 @@ function AdminConsole({ token }) {
   );
 }
 
+// ── ReportsView: master reporting & CSV export ───────────────────────────────
+function ReportsView({ token }) {
+  const [reportType, setReportType] = useState("cases");
+  const [startDate, setStartDate]   = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return d.toISOString().split("T")[0];
+  });
+  const [endDate, setEndDate]       = useState(() => new Date().toISOString().split("T")[0]);
+  const [planFilter, setPlanFilter] = useState("");
+  const [discFilter, setDiscFilter] = useState("");
+  const [plans, setPlans]           = useState([]);
+  const [rows, setRows]             = useState(null);
+  const [summary, setSummary]       = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setPlans(r.data.plans || [])).catch(() => {});
+  }, [token]); // eslint-disable-line
+
+  const runReport = async () => {
+    setLoading(true); setError(""); setRows(null); setSummary(null);
+    try {
+      const params = new URLSearchParams({ startDate, endDate });
+      if (planFilter) params.set("planId", planFilter);
+      if (discFilter) params.set("discipline", discFilter);
+
+      if (reportType === "cases") {
+        const r = await axios.get(`${API_BASE}/v1/reports/cases?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        setRows(r.data.rows);
+      } else if (reportType === "summary") {
+        const r = await axios.get(`${API_BASE}/v1/reports/summary?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        setSummary(r.data);
+      } else if (reportType === "appeals") {
+        const r = await axios.get(`${API_BASE}/v1/reports/appeals?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        setRows(r.data.rows);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to generate report.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportCsv = () => {
+    if (!rows || rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const csvLines = [
+      headers.join(","),
+      ...rows.map(row =>
+        headers.map(h => {
+          const v = row[h] == null ? "" : String(row[h]);
+          return v.includes(",") || v.includes('"') || v.includes("\n")
+            ? `"${v.replace(/"/g, '""')}"` : v;
+        }).join(",")
+      ),
+    ];
+    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = `cogentcr_${reportType}_${startDate}_${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const REPORT_TYPES = [
+    { key: "cases",   label: "Case Activity",      desc: "All submissions with determination, TAT, reviewer" },
+    { key: "summary", label: "Summary Dashboard",  desc: "Aggregated rates by plan, discipline, SLA" },
+    { key: "appeals", label: "Appeals Outcomes",   desc: "All appeals with level, decision, days-to-decision" },
+  ];
+
+  const NAVY = "#0d1b2a";
+
+  // Column display configs
+  const CASE_COLS = [
+    { key: "member_name",            label: "Member" },
+    { key: "member_id",              label: "Member ID" },
+    { key: "discipline",             label: "Disc." },
+    { key: "plan_id",                label: "Plan" },
+    { key: "status",                 label: "Status" },
+    { key: "review_priority",        label: "Priority" },
+    { key: "requested_visits",       label: "Req. Visits" },
+    { key: "final_determination",    label: "Determination" },
+    { key: "final_approved_visits",  label: "Approved" },
+    { key: "tat_hours",              label: "TAT (h)" },
+    { key: "had_rmi",                label: "RMI" },
+    { key: "appeal_count",           label: "Appeals" },
+    { key: "submitted_at",           label: "Submitted" },
+    { key: "decided_at",             label: "Decided" },
+    { key: "reviewer",               label: "Reviewer" },
+  ];
+
+  const APPEAL_COLS = [
+    { key: "member_name",            label: "Member" },
+    { key: "discipline",             label: "Disc." },
+    { key: "plan_id",                label: "Plan" },
+    { key: "level",                  label: "Level" },
+    { key: "status",                 label: "Status" },
+    { key: "grounds",                label: "Grounds" },
+    { key: "original_determination", label: "Original Det." },
+    { key: "decision",               label: "Decision" },
+    { key: "new_determination",      label: "New Det." },
+    { key: "days_to_decision",       label: "Days" },
+    { key: "filed_at",               label: "Filed" },
+    { key: "decided_at",             label: "Decided" },
+  ];
+
+  const cols = reportType === "appeals" ? APPEAL_COLS : CASE_COLS;
+  const fmtDate = (v) => v ? new Date(v).toLocaleDateString() : "—";
+  const fmtVal  = (key, v) => {
+    if (v == null) return "—";
+    if (key.endsWith("_at")) return fmtDate(v);
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+    return String(v);
+  };
+
+  const detColor = (v) => {
+    if (!v) return "#374151";
+    if (/approv/i.test(v)) return "#15803d";
+    if (/denial|denied/i.test(v)) return "#dc2626";
+    if (/partial/i.test(v)) return "#d97706";
+    return "#374151";
+  };
+
+  return (
+    <div style={{ padding: "24px 28px", maxWidth: 1100, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: NAVY, fontFamily: "'Fraunces', Georgia, serif" }}>Reports & Analytics Export</div>
+          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>Generate, preview, and export data for compliance, actuarial, and operations teams</div>
+        </div>
+        {rows && rows.length > 0 && (
+          <button onClick={exportCsv} style={{ padding: "10px 22px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+            ↓ Export CSV ({rows.length} rows)
+          </button>
+        )}
+      </div>
+
+      {/* Report type selector */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+        {REPORT_TYPES.map(rt => (
+          <button key={rt.key} onClick={() => { setReportType(rt.key); setRows(null); setSummary(null); }}
+            style={{ flex: 1, padding: "14px 16px", borderRadius: 10, border: `2px solid ${reportType === rt.key ? NAVY : "#e2e8f0"}`, background: reportType === rt.key ? NAVY : "#fff", color: reportType === rt.key ? "#fff" : "#374151", cursor: "pointer", textAlign: "left", transition: "all 0.15s" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>{rt.label}</div>
+            <div style={{ fontSize: 11, opacity: 0.75 }}>{rt.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: "18px 20px", marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Start Date</div>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>End Date</div>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13 }} />
+        </div>
+        {reportType !== "appeals" && (
+          <>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Plan</div>
+              <select value={planFilter} onChange={e => setPlanFilter(e.target.value)}
+                style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13, minWidth: 140 }}>
+                <option value="">All Plans</option>
+                {plans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Discipline</div>
+              <select value={discFilter} onChange={e => setDiscFilter(e.target.value)}
+                style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 13 }}>
+                <option value="">All</option>
+                <option>PT</option><option>OT</option><option>ST</option>
+              </select>
+            </div>
+          </>
+        )}
+        <button onClick={runReport} disabled={loading}
+          style={{ padding: "9px 24px", background: NAVY, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
+          {loading ? "Running…" : "Run Report"}
+        </button>
+      </div>
+
+      {error && <div style={{ padding: "12px 16px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, color: "#dc2626", marginBottom: 16 }}>{error}</div>}
+
+      {/* Summary report */}
+      {summary && (
+        <div>
+          {/* Totals row */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "Total Cases",      value: summary.totals?.total_cases   || 0, color: NAVY },
+              { label: "Approved",         value: summary.totals?.approved       || 0, color: "#15803d" },
+              { label: "Denied",           value: summary.totals?.denied         || 0, color: "#dc2626" },
+              { label: "Avg TAT (hours)",  value: summary.totals?.avg_tat_hours  || "—", color: "#d97706" },
+              { label: "Appeals Filed",    value: summary.totals?.total_appeals  || 0, color: "#7c3aed" },
+              { label: "Appeals Overturned", value: summary.totals?.appeals_overturned || 0, color: "#0891b2" },
+            ].map(card => (
+              <div key={card.label} style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "16px 18px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: card.color, fontFamily: "'Fraunces', Georgia, serif" }}>{card.value}</div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{card.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* By Plan */}
+          {summary.byPlan?.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 16, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: NAVY }}>By Payer Plan</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr style={{ background: "#f8fafc" }}>
+                  {["Plan","Total","Approved","Partial Denial","Full Denial","Pended","Avg TAT (h)"].map(h => (
+                    <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4 }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {summary.byPlan.map((r, i) => (
+                    <tr key={r.plan_id} style={{ borderTop: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                      <td style={{ padding: "10px 16px", fontWeight: 600, color: NAVY }}>{r.plan_id}</td>
+                      <td style={{ padding: "10px 16px" }}>{r.total}</td>
+                      <td style={{ padding: "10px 16px", color: "#15803d", fontWeight: 600 }}>{r.approved}</td>
+                      <td style={{ padding: "10px 16px", color: "#d97706" }}>{r.partial_denial}</td>
+                      <td style={{ padding: "10px 16px", color: "#dc2626" }}>{r.full_denial}</td>
+                      <td style={{ padding: "10px 16px", color: "#6b7280" }}>{r.pended}</td>
+                      <td style={{ padding: "10px 16px" }}>{r.avg_tat_hours ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* By Discipline */}
+          {summary.byDisc?.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: NAVY }}>By Discipline</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr style={{ background: "#f8fafc" }}>
+                  {["Discipline","Total","Approved","Approval Rate"].map(h => (
+                    <th key={h} style={{ padding: "9px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4 }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {summary.byDisc.map((r, i) => (
+                    <tr key={r.discipline} style={{ borderTop: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                      <td style={{ padding: "10px 16px", fontWeight: 700, color: NAVY }}>{r.discipline}</td>
+                      <td style={{ padding: "10px 16px" }}>{r.total}</td>
+                      <td style={{ padding: "10px 16px", color: "#15803d", fontWeight: 600 }}>{r.approved}</td>
+                      <td style={{ padding: "10px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ flex: 1, height: 6, background: "#e2e8f0", borderRadius: 3, maxWidth: 80 }}>
+                            <div style={{ height: "100%", width: `${r.approval_rate_pct || 0}%`, background: "#15803d", borderRadius: 3 }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#15803d" }}>{r.approval_rate_pct ?? "—"}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Row data table (cases / appeals) */}
+      {rows && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{rows.length} records</span>
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>Preview shows all rows — Export CSV for full data</span>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  {cols.map(c => (
+                    <th key={c.key} style={{ padding: "9px 14px", textAlign: "left", fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 100).map((row, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                    {cols.map(c => (
+                      <td key={c.key} style={{ padding: "9px 14px", whiteSpace: "nowrap", color: c.key === "final_determination" || c.key === "decision" ? detColor(row[c.key]) : "#374151", fontWeight: c.key === "final_determination" || c.key === "decision" ? 600 : 400 }}>
+                        {fmtVal(c.key, row[c.key])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length > 100 && (
+              <div style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, color: "#94a3b8", borderTop: "1px solid #f1f5f9" }}>
+                Showing first 100 of {rows.length} rows — export CSV for all data
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MasterShell({ user, token, onLogout }) {
   const [masterView, setMasterView] = useState("dashboard");
 
@@ -4131,6 +4443,7 @@ function MasterShell({ user, token, onLogout }) {
     ["ur_form",   "UR Form"],
     ["cockpit",   "Cockpit"],
     ["appeals",   "Appeals"],
+    ["reports",   "Reports"],
     ["admin",     "Admin"],
   ];
 
@@ -4168,6 +4481,7 @@ function MasterShell({ user, token, onLogout }) {
         </div>
       )}
       {masterView === "appeals"   && <MasterAppealsView token={token} />}
+      {masterView === "reports"   && <ReportsView token={token} />}
       {masterView === "admin"     && <AdminConsole token={token} />}
     </div>
   );
