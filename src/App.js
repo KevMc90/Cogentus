@@ -1869,6 +1869,328 @@ function IntegrationsView({ token }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BULK IMPORT VIEW (Phase 25)
+// ─────────────────────────────────────────────────────────────────────────────
+const BULK_TEMPLATE = `provider_name,provider_npi,member_name,member_id,dob,member_state,discipline,diagnosis_codes,requested_visits,plan_id,provider_notes
+Springfield PT Clinic,1234567890,Jane Smith,MBR-001,1978-04-12,CA,PT,M54.5;M47.816,12,BCBS-STD,Lower back pain with radiculopathy
+Lakeside OT Associates,0987654321,Marcus Lee,MBR-002,1990-07-22,NY,OT,F84.0,16,,Sensory processing and ADL goals`;
+
+function BulkImportView({ token }) {
+  const [csv,     setCsv]     = React.useState('');
+  const [result,  setResult]  = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error,   setError]   = React.useState('');
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setCsv(ev.target.result);
+    reader.readAsText(file);
+  };
+
+  const handleSubmit = async () => {
+    if (!csv.trim()) return;
+    setLoading(true); setError(''); setResult(null);
+    try {
+      const r = await axios.post(`${API_BASE}/v1/bulk-import`, { csv }, { headers: { Authorization: `Bearer ${token}` } });
+      setResult(r.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Import failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([BULK_TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'cogentcr-bulk-template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const inputS = { padding: '8px 12px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, fontFamily: "'DM Sans', sans-serif" };
+
+  return (
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 24px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Bulk Case Import</div>
+        <div style={{ fontSize: 12, color: '#6b7280', fontFamily: "'Public Sans', sans-serif" }}>Upload a CSV to batch-submit multiple cases at once</div>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '20px 24px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+          <button onClick={downloadTemplate} style={{ ...inputS, background: '#f8fafc', color: '#1a3a5c', border: '1px solid #cbd5e1', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Download Template CSV</button>
+          <label style={{ ...inputS, background: '#f8fafc', color: '#1a3a5c', border: '1px solid #cbd5e1', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+            Upload CSV <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+          </label>
+        </div>
+
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>CSV Content</div>
+        <textarea
+          value={csv} onChange={e => setCsv(e.target.value)}
+          placeholder="Paste CSV here or upload a file above…"
+          style={{ width: '100%', minHeight: 160, padding: '10px 12px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 12, fontFamily: 'monospace', boxSizing: 'border-box', resize: 'vertical' }}
+        />
+        <div style={{ marginTop: 4, fontSize: 11, color: '#9ca3af', fontFamily: "'DM Sans', sans-serif" }}>
+          Columns: provider_name, provider_npi, member_name, member_id, dob, member_state, discipline, diagnosis_codes (semicolon-separated), requested_visits, plan_id, provider_notes
+        </div>
+
+        {error && <div style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, fontSize: 12, color: '#dc2626', fontFamily: "'Public Sans', sans-serif" }}>{error}</div>}
+
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={handleSubmit} disabled={loading || !csv.trim()}
+            style={{ padding: '9px 20px', background: loading ? '#94a3b8' : '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Public Sans', sans-serif" }}>
+            {loading ? 'Importing…' : 'Run Import'}
+          </button>
+        </div>
+      </div>
+
+      {result && (
+        <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '20px 24px' }}>
+          <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[['Imported', result.imported, '#16a34a', '#f0fdf4'], ['Skipped', result.skipped, '#d97706', '#fffbeb'], ['Errors', result.errors, '#dc2626', '#fef2f2']].map(([label, val, color, bg]) => (
+              <div key={label} style={{ padding: '12px 20px', background: bg, borderRadius: 8, textAlign: 'center', minWidth: 80 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'Fraunces', Georgia, serif" }}>{val}</div>
+                <div style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+            {result.results.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: '1px solid #f1f5f9', fontSize: 12, fontFamily: "'DM Sans', sans-serif", alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: r.status === 'imported' ? '#16a34a' : r.status === 'skipped' ? '#d97706' : '#dc2626' }}>{r.status === 'imported' ? '✓' : '!'}</span>
+                <span style={{ color: '#374151' }}>Row {r.row} — {r.memberName || '(no name)'}</span>
+                {r.submissionId && <span style={{ fontFamily: 'monospace', color: '#9ca3af', fontSize: 11 }}>{r.submissionId}</span>}
+                {r.reason && <span style={{ color: '#dc2626' }}>{r.reason}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USER MANAGEMENT VIEW (Phase 27)
+// ─────────────────────────────────────────────────────────────────────────────
+const ROLES = ['reviewer', 'provider', 'master', 'medical_director'];
+const DISCS = ['PT', 'OT', 'ST'];
+
+function UserManagementView({ token }) {
+  const [users,   setUsers]   = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [form,    setForm]    = React.useState({ email: '', password: '', fullName: '', role: 'reviewer', discipline: 'PT', allowedDisciplines: ['PT'] });
+  const [editing, setEditing] = React.useState(null);
+  const [toast,   setToast]   = React.useState(null);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
+  const fetchUsers = () => {
+    axios.get(`${API_BASE}/v1/admin/users`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setUsers(r.data.users || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+  React.useEffect(() => { fetchUsers(); }, [token]); // eslint-disable-line
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_BASE}/v1/admin/users`, form, { headers: { Authorization: `Bearer ${token}` } });
+      setForm({ email: '', password: '', fullName: '', role: 'reviewer', discipline: 'PT', allowedDisciplines: ['PT'] });
+      fetchUsers(); showToast('User created.');
+    } catch (err) { showToast(err.response?.data?.error || 'Failed to create user.'); }
+  };
+
+  const handleToggleActive = async (u) => {
+    await axios.patch(`${API_BASE}/v1/admin/users/${u.id}`, { isActive: !u.is_active }, { headers: { Authorization: `Bearer ${token}` } });
+    fetchUsers(); showToast(u.is_active ? 'User deactivated.' : 'User reactivated.');
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await axios.patch(`${API_BASE}/v1/admin/users/${editing.id}`, { role: editing.role, discipline: editing.discipline, allowedDisciplines: editing.allowed_disciplines, fullName: editing.full_name }, { headers: { Authorization: `Bearer ${token}` } });
+      setEditing(null); fetchUsers(); showToast('User updated.');
+    } catch (err) { showToast(err.response?.data?.error || 'Failed to update.'); }
+  };
+
+  const roleColor = (r) => ({ reviewer: '#1d4ed8', provider: '#15803d', master: '#0d1b2a', medical_director: '#7c3aed' }[r] || '#374151');
+  const inputS = { padding: '7px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, fontFamily: "'DM Sans', sans-serif", width: '100%', boxSizing: 'border-box' };
+
+  return (
+    <div style={{ maxWidth: 920, margin: '0 auto', padding: '28px 24px' }}>
+      {toast && <div style={{ position: 'fixed', top: 20, right: 24, background: '#1e293b', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 9999, fontFamily: "'Public Sans', sans-serif" }}>{toast}</div>}
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>User Management</div>
+        <div style={{ fontSize: 12, color: '#6b7280', fontFamily: "'Public Sans', sans-serif" }}>Create accounts, assign roles and disciplines, activate/deactivate users</div>
+      </div>
+
+      {/* User list */}
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 24, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 70px 140px 80px', padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'DM Sans', sans-serif" }}>
+          <span>User</span><span>Role</span><span>Disc.</span><span>Disciplines</span><span>Status</span>
+        </div>
+        {loading ? <div style={{ padding: 20, color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>Loading…</div> :
+          users.map(u => (
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 70px 140px 80px', padding: '11px 16px', borderBottom: '1px solid #f1f5f9', alignItems: 'center', fontSize: 12, fontFamily: "'DM Sans', sans-serif', opacity: u.is_active ? 1 : 0.5" }}>
+              <div>
+                <div style={{ fontWeight: 600, color: '#1e293b', fontFamily: "'Public Sans', sans-serif" }}>{u.full_name || '—'}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{u.email}</div>
+              </div>
+              {editing?.id === u.id ? (
+                <>
+                  <select value={editing.role} onChange={e => setEditing(x => ({...x, role: e.target.value}))} style={{ ...inputS, width: 'auto' }}>
+                    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <select value={editing.discipline || ''} onChange={e => setEditing(x => ({...x, discipline: e.target.value || null}))} style={{ ...inputS, width: 'auto' }}>
+                    <option value="">—</option>{DISCS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {DISCS.map(d => <label key={d} style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 2 }}><input type="checkbox" checked={(editing.allowed_disciplines||[]).includes(d)} onChange={e => setEditing(x => ({ ...x, allowed_disciplines: e.target.checked ? [...(x.allowed_disciplines||[]), d] : (x.allowed_disciplines||[]).filter(v => v !== d) }))} />{d}</label>)}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={handleSaveEdit} style={{ padding: '3px 8px', background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 4, fontSize: 10, cursor: 'pointer' }}>Save</button>
+                    <button onClick={() => setEditing(null)} style={{ padding: '3px 8px', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 10, cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span style={{ padding: '2px 8px', borderRadius: 10, background: '#f0f4ff', color: roleColor(u.role), fontWeight: 700, fontSize: 10, width: 'fit-content' }}>{u.role}</span>
+                  <span>{u.discipline || '—'}</span>
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{(u.allowed_disciplines||[]).map(d => <span key={d} style={{ padding: '1px 5px', background: '#eff6ff', color: '#1a3a5c', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>{d}</span>)}</div>
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: u.is_active ? '#16a34a' : '#9ca3af', fontSize: 10 }}>{u.is_active ? 'Active' : 'Inactive'}</span>
+                    <button onClick={() => setEditing({...u})} style={{ padding: '2px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: 10, cursor: 'pointer' }}>Edit</button>
+                    <button onClick={() => handleToggleActive(u)} style={{ padding: '2px 7px', background: u.is_active ? '#fef2f2' : '#f0fdf4', color: u.is_active ? '#dc2626' : '#16a34a', border: `1px solid ${u.is_active ? '#fca5a5' : '#86efac'}`, borderRadius: 4, fontSize: 10, cursor: 'pointer' }}>{u.is_active ? 'Deactivate' : 'Activate'}</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+      </div>
+
+      {/* Create user form */}
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '20px 24px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid #f1f5f9' }}>Create New User</div>
+        <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 14px' }}>
+          {[['Email', 'email', 'email', 'reviewer@example.com'], ['Password', 'password', 'password', 'Min 8 chars'], ['Full Name', 'fullName', 'text', 'Dr. Jane Doe']].map(([label, key, type, ph]) => (
+            <div key={key}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>{label}</div>
+              <input type={type} value={form[key]} onChange={e => setForm(f => ({...f, [key]: e.target.value}))} placeholder={ph} style={inputS} required={key !== 'fullName'} />
+            </div>
+          ))}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Role</div>
+            <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))} style={inputS}>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Primary Discipline</div>
+            <select value={form.discipline} onChange={e => setForm(f => ({...f, discipline: e.target.value}))} style={inputS}>
+              <option value="">None</option>{DISCS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>Allowed Disciplines</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {DISCS.map(d => <label key={d} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><input type="checkbox" checked={form.allowedDisciplines.includes(d)} onChange={e => setForm(f => ({ ...f, allowedDisciplines: e.target.checked ? [...f.allowedDisciplines, d] : f.allowedDisciplines.filter(v => v !== d) }))} />{d}</label>)}
+            </div>
+          </div>
+          <div style={{ gridColumn: '1 / 4', display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+            <button type="submit" style={{ padding: '9px 20px', background: '#1a3a5c', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Public Sans', sans-serif" }}>Create User</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT EXPORT & COMPLIANCE VIEW (Phase 28)
+// ─────────────────────────────────────────────────────────────────────────────
+function AuditExportView({ token }) {
+  const [summary, setSummary] = React.useState(null);
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate,   setEndDate]   = React.useState('');
+  const [loading,   setLoading]   = React.useState(true);
+
+  const fetchSummary = (s, e) => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/compliance-summary`, {
+      params: { ...(s ? { startDate: s } : {}), ...(e ? { endDate: e } : {}) },
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => { setSummary(r.data); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  React.useEffect(() => { fetchSummary('', ''); }, [token]); // eslint-disable-line
+
+  const handleExport = () => {
+    const params = new URLSearchParams({ ...(startDate ? { startDate } : {}), ...(endDate ? { endDate } : {}) });
+    const url = `${API_BASE}/v1/audit-export?${params}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', '');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const inputS = { padding: '7px 12px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, fontFamily: "'DM Sans', sans-serif" };
+
+  return (
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 24px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Audit Export & Compliance</div>
+        <div style={{ fontSize: 12, color: '#6b7280', fontFamily: "'Public Sans', sans-serif" }}>HIPAA-ready audit trail export and compliance metrics</div>
+      </div>
+
+      {/* Date filter + export */}
+      <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '16px 20px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div><div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>From</div><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputS} /></div>
+        <div><div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>To</div><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputS} /></div>
+        <button onClick={() => fetchSummary(startDate, endDate)} style={{ ...inputS, background: '#f8fafc', color: '#1a3a5c', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Update</button>
+        <button onClick={handleExport} style={{ ...inputS, background: '#1a3a5c', color: '#fff', fontWeight: 600, cursor: 'pointer', border: 'none', fontSize: 12 }}>Download Audit CSV</button>
+      </div>
+
+      {/* Compliance summary cards */}
+      {loading ? <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: 24 }}>Loading…</div> : summary && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+            {[
+              ['Total Cases',     summary.totalCases,    '#1a3a5c', '#eff6ff'],
+              ['Approved',        summary.totalApproved, '#16a34a', '#f0fdf4'],
+              ['Adverse',         summary.totalAdverse,  '#dc2626', '#fef2f2'],
+              ['Avg TAT (hrs)',   summary.avgTatHours,   '#d97706', '#fffbeb'],
+            ].map(([label, val, color, bg]) => (
+              <div key={label} style={{ background: bg, borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "'Fraunces', Georgia, serif" }}>{val}</div>
+                <div style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+            {[
+              ['Adverse Rate',    `${summary.adverseRate}%`,  '#dc2626', '#fef2f2'],
+              ['Appeals Filed',   summary.totalAppeals,       '#6d28d9', '#f5f3ff'],
+              ['Overturned',      summary.overturned,         '#d97706', '#fffbeb'],
+              ['Audit Entries',   summary.auditEntries,       '#374151', '#f8fafc'],
+            ].map(([label, val, color, bg]) => (
+              <div key={label} style={{ background: bg, borderRadius: 10, padding: '16px 18px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "'Fraunces', Georgia, serif" }}>{val}</div>
+                <div style={{ fontSize: 11, color, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATE RULES BAR + VIEW (Phase 23)
 // ─────────────────────────────────────────────────────────────────────────────
 const RULE_TYPE_META = {
@@ -5074,6 +5396,48 @@ function AdminConsole({ token }) {
 }
 
 // ── ReportsView: master reporting & CSV export ───────────────────────────────
+function TrendChart({ weeks }) {
+  if (!weeks || weeks.length === 0) return null;
+  const W = 600, H = 160, PAD = 32, BOTTOM = 28;
+  const innerW = W - PAD * 2, innerH = H - BOTTOM;
+  const maxVal = Math.max(1, ...weeks.map(w => Math.max(w.total, w.approved, w.denied, w.pended)));
+  const pts = (key, color) => {
+    const points = weeks.map((w, i) => {
+      const x = PAD + (i / (weeks.length - 1 || 1)) * innerW;
+      const y = innerH - (w[key] / maxVal) * (innerH - 12);
+      return [x, y];
+    });
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    return (
+      <g key={key}>
+        <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+        {points.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="3" fill={color} />)}
+      </g>
+    );
+  };
+  const series = [["total","#0d1b2a"],["approved","#16a34a"],["denied","#dc2626"],["pended","#d97706"]];
+  const fmtWk = (s) => { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, display: "block" }}>
+      {[0, 0.5, 1].map(t => {
+        const y = innerH - t * (innerH - 12);
+        return <line key={t} x1={PAD} y1={y} x2={W - PAD} y2={y} stroke="#e2e8f0" strokeWidth="1" />;
+      })}
+      {series.map(([k, c]) => pts(k, c))}
+      {weeks.map((w, i) => {
+        const x = PAD + (i / (weeks.length - 1 || 1)) * innerW;
+        return <text key={i} x={x} y={H - 6} textAnchor="middle" fontSize="9" fill="#94a3b8">{fmtWk(w.week)}</text>;
+      })}
+      {series.map(([k, c], i) => (
+        <g key={k} transform={`translate(${PAD + i * 90}, 8)`}>
+          <circle cx="5" cy="5" r="4" fill={c} />
+          <text x="13" y="9" fontSize="10" fill="#374151" fontFamily="DM Sans, sans-serif">{k.charAt(0).toUpperCase()+k.slice(1)}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function ReportsView({ token }) {
   const [reportType, setReportType] = useState("cases");
   const [startDate, setStartDate]   = useState(() => {
@@ -5086,6 +5450,7 @@ function ReportsView({ token }) {
   const [plans, setPlans]           = useState([]);
   const [rows, setRows]             = useState(null);
   const [summary, setSummary]       = useState(null);
+  const [trends, setTrends]         = useState(null);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
 
@@ -5095,7 +5460,7 @@ function ReportsView({ token }) {
   }, [token]); // eslint-disable-line
 
   const runReport = async () => {
-    setLoading(true); setError(""); setRows(null); setSummary(null);
+    setLoading(true); setError(""); setRows(null); setSummary(null); setTrends(null);
     try {
       const params = new URLSearchParams({ startDate, endDate });
       if (planFilter) params.set("planId", planFilter);
@@ -5110,6 +5475,9 @@ function ReportsView({ token }) {
       } else if (reportType === "appeals") {
         const r = await axios.get(`${API_BASE}/v1/reports/appeals?${params}`, { headers: { Authorization: `Bearer ${token}` } });
         setRows(r.data.rows);
+      } else if (reportType === "trends") {
+        const r = await axios.get(`${API_BASE}/v1/reports/trends`, { headers: { Authorization: `Bearer ${token}` } });
+        setTrends(r.data.weeks);
       }
     } catch (err) {
       setError(err.response?.data?.error || "Failed to generate report.");
@@ -5144,6 +5512,7 @@ function ReportsView({ token }) {
     { key: "cases",   label: "Case Activity",      desc: "All submissions with determination, TAT, reviewer" },
     { key: "summary", label: "Summary Dashboard",  desc: "Aggregated rates by plan, discipline, SLA" },
     { key: "appeals", label: "Appeals Outcomes",   desc: "All appeals with level, decision, days-to-decision" },
+    { key: "trends",  label: "12-Week Trends",     desc: "Weekly volume chart: total, approved, denied, pended" },
   ];
 
   const NAVY = "#0d1b2a";
@@ -5345,6 +5714,15 @@ function ReportsView({ token }) {
         </div>
       )}
 
+      {/* Trends chart */}
+      {trends && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: "20px 24px" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: NAVY, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 16 }}>Weekly Case Volume — Last 12 Weeks</div>
+          <TrendChart weeks={trends} />
+          {trends.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: 24 }}>No data yet — submit cases to populate trends.</div>}
+        </div>
+      )}
+
       {/* Row data table (cases / appeals) */}
       {rows && (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
@@ -5419,6 +5797,9 @@ function MasterShell({ user, token, onLogout }) {
     ["providers",   "Providers"],
     ["state_rules",    "State Rules"],
     ["integrations",   "Integrations"],
+    ["bulk_import",    "Bulk Import"],
+    ["users",          "Users"],
+    ["audit",          "Audit"],
   ];
 
   return (
@@ -5461,6 +5842,9 @@ function MasterShell({ user, token, onLogout }) {
       {masterView === "providers"   && <ProviderDirectoryView token={token} />}
       {masterView === "state_rules"  && <StateRulesView token={token} />}
       {masterView === "integrations" && <IntegrationsView token={token} />}
+      {masterView === "bulk_import"  && <BulkImportView token={token} />}
+      {masterView === "users"        && <UserManagementView token={token} />}
+      {masterView === "audit"        && <AuditExportView token={token} />}
     </div>
   );
 }
