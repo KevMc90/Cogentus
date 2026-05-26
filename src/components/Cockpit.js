@@ -1795,7 +1795,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
         setEngineState("offline");
       });
     return () => controller.abort();
-  }, [liveCaseId, selectedPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [liveCaseId, selectedPlanId]); // eslint-disable-line
 
   // Fetch plans on mount
   useEffect(() => { fetchPlans(setPlans); }, []);
@@ -1852,7 +1852,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
         .then(() => setAuditStates(prev => ({ ...prev, [caseId]: "recorded" })))
         .catch(() => setAuditStates(prev => ({ ...prev, [caseId]: "error" })));
     }
-  }, [kase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kase]); // eslint-disable-line
 
   const handleAction = useCallback((type) => {
     if (decisions[kase.caseId] || !kase.contract) return;
