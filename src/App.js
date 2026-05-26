@@ -1257,7 +1257,11 @@ function SubmitCaseView({ user, token, plans, onBack }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 18, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", fontFamily: '"DM Sans", sans-serif' }}>Provider Information</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={fieldWrapS}>{labelS("Provider Name *")}<input value={providerName} onChange={e => setProviderName(e.target.value)} placeholder="e.g. Springfield PT Associates" style={inputS} /></div>
-            <div style={fieldWrapS}>{labelS("Provider NPI")}<input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="10-digit NPI" style={inputS} /></div>
+            <div style={fieldWrapS}>
+              {labelS("Provider NPI")}
+              <input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="10-digit NPI" style={inputS} />
+              <NpiLookupWidget npi={providerNpi} token={token} onVerified={name => { if (!providerName) setProviderName(name); }} />
+            </div>
           </div>
         </div>
 
@@ -1471,6 +1475,157 @@ function NotificationBell({ token }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NPI LOOKUP WIDGET (Phase 22)
+// ─────────────────────────────────────────────────────────────────────────────
+function NpiLookupWidget({ npi, token, onVerified }) {
+  const [state, setState] = React.useState(null); // null | "loading" | {provider} | "error" | "notfound"
+
+  React.useEffect(() => {
+    if (!npi || npi.length !== 10 || !/^\d{10}$/.test(npi)) { setState(null); return; }
+    setState("loading");
+    const tid = setTimeout(() => {
+      axios.get(`${API_BASE}/v1/npi-lookup`, {
+        params: { npi },
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => {
+          setState({ provider: r.data.provider });
+          if (onVerified && r.data.provider?.displayName) onVerified(r.data.provider.displayName);
+        })
+        .catch(e => {
+          setState(e.response?.status === 404 ? "notfound" : "error");
+        });
+    }, 400);
+    return () => clearTimeout(tid);
+  }, [npi, token]); // eslint-disable-line
+
+  if (!state) return null;
+  if (state === "loading") return (
+    <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>Verifying NPI…</div>
+  );
+  if (state === "notfound") return (
+    <div style={{ marginTop: 6, fontSize: 11, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>NPI not found in NPPES registry.</div>
+  );
+  if (state === "error") return (
+    <div style={{ marginTop: 6, fontSize: 11, color: "#d97706", fontFamily: "'Public Sans', sans-serif" }}>NPI registry unavailable — continuing without verification.</div>
+  );
+  const p = state.provider;
+  return (
+    <div style={{ marginTop: 6, background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 7, padding: "8px 12px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <span style={{ fontSize: 14, marginTop: 1 }}>✓</span>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#15803d", fontFamily: "'Public Sans', sans-serif" }}>{p.displayName || "—"}{p.credential ? `, ${p.credential}` : ""}</div>
+        <div style={{ fontSize: 11, color: "#166534", fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>
+          {[p.specialty, p.city && p.state ? `${p.city}, ${p.state}` : (p.state || null)].filter(Boolean).join(" · ")}
+          {p.status === "I" && <span style={{ marginLeft: 8, fontWeight: 700, color: "#dc2626" }}>INACTIVE</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROVIDER DIRECTORY VIEW (Phase 22)
+// ─────────────────────────────────────────────────────────────────────────────
+function ProviderDirectoryView({ token }) {
+  const [providers, setProviders] = React.useState([]);
+  const [q, setQ]                 = React.useState("");
+  const [loading, setLoading]     = React.useState(true);
+  const [npiInput, setNpiInput]   = React.useState("");
+  const [lookupResult, setLookupResult] = React.useState(null);
+  const [looking, setLooking]     = React.useState(false);
+
+  const fetchProviders = (search) => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/providers`, {
+      params: search ? { q: search } : {},
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { setProviders(r.data.providers || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  React.useEffect(() => { fetchProviders(); }, [token]); // eslint-disable-line
+
+  const handleSearch = (e) => { e.preventDefault(); fetchProviders(q); };
+
+  const handleLookup = async () => {
+    if (!/^\d{10}$/.test(npiInput)) return;
+    setLooking(true); setLookupResult(null);
+    try {
+      const r = await axios.get(`${API_BASE}/v1/npi-lookup`, {
+        params: { npi: npiInput },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setLookupResult(r.data.provider);
+      fetchProviders(q);
+    } catch (e) {
+      setLookupResult({ error: e.response?.data?.error || "Lookup failed." });
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: "28px 24px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, marginBottom: 28, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Provider Directory</div>
+          <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>NPPES-verified providers cached from NPI lookups</div>
+        </div>
+        {/* Quick NPI lookup */}
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif", marginBottom: 4 }}>Look up NPI</div>
+            <input value={npiInput} onChange={e => setNpiInput(e.target.value)} placeholder="10-digit NPI"
+              style={{ padding: "7px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "monospace", width: 150 }} />
+          </div>
+          <button onClick={handleLookup} disabled={looking || npiInput.length !== 10}
+            style={{ padding: "7px 14px", background: "#1a3a5c", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'Public Sans', sans-serif", opacity: npiInput.length !== 10 ? 0.5 : 1 }}>
+            {looking ? "…" : "Verify"}
+          </button>
+        </div>
+      </div>
+
+      {lookupResult && (
+        <div style={{ marginBottom: 18, padding: "12px 16px", borderRadius: 8, background: lookupResult.error ? "#fef2f2" : "#f0fdf4", border: `1px solid ${lookupResult.error ? "#fca5a5" : "#86efac"}`, fontFamily: "'Public Sans', sans-serif", fontSize: 13 }}>
+          {lookupResult.error
+            ? <span style={{ color: "#dc2626" }}>{lookupResult.error}</span>
+            : <><strong>{lookupResult.displayName}{lookupResult.credential ? `, ${lookupResult.credential}` : ""}</strong> · {lookupResult.specialty} · {lookupResult.city}, {lookupResult.state} · NPI {lookupResult.npi}</>
+          }
+        </div>
+      )}
+
+      <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name, NPI, or specialty…"
+          style={{ flex: 1, padding: "9px 14px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }} />
+        <button type="submit" style={{ padding: "9px 18px", background: "#1a3a5c", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Search</button>
+      </form>
+
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 80px 140px 80px 80px", padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>
+          <span>NPI</span><span>Provider</span><span>Cred.</span><span>Specialty</span><span>Location</span><span>Status</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center" }}>Loading…</div>
+        ) : providers.length === 0 ? (
+          <div style={{ padding: 24, color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No providers found. Look up an NPI above to add one.</div>
+        ) : providers.map(p => (
+          <div key={p.npi} style={{ display: "grid", gridTemplateColumns: "120px 1fr 80px 140px 80px 80px", padding: "11px 16px", borderBottom: "1px solid #f1f5f9", alignItems: "center", fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+            <span style={{ fontFamily: "monospace", color: "#374151", fontSize: 11 }}>{p.npi}</span>
+            <span style={{ fontWeight: 600, color: "#1e293b" }}>{p.display_name || "—"}</span>
+            <span style={{ color: "#6b7280" }}>{p.credential || "—"}</span>
+            <span style={{ color: "#4b5563" }}>{p.specialty ? p.specialty.substring(0, 22) : "—"}</span>
+            <span style={{ color: "#6b7280" }}>{p.city && p.state ? `${p.city}, ${p.state}` : (p.state || "—")}</span>
+            <span style={{ fontWeight: 700, color: p.status === "I" ? "#dc2626" : "#16a34a" }}>{p.status === "A" ? "Active" : p.status === "I" ? "Inactive" : "—"}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2775,7 +2930,11 @@ function NewSubmissionForm({ token, onSubmitted }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Provider Information</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
           <div>{labelS("Practice / Provider Name")}<input value={providerName} onChange={e => setProviderName(e.target.value)} placeholder="e.g. Springfield PT Clinic" style={inputS} /></div>
-          <div>{labelS("NPI (optional)")}<input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="1234567890" style={inputS} /></div>
+          <div>
+            {labelS("NPI (optional)")}
+            <input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="1234567890" style={inputS} />
+            <NpiLookupWidget npi={providerNpi} token={token} onVerified={name => { if (!providerName) setProviderName(name); }} />
+          </div>
         </div>
 
         {/* Member info */}
@@ -4912,14 +5071,15 @@ function MasterShell({ user, token, onLogout }) {
   }
 
   const TABS = [
-    ["dashboard", "Dashboard"],
-    ["queue",     "All Cases"],
-    ["ur_form",   "UR Form"],
-    ["cockpit",   "Cockpit"],
-    ["appeals",   "Appeals"],
-    ["reports",   "Reports"],
-    ["admin",     "Admin"],
-    ["criteria",  "Criteria"],
+    ["dashboard",  "Dashboard"],
+    ["queue",      "All Cases"],
+    ["ur_form",    "UR Form"],
+    ["cockpit",    "Cockpit"],
+    ["appeals",    "Appeals"],
+    ["reports",    "Reports"],
+    ["admin",      "Admin"],
+    ["criteria",   "Criteria"],
+    ["providers",  "Providers"],
   ];
 
   return (
@@ -4958,7 +5118,8 @@ function MasterShell({ user, token, onLogout }) {
       {masterView === "appeals"   && <MasterAppealsView token={token} />}
       {masterView === "reports"   && <ReportsView token={token} />}
       {masterView === "admin"     && <AdminConsole token={token} />}
-      {masterView === "criteria"  && <CriteriaLibraryView token={token} />}
+      {masterView === "criteria"   && <CriteriaLibraryView token={token} />}
+      {masterView === "providers"  && <ProviderDirectoryView token={token} />}
     </div>
   );
 }
