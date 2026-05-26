@@ -1243,7 +1243,7 @@ function SubmitCaseView({ user, token, plans, onBack }) {
 // REVIEWER SHELL
 // ─────────────────────────────────────────────────────────────────────────────
 function ReviewerShell({ user, token, onLogout }) {
-  const [revView, setRevView]               = useState("home"); // "home"|"cockpit"|"ur_form"
+  const [revView, setRevView]               = useState("home"); // "home"|"cockpit"|"ur_form"|"search"|"my_stats"
   const [assignedCase, setAssignedCase]     = useState(null);
   const [queueStats, setQueueStats]         = useState(null);
   const [getCaseLoading, setGetCaseLoading] = useState(false);
@@ -1332,20 +1332,77 @@ function ReviewerShell({ user, token, onLogout }) {
     );
   }
 
-  // ── UR Form view ── (reuses the full App logic — we render App with forceRole="master")
+  // ── UR Form view ──
   if (revView === "ur_form") {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{
-          background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12,
-        }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => setRevView("home")} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>
-            Back
-          </button>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
         </div>
         <URFormEmbed user={user} token={token} />
+      </div>
+    );
+  }
+
+  // ── Search view ──
+  if (revView === "search") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <CaseSearchView token={token} />
+      </div>
+    );
+  }
+
+  // ── My Stats view ──
+  if (revView === "my_stats") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
+            <button key={v} onClick={() => setRevView(v)} style={{
+              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
+              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
+              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            }}>{label}</button>
+          ))}
+        </div>
+        <ReviewerDashboard token={token} user={user} />
       </div>
     );
   }
@@ -1371,7 +1428,7 @@ function ReviewerShell({ user, token, onLogout }) {
 
       {/* Tab bar */}
       <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"]].map(([v, label]) => (
+        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"]].map(([v, label]) => (
           <button key={v} onClick={() => setRevView(v)} style={{
             padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
             color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -1494,6 +1551,283 @@ function URFormEmbed({ user, token }) {
             {review}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CASE SEARCH VIEW (Phase 9)
+// ─────────────────────────────────────────────────────────────────────────────
+function CaseSearchView({ token }) {
+  const [q, setQ]               = useState("");
+  const [status, setStatus]     = useState("all");
+  const [discipline, setDisc]   = useState("all");
+  const [results, setResults]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [error, setError]       = useState("");
+
+  const statusColor = (s) => {
+    if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
+    if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
+    if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
+    if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#374151" };
+  };
+
+  const discColor = (d) => {
+    if (d === "OT") return { bg: "#fff7ed", text: "#c2410c" };
+    if (d === "ST") return { bg: "#f0fdf4", text: "#15803d" };
+    return { bg: "#eff6ff", text: "#1a3a5c" };
+  };
+
+  const runSearch = async () => {
+    setLoading(true); setError(""); setSearched(true);
+    try {
+      const params = new URLSearchParams();
+      if (q.trim())           params.set("q", q.trim());
+      if (status !== "all")   params.set("status", status);
+      if (discipline !== "all") params.set("discipline", discipline);
+      const res = await axios.get(`${API_BASE}/v1/search-cases?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setResults(res.data.cases || []);
+    } catch {
+      setError("Search failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputS = { padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", background: "#fff" };
+
+  return (
+    <div style={{ maxWidth: 900, margin: "32px auto", padding: "0 24px" }}>
+      {/* Search bar */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Search</div>
+            <input
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && runSearch()}
+              placeholder="Member name, case ID, member ID, or diagnosis code..."
+              style={{ ...inputS, width: "100%", boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Status</div>
+            <select value={status} onChange={e => setStatus(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
+              <option value="all">All Statuses</option>
+              <option value="submitted">Submitted</option>
+              <option value="pending_review">Pending Review</option>
+              <option value="under_review">Under Review</option>
+              <option value="approved">Approved</option>
+              <option value="denied">Denied</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Discipline</div>
+            <select value={discipline} onChange={e => setDisc(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
+              <option value="all">All Disciplines</option>
+              <option value="PT">PT</option>
+              <option value="OT">OT</option>
+              <option value="ST">ST</option>
+            </select>
+          </div>
+          <button
+            onClick={runSearch}
+            disabled={loading}
+            style={{ padding: "9px 22px", borderRadius: 8, background: "#1a3a5c", color: "#fff", fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", flexShrink: 0 }}
+          >
+            {loading ? "Searching..." : "Search"}
+          </button>
+        </div>
+        {error && <div style={{ marginTop: 10, fontSize: 13, color: "#dc2626" }}>{error}</div>}
+      </div>
+
+      {/* Results */}
+      {searched && (
+        <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Results</span>
+            <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>{results.length} case{results.length !== 1 ? "s" : ""} found</span>
+          </div>
+          {results.length === 0 ? (
+            <div style={{ padding: "32px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>
+              No cases match your search.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 120px 70px", gap: 0, padding: "8px 20px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+                {["Member", "Case ID", "Disc.", "Status", "Submitted", "Score"].map(h => (
+                  <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
+                ))}
+              </div>
+              {results.map(r => {
+                const sc = statusColor(r.status);
+                const dc = discColor(r.discipline);
+                return (
+                  <div key={r.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 120px 70px", gap: 0, padding: "12px 20px", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.member_name || "—"}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, fontFamily: "'DM Sans', monospace" }}>{r.member_id || "—"}</div>
+                    </div>
+                    <span style={{ fontSize: 11, color: "#374151", fontFamily: "monospace" }}>{r.submission_id}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: dc.bg, color: dc.text, width: "fit-content", fontFamily: "'DM Sans', sans-serif" }}>{r.discipline || "—"}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: sc.bg, color: sc.text, width: "fit-content", textTransform: "capitalize", fontFamily: "'DM Sans', sans-serif" }}>
+                      {(r.status || "submitted").replace(/_/g, " ")}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: r.completeness_score >= 80 ? "#15803d" : r.completeness_score >= 50 ? "#92400e" : "#6b7280" }}>
+                      {r.completeness_score != null ? r.completeness_score + "%" : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {!searched && (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>
+          Enter a search term above and press Search or Enter.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWER DASHBOARD (Phase 9)
+// ─────────────────────────────────────────────────────────────────────────────
+function ReviewerDashboard({ token, user }) {
+  const [stats, setStats]       = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [period, setPeriod]     = useState("today");
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get(`${API_BASE}/v1/reviewer-stats`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setStats(r.data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [token]);
+
+  const PERIODS = [
+    { key: "today",      label: "Today" },
+    { key: "this_week",  label: "This Week" },
+    { key: "this_month", label: "Month" },
+    { key: "all_time",   label: "All Time" },
+  ];
+
+  const DET_COLORS = {
+    "Approved":      "#15803d",
+    "Partial Denial":"#92400e",
+    "Full Denial":   "#991b1b",
+    "Pended":        "#1d4ed8",
+  };
+
+  const totals = stats?.totals || {};
+  const totalForPeriod = parseInt(totals[period] || 0);
+
+  const byDet = stats?.byDetermination || [];
+  const detRows = byDet.map(r => ({
+    det: r.determination,
+    count: parseInt(r[period] || 0),
+    color: DET_COLORS[r.determination] || "#6b7280",
+  })).filter(r => r.count > 0).sort((a, b) => b.count - a.count);
+
+  const recent = stats?.recent || [];
+
+  const detColor2 = (det) => {
+    if (!det) return { bg: "#f3f4f6", text: "#374151" };
+    const l = det.toLowerCase();
+    if (l.startsWith("approved"))        return { bg: "#dcfce7", text: "#15803d" };
+    if (l.startsWith("partial denial"))  return { bg: "#fef3c7", text: "#92400e" };
+    if (l.startsWith("full denial"))     return { bg: "#fee2e2", text: "#991b1b" };
+    if (l.startsWith("pend"))            return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#374151" };
+  };
+
+  if (loading) {
+    return <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading your stats...</div>;
+  }
+
+  return (
+    <div style={{ maxWidth: 820, margin: "32px auto", padding: "0 24px" }}>
+      {/* Period stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
+        {PERIODS.map(p => {
+          const val = parseInt(totals[p.key] || 0);
+          const active = period === p.key;
+          return (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              style={{
+                background: active ? "#1a3a5c" : "#fff",
+                border: active ? "2px solid #1a3a5c" : "1px solid #e2e8f0",
+                borderRadius: 12, padding: "18px 16px", cursor: "pointer", textAlign: "left",
+                boxShadow: active ? "0 4px 16px rgba(26,58,92,0.18)" : "0 1px 4px rgba(0,0,0,0.06)",
+                transition: "all 0.14s",
+              }}
+            >
+              <div style={{ fontSize: 28, fontWeight: 800, color: active ? "#fff" : "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{val}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: active ? "rgba(255,255,255,0.75)" : "#6b7280", marginTop: 6, fontFamily: "'Public Sans', sans-serif" }}>{p.label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Determination breakdown */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: "20px 24px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", marginBottom: 16, fontFamily: "'Fraunces', Georgia, serif" }}>
+          Breakdown — {PERIODS.find(p => p.key === period)?.label}
+        </div>
+        {detRows.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>No cases recorded for this period.</div>
+        ) : detRows.map(r => {
+          const pct = totalForPeriod > 0 ? Math.round((r.count / totalForPeriod) * 100) : 0;
+          return (
+            <div key={r.det} style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{r.det}</span>
+                <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{r.count} ({pct}%)</span>
+              </div>
+              <div style={{ background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                <div style={{ width: pct + "%", height: "100%", background: r.color, borderRadius: 4, transition: "width 0.4s ease" }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Recent activity */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>
+          Recent Activity
+        </div>
+        {recent.length === 0 ? (
+          <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No recent activity.</div>
+        ) : recent.map((r, i) => {
+          const dc = detColor2(r.determination);
+          return (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 130px 60px 70px 120px", gap: 0, padding: "11px 20px", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontFamily: "monospace", color: "#374151" }}>{r.case_id || "—"}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: dc.bg, color: dc.text, width: "fit-content", fontFamily: "'DM Sans', sans-serif" }}>
+                {r.determination || "—"}
+              </span>
+              <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{r.discipline || "—"}</span>
+              <span style={{ fontSize: 11, color: "#374151", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{r.approved_visits != null ? r.approved_visits + " v" : "—"}</span>
+              <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>
+                {r.recorded_at ? new Date(r.recorded_at).toLocaleDateString() : "—"}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
