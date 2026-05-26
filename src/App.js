@@ -1476,6 +1476,58 @@ function NotificationBell({ token }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EPISODE CONTEXT BAR (Phase 21)
+// ─────────────────────────────────────────────────────────────────────────────
+function EpisodeContextBar({ memberId, discipline, token }) {
+  const [ctx, setCtx] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!memberId || !discipline || memberId === "—") { setLoading(false); return; }
+    axios.get(`${API_BASE}/v1/episode-context`, {
+      params: { memberId, discipline },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { setCtx(r.data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [memberId, discipline, token]);
+
+  if (loading || !ctx || !ctx.episode) return null;
+
+  const ep = ctx.episode;
+  const subs = ctx.submissions || [];
+  const cumVisits = ctx.cumulativeVisits || 0;
+  const isConcurrent = subs.length > 1;
+
+  return (
+    <div style={{
+      background: isConcurrent ? "#fffbeb" : "#f0f9ff",
+      borderBottom: `1px solid ${isConcurrent ? "#fde68a" : "#bae6fd"}`,
+      padding: "8px 20px",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap",
+      fontFamily: "'Public Sans', sans-serif",
+      fontSize: 12,
+    }}>
+      {isConcurrent && (
+        <span style={{ fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 8px", fontSize: 11 }}>
+          CONCURRENT REVIEW
+        </span>
+      )}
+      <span style={{ color: "#374151" }}>
+        <strong>Episode #{ep.episode_number}</strong> · {discipline} · Started {ep.started_at ? new Date(ep.started_at).toLocaleDateString() : "—"}
+      </span>
+      <span style={{ color: "#6b7280" }}>|</span>
+      <span style={{ color: "#374151" }}>{subs.length} auth request{subs.length !== 1 ? "s" : ""} this episode</span>
+      <span style={{ color: "#6b7280" }}>|</span>
+      <span style={{ color: "#374151" }}><strong>{cumVisits}</strong> visits authorized to date</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CRITERIA LIBRARY (Phase 20)
 // ─────────────────────────────────────────────────────────────────────────────
 function CriteriaLibraryView({ token }) {
@@ -1830,6 +1882,7 @@ function ReviewerShell({ user, token, onLogout }) {
             Back to Queue
           </button>
         </div>
+        <EpisodeContextBar memberId={assignedCase.memberId} discipline={assignedCase.discipline} token={token} />
         <div style={{ flex: 1, overflow: "hidden" }}>
           <Cockpit
             user={user}
@@ -3664,6 +3717,9 @@ function MyCasesView({ token }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{sub.member_name || "Unknown Member"}</span>
                   <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id}</span>
+                  {sub.review_type === "concurrent" && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>CONCURRENT</span>
+                  )}
                   {canRequestP2P(sub) && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>P2P AVAILABLE</span>
                   )}
@@ -4232,6 +4288,9 @@ function MasterQueueView({ token }) {
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{s.member_name || "—"}</span>
                   {s.review_priority === "urgent" && (
                     <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>⚡ URGENT</span>
+                  )}
+                  {s.review_type === "concurrent" && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>CONCURRENT</span>
                   )}
                 </div>
                 <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{s.member_id || "—"}</div>
