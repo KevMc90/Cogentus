@@ -4433,6 +4433,135 @@ function AppealsQueueView({ token }) {
   );
 }
 
+// ── Statuses that are still editable by provider ──────────────────────────────
+const EDITABLE_STATUSES = new Set(["submitted", "pending_review", "on_hold", "rmi_pending"]);
+
+// ── EditSubmissionModal ────────────────────────────────────────────────────────
+function EditSubmissionModal({ submission, token, plans, onClose, onSaved }) {
+  const sub = submission;
+  const [providerName, setProviderName]   = useState(sub.provider_name   || "");
+  const [providerNpi,  setProviderNpi]    = useState(sub.provider_npi    || "");
+  const [memberName,   setMemberName]     = useState(sub.member_name     || "");
+  const [memberId,     setMemberId]       = useState(sub.member_id       || "");
+  const [dob,          setDob]            = useState(sub.dob             || "");
+  const [memberState,  setMemberState]    = useState(sub.member_state    || "");
+  const [discipline,   setDiscipline]     = useState(sub.discipline      || "PT");
+  const [diagCodes,    setDiagCodes]      = useState((sub.diagnosis_codes || []).join(", "));
+  const [reqVisits,    setReqVisits]      = useState(String(sub.requested_visits || ""));
+  const [planId,       setPlanId]         = useState(sub.plan_id         || "");
+  const [docList,      setDocList]        = useState((sub.document_list  || []).join("\n"));
+  const [notes,        setNotes]          = useState(sub.provider_notes  || "");
+  const [loading,      setLoading]        = useState(false);
+  const [error,        setError]          = useState("");
+
+  const parsedDiags = diagCodes.split(",").map(s => s.trim()).filter(Boolean);
+  const parsedDocs  = docList.split("\n").map(s => s.trim()).filter(Boolean);
+  const completeness = Math.round([
+    !!providerName.trim(), !!memberName.trim(), !!memberId.trim(), !!dob.trim(),
+    !!discipline, parsedDiags.length > 0, parseInt(reqVisits, 10) > 0, parsedDocs.length > 0,
+  ].filter(Boolean).length / 8 * 100);
+  const meterColor = completeness >= 80 ? "#22c55e" : completeness >= 50 ? "#f59e0b" : "#ef4444";
+
+  const handleSave = async () => {
+    setError(""); setLoading(true);
+    try {
+      await axios.patch(
+        `${API_BASE}/v1/submissions/${sub.submission_id}/edit`,
+        {
+          providerName: providerName.trim() || null, providerNpi: providerNpi.trim() || null,
+          memberName: memberName.trim() || null, memberId: memberId.trim() || null,
+          dob: dob.trim() || null, memberState: memberState.trim().toUpperCase().slice(0,2) || null,
+          discipline, diagnosisCodes: parsedDiags,
+          requestedVisits: parseInt(reqVisits, 10) || null,
+          planId: planId || null, documentList: parsedDocs,
+          providerNotes: notes.trim() || null,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.error || "Save failed. Please try again.");
+    } finally { setLoading(false); }
+  };
+
+  const inputS = { width: "100%", border: "1px solid #e2e8f0", borderRadius: 7, padding: "8px 12px", fontSize: 13, color: "#0f172a", background: "#f8fafc", outline: "none", boxSizing: "border-box", fontFamily: "'Public Sans', sans-serif" };
+  const labelS = (t) => <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: "'Public Sans', sans-serif" }}>{t}</label>;
+  const fieldS = { marginBottom: 12 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 9000, overflowY: "auto", padding: "32px 16px" }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 640, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ background: "#1a3a5c", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>Edit Submission</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2, fontFamily: "'Public Sans', sans-serif" }}>{sub.submission_id} · {sub.member_name}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 80, height: 5, background: "rgba(255,255,255,0.2)", borderRadius: 3 }}>
+                <div style={{ height: "100%", width: `${completeness}%`, background: meterColor, borderRadius: 3, transition: "width 0.2s" }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: meterColor, fontFamily: "'Public Sans', sans-serif" }}>{completeness}%</span>
+            </div>
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 6, color: "#fff", fontSize: 13, padding: "4px 12px", cursor: "pointer" }}>✕</button>
+          </div>
+        </div>
+
+        {/* Edit notice */}
+        <div style={{ background: "#fef3c7", borderBottom: "1px solid #fde68a", padding: "10px 24px", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "#92400e", fontFamily: "'Public Sans', sans-serif" }}>
+            <strong>Editable while queued.</strong> Once a reviewer picks up this case it will be locked.
+          </span>
+        </div>
+
+        {/* Form */}
+        <div style={{ padding: "24px", maxHeight: "60vh", overflowY: "auto" }}>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #f1f5f9", fontFamily: "'Public Sans', sans-serif" }}>Provider</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div style={fieldS}>{labelS("Provider Name *")}<input value={providerName} onChange={e => setProviderName(e.target.value)} style={inputS} /></div>
+            <div style={fieldS}>{labelS("Provider NPI")}<input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="10-digit NPI" style={inputS} /></div>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #f1f5f9", fontFamily: "'Public Sans', sans-serif" }}>Member</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+            <div style={fieldS}>{labelS("Member Name *")}<input value={memberName} onChange={e => setMemberName(e.target.value)} style={inputS} /></div>
+            <div style={fieldS}>{labelS("Member ID *")}<input value={memberId} onChange={e => setMemberId(e.target.value)} style={inputS} /></div>
+            <div style={fieldS}>{labelS("Date of Birth *")}<input type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputS} /></div>
+            <div style={fieldS}>{labelS("State")}<input value={memberState} onChange={e => setMemberState(e.target.value.toUpperCase().slice(0,2))} maxLength={2} placeholder="e.g. TX" style={{ ...inputS, textTransform: "uppercase" }} /></div>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #f1f5f9", fontFamily: "'Public Sans', sans-serif" }}>Clinical</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div style={fieldS}>{labelS("Discipline *")}<select value={discipline} onChange={e => setDiscipline(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="PT">PT</option><option value="OT">OT</option><option value="ST">ST</option></select></div>
+            <div style={fieldS}>{labelS("Requested Visits *")}<input type="number" min="0" value={reqVisits} onChange={e => setReqVisits(e.target.value)} style={inputS} /></div>
+            <div style={fieldS}>{labelS("Insurance Plan")}<select value={planId} onChange={e => setPlanId(e.target.value)} style={{ ...inputS, cursor: "pointer" }}><option value="">— Select —</option>{(plans||[]).map(p => <option key={p.plan_id} value={p.plan_id}>{p.plan_name}</option>)}</select></div>
+          </div>
+          <div style={fieldS}>{labelS("Diagnosis Codes * (comma-separated)")}<input value={diagCodes} onChange={e => setDiagCodes(e.target.value)} placeholder="e.g. M25.561, M75.1" style={inputS} /></div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", margin: "16px 0 12px", paddingBottom: 8, borderBottom: "1px solid #f1f5f9", fontFamily: "'Public Sans', sans-serif" }}>Documents</div>
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, padding: "10px 14px", marginBottom: 10, fontSize: 12, color: "#1d4ed8", fontFamily: "'Public Sans', sans-serif" }}>
+            List the filenames of the clinical documents you are attaching (one per line). PDF upload integration coming soon — for now list the document names so the reviewer knows what to expect.
+          </div>
+          <div style={fieldS}>{labelS("Document List (one filename per line)")}<textarea value={docList} onChange={e => setDocList(e.target.value)} rows={4} placeholder={"IE_PatientName_05202026.pdf\nScript_PatientName_05182026.pdf"} style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} /></div>
+          <div style={fieldS}>{labelS("Provider Notes")}<textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Clinical context, urgency, relevant history..." style={{ ...inputS, resize: "vertical", lineHeight: 1.6 }} /></div>
+
+          {error && <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 7, color: "#991b1b", fontSize: 13, marginTop: 4, fontFamily: "'Public Sans', sans-serif" }}>{error}</div>}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #e2e8f0", display: "flex", gap: 10, background: "#f8fafc" }}>
+          <button onClick={handleSave} disabled={loading} style={{ flex: 1, padding: "11px 0", borderRadius: 8, border: "none", background: loading ? "#94a3b8" : "#1a3a5c", color: "#fff", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "'Public Sans', sans-serif", boxShadow: loading ? "none" : "0 2px 10px rgba(26,58,92,0.2)" }}>
+            {loading ? "Saving..." : `Save Changes (${completeness}% complete)`}
+          </button>
+          <button onClick={onClose} style={{ padding: "11px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", fontSize: 14, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MyCasesView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -4442,12 +4571,22 @@ function MyCasesView({ token }) {
   const [p2pSuccess, setP2pSuccess]   = useState({});
   const [appealModal, setAppealModal] = useState(null);
   const [appealSuccess, setAppealSuccess] = useState({});
+  const [editTarget, setEditTarget]   = useState(null); // submission being edited
+  const [plans, setPlans]             = useState([]);
 
-  useEffect(() => {
+  const loadSubmissions = () => {
+    setLoading(true);
     axios.get(`${API_BASE}/v1/submissions`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { setSubmissions(r.data.submissions || []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [token]);
+  };
+
+  useEffect(() => { loadSubmissions(); }, [token]); // eslint-disable-line
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setPlans(r.data.plans || []))
+      .catch(() => {});
+  }, [token]); // eslint-disable-line
 
   const handleExpand = async (sub) => {
     const id = sub.submission_id;
@@ -4480,6 +4619,15 @@ function MyCasesView({ token }) {
 
   return (
     <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+      {editTarget && (
+        <EditSubmissionModal
+          submission={editTarget}
+          token={token}
+          plans={plans}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); loadSubmissions(); }}
+        />
+      )}
       {p2pModal && (
         <P2PRequestModal
           submissionId={p2pModal.submission_id}
@@ -4532,7 +4680,15 @@ function MyCasesView({ token }) {
                   <StatusProgressBar status={sub.status} />
                 </div>
               </div>
-              <span style={{ fontSize: 16, color: "#9ca3af", flexShrink: 0, marginTop: 2 }}>{isOpen ? "▲" : "▼"}</span>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                {EDITABLE_STATUSES.has(sub.status) && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setEditTarget(sub); }}
+                    style={{ padding: "5px 13px", borderRadius: 6, background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap" }}
+                  >Edit</button>
+                )}
+                <span style={{ fontSize: 16, color: "#9ca3af" }}>{isOpen ? "▲" : "▼"}</span>
+              </div>
             </div>
             {isOpen && (
               <div style={{ borderTop: "1px solid #f1f5f9", padding: "16px 20px" }}>
