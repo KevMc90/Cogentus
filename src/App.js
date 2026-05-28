@@ -3407,25 +3407,32 @@ function DecisionLetter({ submission, decision }) {
   );
 }
 
-function NewSubmissionForm({ token, onSubmitted }) {
-  const [providerName,    setProviderName]    = useState("");
-  const [providerNpi,     setProviderNpi]     = useState("");
+function NewSubmissionForm({ token, onSubmitted, clinicProfile }) {
+  const [providerName,    setProviderName]    = useState(clinicProfile?.clinic_name || "");
+  const [providerNpi,     setProviderNpi]     = useState(clinicProfile?.clinic_npi  || "");
   const [memberName,      setMemberName]      = useState("");
   const [memberId,        setMemberId]        = useState("");
   const [dob,             setDob]             = useState("");
   const [memberState,     setMemberState]     = useState("");
-  const [discipline,      setDiscipline]      = useState("PT");
+  const [discipline,      setDiscipline]      = useState(clinicProfile?.clinic_specialty?.split("/")[0] || "PT");
   const [diagInput,       setDiagInput]       = useState("");
   const [diagnosisCodes,  setDiagnosisCodes]  = useState([]);
   const [requestedVisits, setRequestedVisits] = useState("");
   const [planId,          setPlanId]          = useState("");
   const [documentNames,   setDocumentNames]   = useState([""]);
   const [providerNotes,   setProviderNotes]   = useState("");
-  const [uploadedFiles,   setUploadedFiles]   = useState([]);  // File objects
+  const [urgency,         setUrgency]         = useState("standard");
+  const [uploadedFiles,   setUploadedFiles]   = useState([]);
   const [dragOver,        setDragOver]        = useState(false);
   const [loading,         setLoading]         = useState(false);
   const [error,           setError]           = useState("");
   const [plans,           setPlans]           = useState([]);
+
+  // Sync clinic profile defaults when profile loads after mount
+  useEffect(() => {
+    if (clinicProfile?.clinic_name && !providerName) setProviderName(clinicProfile.clinic_name);
+    if (clinicProfile?.clinic_npi  && !providerNpi)  setProviderNpi(clinicProfile.clinic_npi);
+  }, [clinicProfile]); // eslint-disable-line
 
   useEffect(() => {
     axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
@@ -3480,6 +3487,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
         fd.append("planId",       planId || "");
         fd.append("documentList", JSON.stringify(docList));
         fd.append("providerNotes", providerNotes);
+        fd.append("urgency", urgency);
         uploadedFiles.forEach(f => fd.append("documents", f));
         res = await axios.post(`${API_BASE}/v1/submit-with-docs`, fd, {
           headers: { Authorization: `Bearer ${token}` },
@@ -3490,7 +3498,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
           providerName, providerNpi, memberName, memberId, dob, memberState,
           discipline, diagnosisCodes,
           requestedVisits: parseInt(requestedVisits) || 0,
-          planId: planId || null, documentList: docList, providerNotes,
+          planId: planId || null, documentList: docList, providerNotes, urgency,
         }, { headers: { Authorization: `Bearer ${token}` } });
       }
       onSubmitted(res.data);
@@ -3562,7 +3570,12 @@ function NewSubmissionForm({ token, onSubmitted }) {
         )}
 
         {/* Provider info */}
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Provider Information</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 14, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>Provider Information</span>
+          {clinicProfile?.clinic_name && (
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#15803d", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "2px 8px", fontFamily: "'Public Sans', sans-serif" }}>Pre-filled from clinic profile</span>
+          )}
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
           <div>{labelS("Practice / Provider Name")}<input value={providerName} onChange={e => setProviderName(e.target.value)} placeholder="e.g. Springfield PT Clinic" style={inputS} /></div>
           <div>
@@ -3638,11 +3651,38 @@ function NewSubmissionForm({ token, onSubmitted }) {
           </button>
         </div>
 
+        {/* Urgency */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 10, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>Request Priority</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[
+              { v: "standard",  label: "Standard",  sub: "72 hr review",  color: "#1a3a5c", bg: "#eff6ff",  border: "#bfdbfe" },
+              { v: "urgent",    label: "Urgent",     sub: "24 hr review",  color: "#92400e", bg: "#fffbeb",  border: "#fde68a" },
+              { v: "expedited", label: "Expedited",  sub: "8 hr review",   color: "#991b1b", bg: "#fef2f2",  border: "#fca5a5" },
+            ].map(opt => (
+              <button key={opt.v} onClick={() => setUrgency(opt.v)} style={{
+                flex: 1, padding: "10px 8px", borderRadius: 8, textAlign: "center",
+                border: `2px solid ${urgency === opt.v ? opt.color : "#e2e8f0"}`,
+                background: urgency === opt.v ? opt.bg : "#fff",
+                cursor: "pointer", transition: "all 0.1s",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: urgency === opt.v ? opt.color : "#374151", fontFamily: "'Public Sans', sans-serif" }}>{opt.label}</div>
+                <div style={{ fontSize: 10, color: urgency === opt.v ? opt.color : "#9ca3af", marginTop: 2, fontFamily: "'Public Sans', sans-serif", opacity: 0.8 }}>{opt.sub}</div>
+              </button>
+            ))}
+          </div>
+          {urgency !== "standard" && (
+            <div style={{ marginTop: 8, padding: "8px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, fontSize: 11, color: "#92400e", fontFamily: "'Public Sans', sans-serif" }}>
+              Urgent/Expedited requests must have clinical justification in the documents or provider notes above.
+            </div>
+          )}
+        </div>
+
         {error && <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 7, fontSize: 13, color: "#991b1b" }}>{error}</div>}
 
         <button onClick={handleSubmit} disabled={loading} style={{
           width: "100%", padding: "13px 0", borderRadius: 9,
-          background: loading ? "#94a3b8" : "#1a3a5c",
+          background: loading ? "#94a3b8" : urgency === "expedited" ? "#991b1b" : urgency === "urgent" ? "#92400e" : "#1a3a5c",
           color: "#fff", fontSize: 14, fontWeight: 700, border: "none",
           cursor: loading ? "not-allowed" : "pointer",
           fontFamily: "'Public Sans', sans-serif",
@@ -3650,7 +3690,7 @@ function NewSubmissionForm({ token, onSubmitted }) {
         }}>
           {loading
             ? (uploadedFiles.length ? "Uploading & extracting with AI…" : "Submitting…")
-            : `Submit Authorization Request (${completeness}% complete)`}
+            : `Submit ${urgency !== "standard" ? urgency.toUpperCase() + " " : ""}Authorization Request (${completeness}% complete)`}
         </button>
       </div>
     </div>
@@ -4600,16 +4640,29 @@ function MyCasesView({ token }) {
     }
   };
 
-  if (loading) return <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading...</div>;
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchQ,      setSearchQ]      = useState("");
 
-  if (submissions.length === 0) return (
-    <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: "48px 24px", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>No submissions yet</div>
-        <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>Use "New Submission" to request authorization.</div>
-      </div>
-    </div>
-  );
+  const STATUS_FILTERS = [
+    { v: "all",          label: "All" },
+    { v: "queued",       label: "In Queue",   match: s => ["submitted","pending_review","rmi_pending","on_hold"].includes(s) },
+    { v: "under_review", label: "In Review",  match: s => ["under_review","pending_md_review"].includes(s) },
+    { v: "approved",     label: "Approved",   match: s => s === "approved" },
+    { v: "denied",       label: "Denied",     match: s => ["denied","partial_denial"].includes(s) },
+    { v: "needs_action", label: "Needs Action", match: s => ["rmi_pending","on_hold"].includes(s) },
+  ];
+
+  const filteredSubs = submissions.filter(sub => {
+    const sf = STATUS_FILTERS.find(f => f.v === filterStatus);
+    const statusOk = !sf || sf.v === "all" || (sf.match && sf.match(sub.status));
+    const q = searchQ.trim().toLowerCase();
+    const nameOk = !q || (sub.member_name || "").toLowerCase().includes(q)
+      || (sub.member_id  || "").toLowerCase().includes(q)
+      || (sub.submission_id || "").toLowerCase().includes(q);
+    return statusOk && nameOk;
+  });
+
+  if (loading) return <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading...</div>;
 
   const canRequestP2P = (sub) =>
     ["denied", "pending_md_review"].includes(sub.status) && !p2pSuccess[sub.submission_id];
@@ -4618,7 +4671,7 @@ function MyCasesView({ token }) {
     ["denied", "partial_denial"].includes(sub.status) && !appealSuccess[sub.submission_id];
 
   return (
-    <div style={{ maxWidth: 700, margin: "28px auto", padding: "0 24px" }}>
+    <div style={{ maxWidth: 760, margin: "28px auto", padding: "0 24px" }}>
       {editTarget && (
         <EditSubmissionModal
           submission={editTarget}
@@ -4628,6 +4681,43 @@ function MyCasesView({ token }) {
           onSaved={() => { setEditTarget(null); loadSubmissions(); }}
         />
       )}
+
+      {/* Search + filter bar */}
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: "14px 18px", marginBottom: 16 }}>
+        <input
+          value={searchQ}
+          onChange={e => setSearchQ(e.target.value)}
+          placeholder="Search by member name, member ID, or case ID..."
+          style={{ width: "100%", padding: "8px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif", outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+        />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {STATUS_FILTERS.map(f => (
+            <button key={f.v} onClick={() => setFilterStatus(f.v)} style={{
+              padding: "5px 14px", borderRadius: 20, border: `1.5px solid ${filterStatus === f.v ? "#1a3a5c" : "#e2e8f0"}`,
+              background: filterStatus === f.v ? "#1a3a5c" : "#fff",
+              color: filterStatus === f.v ? "#fff" : "#6b7280",
+              fontSize: 12, fontWeight: filterStatus === f.v ? 700 : 500, cursor: "pointer",
+              fontFamily: "'Public Sans', sans-serif", transition: "all 0.1s",
+            }}>{f.label}</button>
+          ))}
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af", alignSelf: "center", fontFamily: "'Public Sans', sans-serif" }}>
+            {filteredSubs.length} of {submissions.length} cases
+          </span>
+        </div>
+      </div>
+
+      {submissions.length === 0 && (
+        <div style={{ background: "#fff", borderRadius: 12, padding: "48px 24px", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>No submissions yet</div>
+          <div style={{ fontSize: 13, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif" }}>Use "New Auth" to request authorization.</div>
+        </div>
+      )}
+      {submissions.length > 0 && filteredSubs.length === 0 && (
+        <div style={{ padding: "24px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>
+          No cases match the current filter.
+        </div>
+      )}
+
       {p2pModal && (
         <P2PRequestModal
           submissionId={p2pModal.submission_id}
@@ -4651,15 +4741,21 @@ function MyCasesView({ token }) {
           }}
         />
       )}
-      {submissions.map(sub => {
+      {filteredSubs.map(sub => {
         const isOpen = expanded === sub.submission_id;
+        const priorityBadge = sub.review_priority && sub.review_priority !== "standard"
+          ? { urgent: { bg: "#fffbeb", text: "#92400e", label: "URGENT" }, expedited: { bg: "#fef2f2", text: "#dc2626", label: "EXPEDITED" } }[sub.review_priority]
+          : null;
         return (
           <div key={sub.submission_id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14, overflow: "hidden" }}>
             <div onClick={() => handleExpand(sub)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{sub.member_name || "Unknown Member"}</span>
-                  <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id}</span>
+                  <span style={{ fontSize: 10, fontFamily: "monospace", color: "#9ca3af" }}>{sub.submission_id?.slice(0,12)}…</span>
+                  {priorityBadge && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: priorityBadge.bg, color: priorityBadge.text, borderRadius: 5, padding: "2px 7px" }}>{priorityBadge.label}</span>
+                  )}
                   {sub.review_type === "concurrent" && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>CONCURRENT</span>
                   )}
@@ -4755,22 +4851,232 @@ function MyCasesView({ token }) {
   );
 }
 
+// ── PROVIDER DASHBOARD ────────────────────────────────────────────────────────
+function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
+  const [stats, setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/provider-stats`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => { setStats(r.data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [token]); // eslint-disable-line
+
+  const bs = stats?.byStatus || {};
+  const pending  = (bs.submitted || 0) + (bs.pending_review || 0) + (bs.rmi_pending || 0) + (bs.on_hold || 0);
+  const approved = (bs.approved || 0);
+  const denied   = (bs.denied || 0) + (bs.partial_denial || 0);
+  const inReview = (bs.under_review || 0) + (bs.pending_md_review || 0);
+  const needsAttn = (bs.rmi_pending || 0) + (bs.on_hold || 0);
+
+  const statCards = [
+    { label: "In Queue",    value: pending,   color: "#1a3a5c", bg: "#eff6ff",  border: "#bfdbfe" },
+    { label: "In Review",   value: inReview,  color: "#92400e", bg: "#fffbeb",  border: "#fde68a" },
+    { label: "Approved",    value: approved,  color: "#15803d", bg: "#f0fdf4",  border: "#86efac" },
+    { label: "Needs Action",value: needsAttn, color: "#dc2626", bg: "#fef2f2",  border: "#fca5a5" },
+  ];
+
+  const profileIncomplete = !clinicProfile?.clinic_name;
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 28px 60px" }}>
+
+      {/* Clinic profile setup prompt */}
+      {profileIncomplete && (
+        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "14px 20px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", fontFamily: "'Public Sans', sans-serif" }}>Complete your clinic profile</div>
+            <div style={{ fontSize: 12, color: "#78350f", marginTop: 2, fontFamily: "'Public Sans', sans-serif" }}>Add your clinic name, NPI, and contact info so it pre-fills every submission automatically.</div>
+          </div>
+          <button onClick={() => onViewCases("settings")} style={{ flexShrink: 0, padding: "8px 18px", background: "#d97706", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+            Set Up Profile
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
+        {statCards.map(s => (
+          <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12, padding: "18px 20px" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>
+              {loading ? "—" : s.value}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: s.color, marginTop: 5, fontFamily: "'Public Sans', sans-serif", opacity: 0.8 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Primary CTA */}
+      <div style={{ background: "#1a3a5c", borderRadius: 14, padding: "28px 32px", marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 6 }}>Submit a new prior authorization</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>
+            Upload clinical PDFs for AI extraction, or fill the form manually.
+            {clinicProfile?.clinic_name && <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}> Your clinic info will be pre-filled.</span>}
+          </div>
+        </div>
+        <button onClick={onNewAuth} style={{ flexShrink: 0, padding: "13px 28px", background: "#fff", color: "#1a3a5c", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "'Public Sans', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.15)", whiteSpace: "nowrap" }}>
+          New Auth Request
+        </button>
+      </div>
+
+      {/* Recent cases */}
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Recent Submissions</span>
+          <button onClick={() => onViewCases("my_cases")} style={{ fontSize: 12, color: "#1a3a5c", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>View all →</button>
+        </div>
+        {loading ? (
+          <div style={{ padding: "32px", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading...</div>
+        ) : !stats?.recentCases?.length ? (
+          <div style={{ padding: "32px", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>
+            No submissions yet — use the button above to get started.
+          </div>
+        ) : stats.recentCases.map(r => {
+          const diags = Array.isArray(r.diagnosis_codes) ? r.diagnosis_codes : [];
+          const statusColors = {
+            approved:         { bg: "#f0fdf4", text: "#15803d" },
+            denied:           { bg: "#fef2f2", text: "#991b1b" },
+            under_review:     { bg: "#fffbeb", text: "#92400e" },
+            submitted:        { bg: "#eff6ff", text: "#1d4ed8" },
+            pending_review:   { bg: "#eff6ff", text: "#1d4ed8" },
+            rmi_pending:      { bg: "#fef3c7", text: "#b45309" },
+            on_hold:          { bg: "#f5f3ff", text: "#6d28d9" },
+          };
+          const sc = statusColors[r.status] || { bg: "#f3f4f6", text: "#374151" };
+          return (
+            <div key={r.submission_id} style={{ padding: "13px 20px", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.member_name || "Unknown Member"}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, fontFamily: "'DM Sans', monospace" }}>{r.discipline} · {r.requested_visits} visits · {diags[0] || "—"}</div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.text, flexShrink: 0, textTransform: "capitalize", fontFamily: "'Public Sans', sans-serif" }}>
+                {(r.status || "submitted").replace(/_/g, " ")}
+              </span>
+              <span style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── CLINIC SETTINGS VIEW ───────────────────────────────────────────────────────
+function ClinicSettingsView({ token, profile, onSaved }) {
+  const [clinicName,     setClinicName]     = useState(profile?.clinic_name     || "");
+  const [clinicNpi,      setClinicNpi]      = useState(profile?.clinic_npi      || "");
+  const [clinicTaxId,    setClinicTaxId]    = useState(profile?.clinic_tax_id   || "");
+  const [clinicAddress,  setClinicAddress]  = useState(profile?.clinic_address  || "");
+  const [clinicPhone,    setClinicPhone]    = useState(profile?.clinic_phone    || "");
+  const [clinicFax,      setClinicFax]      = useState(profile?.clinic_fax      || "");
+  const [clinicSpecialty,setClinicSpecialty]= useState(profile?.clinic_specialty|| "");
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+  const [error,  setError]  = useState("");
+
+  const handleSave = async () => {
+    setError(""); setSaving(true); setSaved(false);
+    try {
+      await axios.patch(`${API_BASE}/v1/clinic-profile`, {
+        clinicName: clinicName.trim() || null,
+        clinicNpi:  clinicNpi.trim()  || null,
+        clinicTaxId: clinicTaxId.trim() || null,
+        clinicAddress: clinicAddress.trim() || null,
+        clinicPhone: clinicPhone.trim() || null,
+        clinicFax:   clinicFax.trim()   || null,
+        clinicSpecialty: clinicSpecialty || null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setSaved(true);
+      onSaved({ clinic_name: clinicName, clinic_npi: clinicNpi, clinic_tax_id: clinicTaxId, clinic_address: clinicAddress, clinic_phone: clinicPhone, clinic_fax: clinicFax, clinic_specialty: clinicSpecialty });
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || "Save failed.");
+    } finally { setSaving(false); }
+  };
+
+  const inputS = { width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, color: "#0f172a", outline: "none", boxSizing: "border-box", fontFamily: "'Public Sans', sans-serif", background: "#fff" };
+  const labelS = (t) => <div style={{ fontSize: 10, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: "'Public Sans', sans-serif" }}>{t}</div>;
+
+  return (
+    <div style={{ maxWidth: 680, margin: "28px auto", padding: "0 24px 60px" }}>
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>Clinic Profile</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, fontFamily: "'Public Sans', sans-serif" }}>This information pre-fills every authorization submission automatically.</div>
+        </div>
+        <div style={{ padding: "24px" }}>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, fontFamily: "'Public Sans', sans-serif" }}>Clinic Identity</div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "10px 16px", marginBottom: 16 }}>
+            <div>{labelS("Clinic / Practice Name *")}<input value={clinicName} onChange={e => setClinicName(e.target.value)} placeholder="e.g. Springfield Physical Therapy Associates" style={inputS} /></div>
+            <div>{labelS("Primary Specialty")}<select value={clinicSpecialty} onChange={e => setClinicSpecialty(e.target.value)} style={{ ...inputS, cursor: "pointer" }}>
+              <option value="">All disciplines</option>
+              <option value="PT">Physical Therapy (PT)</option>
+              <option value="OT">Occupational Therapy (OT)</option>
+              <option value="ST">Speech Therapy (ST)</option>
+              <option value="PT/OT">PT + OT</option>
+              <option value="PT/OT/ST">PT + OT + ST</option>
+            </select></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
+            <div>{labelS("NPI Number")}<input value={clinicNpi} onChange={e => setClinicNpi(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="10-digit NPI" style={{ ...inputS, fontFamily: "monospace" }} /></div>
+            <div>{labelS("Tax ID / EIN")}<input value={clinicTaxId} onChange={e => setClinicTaxId(e.target.value)} placeholder="XX-XXXXXXX" style={{ ...inputS, fontFamily: "monospace" }} /></div>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14, fontFamily: "'Public Sans', sans-serif" }}>Contact & Location</div>
+          <div style={{ marginBottom: 12 }}>{labelS("Clinic Address")}<input value={clinicAddress} onChange={e => setClinicAddress(e.target.value)} placeholder="123 Main St, Suite 100, Springfield, TX 75001" style={inputS} /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", marginBottom: 20 }}>
+            <div>{labelS("Phone")}<input value={clinicPhone} onChange={e => setClinicPhone(e.target.value)} placeholder="(555) 123-4567" style={inputS} /></div>
+            <div>{labelS("Fax")}<input value={clinicFax} onChange={e => setClinicFax(e.target.value)} placeholder="(555) 123-4568" style={inputS} /></div>
+          </div>
+
+          {error && <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 7, color: "#991b1b", fontSize: 13, marginBottom: 14, fontFamily: "'Public Sans', sans-serif" }}>{error}</div>}
+          {saved  && <div style={{ padding: "10px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 7, color: "#15803d", fontSize: 13, marginBottom: 14, fontFamily: "'Public Sans', sans-serif" }}>Profile saved successfully.</div>}
+
+          <button onClick={handleSave} disabled={saving || !clinicName.trim()} style={{
+            padding: "11px 28px", borderRadius: 8, background: saving || !clinicName.trim() ? "#94a3b8" : "#1a3a5c",
+            color: "#fff", fontSize: 14, fontWeight: 700, border: "none",
+            cursor: saving || !clinicName.trim() ? "not-allowed" : "pointer",
+            fontFamily: "'Public Sans', sans-serif", boxShadow: saving ? "none" : "0 2px 10px rgba(26,58,92,0.2)",
+          }}>{saving ? "Saving..." : "Save Profile"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProviderPortal({ user, token, onLogout }) {
-  const [provView, setProvView] = useState("my_cases"); // "new_submission" | "my_cases"
+  const [provView, setProvView] = useState("dashboard");
   const [confirmation, setConfirmation] = useState(null);
+  const [clinicProfile, setClinicProfile] = useState(null);
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/clinic-profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setClinicProfile(r.data.profile || {}))
+      .catch(() => setClinicProfile({}));
+  }, [token]); // eslint-disable-line
 
   const handleSubmitted = (data) => {
     setConfirmation(data);
     setProvView("confirmation");
   };
 
+  const clinicName = clinicProfile?.clinic_name;
+
   const HEADER = (
-    <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
+    <div style={{ background: "#1a3a5c", padding: "13px 28px", display: "flex", alignItems: "center", gap: 14 }}>
       <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
-      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "'Public Sans', sans-serif" }}>Provider Portal</span>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>|</span>
+      {clinicName ? (
+        <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontFamily: "'Public Sans', sans-serif" }}>{clinicName}</span>
+      ) : (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)", fontFamily: "'Public Sans', sans-serif" }}>Provider Portal</span>
+      )}
       <span style={{ flex: 1 }} />
-      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
       <NotificationBell token={token} />
       <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
     </div>
@@ -4778,7 +5084,7 @@ function ProviderPortal({ user, token, onLogout }) {
 
   const TABS = (
     <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-      {[["new_submission","New Submission"], ["my_cases","My Cases"]].map(([v, label]) => (
+      {[["dashboard","Dashboard"], ["new_submission","New Auth"], ["my_cases","My Cases"], ["settings","Settings"]].map(([v, label]) => (
         <button key={v} onClick={() => { setProvView(v); setConfirmation(null); }} style={{
           padding: "12px 20px", fontSize: 13, fontWeight: provView === v ? 700 : 500,
           color: provView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
@@ -4896,8 +5202,10 @@ function ProviderPortal({ user, token, onLogout }) {
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
       {HEADER}{TABS}
-      {provView === "new_submission" && <NewSubmissionForm token={token} onSubmitted={handleSubmitted} />}
+      {provView === "dashboard"      && <ProviderDashboard token={token} clinicProfile={clinicProfile} onNewAuth={() => setProvView("new_submission")} onViewCases={v => setProvView(v)} />}
+      {provView === "new_submission" && <NewSubmissionForm token={token} clinicProfile={clinicProfile} onSubmitted={handleSubmitted} />}
       {provView === "my_cases"       && <MyCasesView token={token} />}
+      {provView === "settings"       && <ClinicSettingsView token={token} profile={clinicProfile} onSaved={p => setClinicProfile(p)} />}
     </div>
   );
 }
