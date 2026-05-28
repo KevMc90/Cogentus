@@ -2590,11 +2590,16 @@ function CriteriaLibraryView({ token }) {
 // REVIEWER SHELL
 // ─────────────────────────────────────────────────────────────────────────────
 function ReviewerShell({ user, token, onLogout }) {
-  const [revView, setRevView]               = useState("home"); // "home"|"cockpit"|"ur_form"|"search"|"my_stats"
+  const [revView, setRevView]               = useState("home");
   const [assignedCase, setAssignedCase]     = useState(null);
   const [queueStats, setQueueStats]         = useState(null);
   const [getCaseLoading, setGetCaseLoading] = useState(false);
   const [getCaseError, setGetCaseError]     = useState("");
+  const [toolsOpen, setToolsOpen]           = useState(false);
+  const [exitModal, setExitModal]           = useState(false); // "hold"|"release"|false
+  const [exitReason, setExitReason]         = useState("");
+  const [exitLoading, setExitLoading]       = useState(false);
+  const [exitError, setExitError]           = useState("");
   const DISC_COLOR = user.discipline === "OT" ? "#c2410c" : user.discipline === "ST" ? "#15803d" : "#1a3a5c";
 
   useEffect(() => {
@@ -2641,7 +2646,15 @@ function ReviewerShell({ user, token, onLogout }) {
         setGetCaseError(res.data.message || "No cases available.");
       }
     } catch (err) {
-      setGetCaseError("Failed to reach server. Please try again.");
+      const serverMsg = err.response?.data?.error;
+      const status    = err.response?.status;
+      if (serverMsg) {
+        setGetCaseError(`Server error (${status}): ${serverMsg}`);
+      } else if (err.request) {
+        setGetCaseError("Could not reach server — check your connection or try again.");
+      } else {
+        setGetCaseError(`Unexpected error: ${err.message}`);
+      }
     } finally {
       setGetCaseLoading(false);
     }
@@ -2650,309 +2663,269 @@ function ReviewerShell({ user, token, onLogout }) {
   const handleCaseDone = () => {
     setAssignedCase(null);
     setRevView("home");
+    setExitModal(false);
+    setExitReason("");
+    setExitError("");
   };
 
-  // ── Cockpit view ──
-  if (revView === "cockpit" && assignedCase) {
-    return (
-      <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{
-          background: "#1a3a5c", padding: "8px 20px", display: "flex", alignItems: "center",
-          gap: 12, flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.01em" }}>CogentCR</span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: 6 }}>|</span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>Reviewing case</span>
-          <div style={{ flex: 1 }} />
+  const handleOpenSearchCase = (sub) => {
+    const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
+    setAssignedCase({
+      caseId:         sub.submission_id,
+      memberName:     sub.member_name    || "Unknown Member",
+      memberId:       sub.member_id      || "—",
+      memberState:    sub.member_state   || null,
+      dob:            sub.dob            || "—",
+      discipline:     sub.discipline     || user.discipline || "PT",
+      reviewType:     "initial",
+      submittedAt:    sub.submitted_at,
+      receivedAt:     sub.received_at    || sub.submitted_at,
+      reviewPriority: sub.review_priority || "standard",
+      rmiSentAt:      sub.rmi_sent_at    || null,
+      rmiRespondedAt: sub.rmi_responded_at || null,
+      documents:      sub.document_list  || [],
+      metrics: {
+        primaryDiagnosisCode: diags[0]    || null,
+        diagnosisCodes:       diags,
+        requestedVisits:      sub.requested_visits || 0,
+        therapyType:          sub.discipline || user.discipline || "PT",
+        functionalLimitations: [],
+        sopIndicators: [],
+        documentationQuality: {},
+      },
+      planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
+    });
+    setRevView("cockpit");
+  };
+
+  const handleHoldCase = async () => {
+    if (!exitReason.trim()) { setExitError("Please enter a hold reason."); return; }
+    setExitLoading(true); setExitError("");
+    try {
+      await axios.patch(
+        `${API_BASE}/v1/submissions/${assignedCase.caseId}/hold`,
+        { reason: exitReason.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      handleCaseDone();
+    } catch (err) {
+      setExitError(err.response?.data?.error || "Failed to hold case.");
+      setExitLoading(false);
+    }
+  };
+
+  const handleReleaseCase = async () => {
+    if (!exitReason.trim()) { setExitError("Please enter a reason."); return; }
+    setExitLoading(true); setExitError("");
+    try {
+      await axios.patch(
+        `${API_BASE}/v1/submissions/${assignedCase.caseId}/release`,
+        { reason: exitReason.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      handleCaseDone();
+    } catch (err) {
+      setExitError(err.response?.data?.error || "Failed to release case.");
+      setExitLoading(false);
+    }
+  };
+
+  const discLabel = user.discipline || "PT";
+  const pendingCount = queueStats
+    ? (queueStats.byDiscipline || []).filter(d => d.discipline === discLabel).reduce((s, r) => s + parseInt(r.count), 0)
+    : null;
+
+  // ── shared nav items ──
+  const PRIMARY_TABS = [
+    assignedCase ? ["cockpit", "★ Case Review"] : ["home", "Get Case"],
+    ["search", "Search"],
+    ["my_stats", "My Stats"],
+    ["p2p", "P2P"],
+    ["appeals", "Appeals"],
+    ["criteria", "Criteria"],
+    ["state_rules", "State Rules"],
+  ];
+
+  const NavBar = () => (
+    <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", alignItems: "center", gap: 0, flexShrink: 0, position: "relative" }}>
+      {PRIMARY_TABS.map(([v, label]) => (
+        <button key={v} onClick={() => setRevView(v)} style={{
+          padding: "12px 18px", fontSize: 13,
+          fontWeight: revView === v ? 700 : 500,
+          color: v === "cockpit" ? (revView === v ? "#1a3a5c" : "#c2410c") : (revView === v ? "#1a3a5c" : "#6b7280"),
+          background: "none", border: "none",
+          borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+          cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+          whiteSpace: "nowrap",
+        }}>{label}</button>
+      ))}
+      <div style={{ flex: 1 }} />
+      {/* Tools dropdown */}
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => setToolsOpen(o => !o)}
+          style={{ padding: "8px 14px", fontSize: 12, fontWeight: 600, color: "#6b7280", background: toolsOpen ? "#f1f5f9" : "none", border: "1px solid " + (toolsOpen ? "#e2e8f0" : "transparent"), borderRadius: 7, cursor: "pointer", fontFamily: "'Public Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}
+        >
+          Tools <span style={{ fontSize: 10 }}>▾</span>
+        </button>
+        {toolsOpen && (
+          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 200, minWidth: 180, overflow: "hidden" }}
+            onMouseLeave={() => setToolsOpen(false)}>
+            {[["ur_form", "UR Review Form"], ["criteria", "Criteria Library"], ["state_rules", "State Rules"]].map(([v, label]) => (
+              <button key={v} onClick={() => { setRevView(v); setToolsOpen(false); }} style={{
+                display: "block", width: "100%", textAlign: "left", padding: "11px 18px",
+                fontSize: 13, color: "#374151", background: revView === v ? "#f1f5f9" : "#fff",
+                border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif",
+                fontWeight: revView === v ? 700 : 400,
+                borderBottom: "1px solid #f1f5f9",
+              }}>{label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const Header = () => (
+    <div style={{ background: "#1a3a5c", padding: "12px 28px", display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+      <span style={{ fontSize: 17, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>|</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.75)", fontFamily: "'Public Sans', sans-serif" }}>Reviewer Portal</span>
+      <div style={{ flex: 1 }} />
+      {assignedCase && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px", borderRadius: 8, background: "rgba(251,191,36,0.18)", border: "1px solid rgba(251,191,36,0.4)" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fbbf24", display: "inline-block", animation: "rsPulse 1.5s ease-in-out infinite" }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#fbbf24", fontFamily: "'Public Sans', sans-serif" }}>Case in review</span>
+          <span style={{ fontSize: 11, color: "rgba(251,191,36,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{assignedCase.memberName}</span>
+        </div>
+      )}
+      <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: DISC_COLOR, color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }}>{discLabel}</span>
+      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+      <NotificationBell token={token} />
+      <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+    </div>
+  );
+
+  // ── Exit-case modal (Hold / Release) ──
+  const ExitModal = () => exitModal && (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000 }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: "28px 32px", width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 6 }}>
+          {exitModal === "hold" ? "Place Case on Hold" : "Return Case to Queue"}
+        </div>
+        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 18, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.5 }}>
+          {exitModal === "hold"
+            ? "Case will be held for 1 business day then automatically returned to the queue."
+            : "Case will be returned to the queue immediately and available for any reviewer."}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Public Sans', sans-serif" }}>
+          {exitModal === "hold" ? "Reason for hold" : "Reason for return"}
+          <span style={{ color: "#dc2626" }}> *</span>
+        </div>
+        <textarea
+          autoFocus
+          value={exitReason}
+          onChange={e => { setExitReason(e.target.value); setExitError(""); }}
+          placeholder={exitModal === "hold"
+            ? "e.g. Awaiting additional documentation from provider before completing review..."
+            : "e.g. Outside scope of reviewer's discipline — returning to general queue..."}
+          rows={3}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif", resize: "vertical", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }}
+        />
+        {exitError && <div style={{ marginTop: 6, fontSize: 12, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>{exitError}</div>}
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
           <button
-            onClick={handleCaseDone}
-            style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
-          >
-            Back to Queue
-          </button>
-        </div>
-        <EpisodeContextBar memberId={assignedCase.memberId} discipline={assignedCase.discipline} token={token} />
-        <StateRulesBar state={assignedCase.memberState} discipline={assignedCase.discipline} token={token} />
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          <Cockpit
-            user={user}
-            liveCase={assignedCase}
-            hideQueueNav={true}
-            onCaseDone={handleCaseDone}
-            onBack={handleCaseDone}
-          />
+            onClick={exitModal === "hold" ? handleHoldCase : handleReleaseCase}
+            disabled={exitLoading}
+            style={{
+              flex: 1, padding: "11px 0", borderRadius: 8, border: "none",
+              background: exitModal === "hold" ? "#1d4ed8" : "#dc2626",
+              color: "#fff", fontSize: 13, fontWeight: 700, cursor: exitLoading ? "not-allowed" : "pointer",
+              fontFamily: "'Public Sans', sans-serif", opacity: exitLoading ? 0.6 : 1,
+            }}
+          >{exitLoading ? "Saving..." : exitModal === "hold" ? "Confirm Hold" : "Return to Queue"}</button>
+          <button
+            onClick={() => { setExitModal(false); setExitReason(""); setExitError(""); }}
+            style={{ padding: "11px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", fontSize: 13, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >Cancel</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ── UR Form view ──
-  if (revView === "ur_form") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <URFormEmbed user={user} token={token} />
-      </div>
-    );
-  }
-
-  // ── Search view ──
-  if (revView === "search") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <CaseSearchView token={token} />
-      </div>
-    );
-  }
-
-  // ── My Stats view ──
-  if (revView === "my_stats") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
+  // ── Cockpit view (kept mounted while case active to preserve state) ──
+  const cockpitVisible = revView === "cockpit" && !!assignedCase;
+  // ── other views ──
         <ReviewerDashboard token={token} user={user} />
       </div>
     );
   }
 
-  // ── P2P view ──
-  if (revView === "p2p") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <div style={{ padding: "18px 24px 0" }}>
-          <ReviewerScheduleSettings token={token} />
-        </div>
-        <P2PQueueView token={token} />
-      </div>
-    );
-  }
-
-  // ── Appeals view ──
-  if (revView === "appeals") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <AppealsQueueView token={token} />
-      </div>
-    );
-  }
-
-  // ── Criteria view ──
-  if (revView === "criteria") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <CriteriaLibraryView token={token} />
-      </div>
-    );
-  }
-
-  if (revView === "state_rules") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-        <div style={{ background: "#1a3a5c", padding: "10px 24px", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
-          <span style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-          <NotificationBell token={token} />
-          <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-        </div>
-        <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-          {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-            <button key={v} onClick={() => setRevView(v)} style={{
-              padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-              color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-              borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-              cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-            }}>{label}</button>
-          ))}
-        </div>
-        <StateRulesView token={token} />
-      </div>
-    );
-  }
-
-  // ── Home view ──
-  const discLabel   = user.discipline || "PT";
-  const pendingCount = queueStats
-    ? (queueStats.byDiscipline || []).filter(d => d.discipline === discLabel).reduce((s, r) => s + parseInt(r.count), 0)
-    : null;
-
+  // ── single unified return ──
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: "#1a3a5c", padding: "14px 28px", display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif", letterSpacing: "-0.02em" }}>CogentCR</span>
-        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "'Public Sans', sans-serif" }}>Reviewer Portal</span>
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: DISC_COLOR, color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }}>{discLabel}</span>
-        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-        <NotificationBell token={token} />
-        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
-      </div>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontFamily: "'Public Sans', system-ui, sans-serif", background: "#f1f5f9" }}>
+      <style>{`
+        @keyframes rsPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+      `}</style>
+      <Header />
+      <NavBar />
+      <ExitModal />
 
-      {/* Tab bar */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
-        {[["home","Get Case"], ["ur_form","UR Form"], ["search","Search"], ["my_stats","My Stats"], ["p2p","P2P"], ["appeals","Appeals"], ["criteria","Criteria"], ["state_rules","State Rules"]].map(([v, label]) => (
-          <button key={v} onClick={() => setRevView(v)} style={{
-            padding: "12px 20px", fontSize: 13, fontWeight: revView === v ? 700 : 500,
-            color: revView === v ? "#1a3a5c" : "#6b7280", background: "none", border: "none",
-            borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-          }}>{label}</button>
-        ))}
-      </div>
-
-      {/* Home content */}
-      <div style={{ maxWidth: 520, margin: "72px auto", padding: "0 24px" }}>
-
-        {/* ── Get Case hero — dominant first element ── */}
-        <div style={{ background: "#fff", borderRadius: 20, padding: "52px 40px 44px", boxShadow: "0 4px 24px rgba(26,58,92,0.13)", border: "1px solid #dde4ef", textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6b7280", marginBottom: 12, fontFamily: "'Public Sans', sans-serif" }}>
-            {discLabel} Reviewer
+      {/* Cockpit — kept mounted while case is active; hidden when on another tab */}
+      {assignedCase && (
+        <div style={{ display: cockpitVisible ? "flex" : "none", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+          <EpisodeContextBar memberId={assignedCase.memberId} discipline={assignedCase.discipline} token={token} />
+          <StateRulesBar state={assignedCase.memberState} discipline={assignedCase.discipline} token={token} />
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <Cockpit
+              user={user}
+              liveCase={assignedCase}
+              hideQueueNav={true}
+              onCaseDone={handleCaseDone}
+              onHoldCase={() => { setExitReason(""); setExitError(""); setExitModal("hold"); }}
+              onReleaseCase={() => { setExitReason(""); setExitError(""); setExitModal("release"); }}
+            />
           </div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1, marginBottom: 10 }}>
-            Ready to review?
-          </div>
-          <div style={{ fontSize: 14, color: "#9ca3af", marginBottom: 36, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.5 }}>
-            Cases are assigned by priority and submission age.<br />
-            Click below to get your next case.
-          </div>
-          <button
-            onClick={handleGetCase}
-            disabled={getCaseLoading}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 10,
-              padding: "16px 56px", borderRadius: 12,
-              background: getCaseLoading ? "#94a3b8" : "#1a3a5c",
-              color: "#fff", fontSize: 18, fontWeight: 700,
-              border: "none", cursor: getCaseLoading ? "not-allowed" : "pointer",
-              fontFamily: "'Public Sans', sans-serif",
-              boxShadow: getCaseLoading ? "none" : "0 6px 20px rgba(26,58,92,0.38)",
-              transition: "all 0.15s",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {getCaseLoading ? "Finding case…" : "Get Case"}
-          </button>
-          {getCaseError && (
-            <div style={{ marginTop: 18, fontSize: 13, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>
-              {getCaseError}
-            </div>
-          )}
         </div>
+      )}
 
-        {/* ── Queue stats — secondary ── */}
-        <div style={{ display: "flex", gap: 12 }}>
-          {[
-            { label: "Pending in your queue", value: pendingCount !== null ? pendingCount : "—", color: pendingCount > 0 ? "#1a3a5c" : "#9ca3af" },
-            { label: "Completed today",        value: queueStats?.casesToday ?? "—",              color: "#15803d" },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 5, fontFamily: "'Public Sans', sans-serif" }}>{s.label}</div>
+      {/* All other views */}
+      <div style={{ display: cockpitVisible ? "none" : "flex", flex: 1, flexDirection: "column", overflow: "auto" }}>
+
+        {/* Home / Get Case */}
+        {revView === "home" && (
+          <div style={{ maxWidth: 520, margin: "60px auto", padding: "0 24px", width: "100%" }}>
+            <div style={{ background: "#fff", borderRadius: 20, padding: "52px 40px 44px", boxShadow: "0 4px 24px rgba(26,58,92,0.13)", border: "1px solid #dde4ef", textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6b7280", marginBottom: 12 }}>{discLabel} Reviewer</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1, marginBottom: 10 }}>Ready to review?</div>
+              <div style={{ fontSize: 14, color: "#9ca3af", marginBottom: 36, lineHeight: 1.5 }}>Cases are assigned by priority and submission age.<br />Click below to get your next case.</div>
+              <button onClick={handleGetCase} disabled={getCaseLoading} style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "16px 56px", borderRadius: 12, background: getCaseLoading ? "#94a3b8" : "#1a3a5c", color: "#fff", fontSize: 18, fontWeight: 700, border: "none", cursor: getCaseLoading ? "not-allowed" : "pointer", boxShadow: getCaseLoading ? "none" : "0 6px 20px rgba(26,58,92,0.38)", transition: "all 0.15s", letterSpacing: "-0.01em" }}>
+                {getCaseLoading ? "Finding case…" : "Get Case"}
+              </button>
+              {getCaseError && <div style={{ marginTop: 18, fontSize: 13, color: "#dc2626" }}>{getCaseError}</div>}
             </div>
-          ))}
-        </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              {[
+                { label: "Pending in your queue", value: pendingCount !== null ? pendingCount : "—", color: pendingCount > 0 ? "#1a3a5c" : "#9ca3af" },
+                { label: "Completed today", value: queueStats?.casesToday ?? "—", color: "#15803d" },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, background: "#fff", borderRadius: 12, padding: "16px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 5 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {revView === "search"      && <CaseSearchView token={token} onOpenCase={handleOpenSearchCase} />}
+        {revView === "my_stats"    && <ReviewerDashboard token={token} user={user} />}
+        {revView === "p2p"         && <><div style={{ padding: "18px 24px 0" }}><ReviewerScheduleSettings token={token} /></div><P2PQueueView token={token} /></>}
+        {revView === "appeals"     && <AppealsQueueView token={token} />}
+        {revView === "criteria"    && <CriteriaLibraryView token={token} />}
+        {revView === "state_rules" && <StateRulesView token={token} />}
+        {revView === "ur_form"     && <URFormEmbed user={user} token={token} />}
+
       </div>
     </div>
   );
@@ -3031,7 +3004,7 @@ function URFormEmbed({ user, token }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CASE SEARCH VIEW (Phase 9)
 // ─────────────────────────────────────────────────────────────────────────────
-function CaseSearchView({ token }) {
+function CaseSearchView({ token, onOpenCase }) {
   const [q, setQ]               = useState("");
   const [status, setStatus]     = useState("all");
   const [discipline, setDisc]   = useState("all");
@@ -3133,8 +3106,8 @@ function CaseSearchView({ token }) {
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 120px 70px", gap: 0, padding: "8px 20px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
-                {["Member", "Case ID", "Disc.", "Status", "Submitted", "Score"].map(h => (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 110px 60px 90px", gap: 0, padding: "8px 20px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+                {["Member", "Case ID", "Disc.", "Status", "Submitted", "Score", ""].map(h => (
                   <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
                 ))}
               </div>
@@ -3142,12 +3115,12 @@ function CaseSearchView({ token }) {
                 const sc = statusColor(r.status);
                 const dc = discColor(r.discipline);
                 return (
-                  <div key={r.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 120px 70px", gap: 0, padding: "12px 20px", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
+                  <div key={r.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 70px 130px 110px 60px 90px", gap: 0, padding: "10px 20px", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.member_name || "—"}</div>
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, fontFamily: "'DM Sans', monospace" }}>{r.member_id || "—"}</div>
                     </div>
-                    <span style={{ fontSize: 11, color: "#374151", fontFamily: "monospace" }}>{r.submission_id}</span>
+                    <span style={{ fontSize: 11, color: "#374151", fontFamily: "monospace" }}>{r.submission_id?.slice(0,12)}…</span>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: dc.bg, color: dc.text, width: "fit-content", fontFamily: "'DM Sans', sans-serif" }}>{r.discipline || "—"}</span>
                     <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: sc.bg, color: sc.text, width: "fit-content", textTransform: "capitalize", fontFamily: "'DM Sans', sans-serif" }}>
                       {(r.status || "submitted").replace(/_/g, " ")}
@@ -3156,6 +3129,11 @@ function CaseSearchView({ token }) {
                     <span style={{ fontSize: 12, fontWeight: 600, color: r.completeness_score >= 80 ? "#15803d" : r.completeness_score >= 50 ? "#92400e" : "#6b7280" }}>
                       {r.completeness_score != null ? r.completeness_score + "%" : "—"}
                     </span>
+                    {onOpenCase ? (
+                      <button onClick={() => onOpenCase(r)} style={{ padding: "5px 12px", borderRadius: 6, background: "#1a3a5c", color: "#fff", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap" }}>
+                        Review
+                      </button>
+                    ) : <span />}
                   </div>
                 );
               })}

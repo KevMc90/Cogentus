@@ -600,6 +600,12 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
   const OT_COLOR    = "#c2410c";
   const ST_COLOR    = "#15803d";
 
+  // Detect cases where no clinical metrics were extracted (form-only submission, no PDF processed)
+  const hasAnyClinicalData = hasROM || hasMMT || ex.painCurrent || hasFIM || hasADL || hasScores
+    || (ex.functionalLimitations && ex.functionalLimitations.length > 0)
+    || (ex.goals && ex.goals.length > 0);
+  const docs = kase.documents || [];
+
   const sevColor = rec.confidence === "high" ? "#15803d"
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
 
@@ -632,6 +638,26 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
             <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: FONTS.body }}>{ex.visitsToDate || 0} VTD</span>
           </div>
         </div>
+
+        {/* No-extraction notice for form-only submissions */}
+        {!hasAnyClinicalData && (
+          <div style={{ padding: "14px 16px", borderRadius: 8, border: "1.5px dashed #c7d2fe", background: "#eef2ff", marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#4338ca", fontFamily: FONTS.body, marginBottom: 4 }}>
+              No clinical metrics extracted
+            </div>
+            <div style={{ fontSize: 11, color: "#6366f1", fontFamily: FONTS.body, lineHeight: 1.5, marginBottom: 10 }}>
+              This case was submitted via form without PDF upload. To populate objective findings (ROM, MMT, pain), the provider must upload clinical documents — or use the UR Form in Tools to manually process PDFs.
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#4338ca", fontFamily: FONTS.body, marginBottom: 4 }}>Submitted documents:</div>
+            {docs.length > 0 ? docs.map((d, i) => (
+              <div key={i} style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, padding: "3px 0" }}>
+                · {typeof d === "string" ? d : d.name || "Unnamed document"}
+              </div>
+            )) : (
+              <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents listed</div>
+            )}
+          </div>
+        )}
 
         {ex.painCurrent && (
           <div style={{ marginBottom: 14 }}>
@@ -936,23 +962,23 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
         )}
       </div>
 
-      {/* Docs button pinned to bottom-left of zone */}
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-start", flexShrink: 0 }}>
+      {/* Docs footer */}
+      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         <button
           onClick={onToggleDocs}
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            padding: "6px 14px", borderRadius: 7,
-            border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`,
-            background: showDocs ? NAVY : "#f8fafc",
-            cursor: "pointer", transition: "all 0.15s",
-          }}
+          style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 7, border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`, background: showDocs ? NAVY : "#f8fafc", cursor: "pointer", transition: "all 0.15s" }}
         >
           <span style={{ fontSize: 12, fontWeight: 600, color: showDocs ? "#fff" : "#374151", fontFamily: FONTS.body }}>
-            {showDocs ? "Hide Documents" : "View Documents"}
+            {showDocs ? "Hide Docs" : "Docs"}
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: showDocs ? "rgba(255,255,255,0.2)" : "#e2e8f0", color: showDocs ? "#fff" : "#64748b", fontFamily: FONTS.body }}>
+            {(kase.documents || []).length}
           </span>
           <span style={{ fontSize: 10, color: showDocs ? "rgba(255,255,255,0.6)" : "#9ca3af", fontFamily: FONTS.body }}>V</span>
         </button>
+        <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body }}>
+          Click Docs to view attached clinical documents
+        </span>
       </div>
     </div>
   );
@@ -1135,7 +1161,8 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   onPendNoteChange, onPendSubmit,
   onApproveChecksChange, onApproveSubmit,
   onDenyNoteChange, onDenySignoffSubmit,
-  onCancelAction, onNavigate, hideQueueNav }) {
+  onCancelAction, onNavigate, hideQueueNav,
+  onHoldCase, onReleaseCase }) {
 
   const decided    = decisions[kase.caseId];
   const rec        = kase.contract?.recommendation;
@@ -1396,10 +1423,25 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
         {/* Action buttons */}
         {!decided && actionState === "idle" && kase.contract && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <ActionBtn kbd="A" label="Approve"       color="#166534" bg="#dcfce7" border="#86efac" onClick={() => onAction("approve")} />
-            <ActionBtn kbd="P" label="Partial Denial" color="#92400e" bg="#fef3c7" border="#fcd34d" onClick={() => onAction("partial")} />
-            <ActionBtn kbd="D" label="Full Denial"    color="#991b1b" bg="#fee2e2" border="#fca5a5" onClick={() => onAction("deny")} />
-            <ActionBtn kbd="N" label="Pend"           color="#1d4ed8" bg="#eff6ff" border="#93c5fd" onClick={() => onAction("pend")} />
+            <ActionBtn kbd="A" label="Approve"        color="#166534" bg="#dcfce7" border="#86efac" onClick={() => onAction("approve")} />
+            <ActionBtn kbd="P" label="Partial Denial"  color="#92400e" bg="#fef3c7" border="#fcd34d" onClick={() => onAction("partial")} />
+            <ActionBtn kbd="D" label="Full Denial"     color="#991b1b" bg="#fee2e2" border="#fca5a5" onClick={() => onAction("deny")} />
+            <ActionBtn kbd="N" label="Pend"            color="#1d4ed8" bg="#eff6ff" border="#93c5fd" onClick={() => onAction("pend")} />
+            {/* Hold / Release — only for live assigned cases */}
+            {kase.isLive && (onHoldCase || onReleaseCase) && (
+              <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px dashed #e2e8f0", display: "flex", gap: 6 }}>
+                {onHoldCase && (
+                  <button onClick={onHoldCase} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
+                    Hold (1 day)
+                  </button>
+                )}
+                {onReleaseCase && (
+                  <button onClick={onReleaseCase} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
+                    Return to Queue
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1486,15 +1528,35 @@ function DocumentsPanel({ kase, onClose }) {
         }}>Esc / V</button>
       </div>
       <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-        {kase.documents && kase.documents.length > 0 ? kase.documents.map((doc, i) => (
-          <div key={i} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 4 }}>{doc.name}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>{doc.type}{doc.date ? ` · ${doc.date}` : ""}</div>
-            <div style={{ marginTop: 10, padding: "8px 10px", background: "#f0f4f8", borderRadius: 6, fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, textAlign: "center", border: "1px dashed #cbd5e1" }}>
-              PDF viewer available in Phase 6
+        {kase.documents && kase.documents.length > 0 ? kase.documents.map((doc, i) => {
+          const name = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
+          const type = typeof doc === "object" ? doc.type : null;
+          const date = typeof doc === "object" ? doc.date : null;
+          const url  = typeof doc === "object" ? (doc.url || doc.file_url) : null;
+          return (
+            <div key={i} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 2 }}>{name}</div>
+                  {(type || date) && <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>{type}{date ? ` · ${date}` : ""}</div>}
+                </div>
+                {url ? (
+                  <a href={url} target="_blank" rel="noopener noreferrer" style={{
+                    padding: "5px 12px", borderRadius: 6, background: NAVY, color: "#fff",
+                    fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: FONTS.body, flexShrink: 0,
+                  }}>Open PDF</a>
+                ) : (
+                  <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body, padding: "5px 0", flexShrink: 0 }}>No URL</span>
+                )}
+              </div>
+              {!url && (
+                <div style={{ marginTop: 8, padding: "7px 10px", background: "#f0f4f8", borderRadius: 6, fontSize: 11, color: "#64748b", fontFamily: FONTS.body, border: "1px dashed #cbd5e1" }}>
+                  Document listed but not stored — provider must re-upload for AI extraction.
+                </div>
+              )}
             </div>
-          </div>
-        )) : (
+          );
+        }) : (
           <div style={{ padding: "24px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: FONTS.body, fontStyle: "italic" }}>
             No documents attached to this case
           </div>
@@ -1705,7 +1767,7 @@ function SubmissionsPanel({ submissions, onClose, onForward, onRefresh }) {
 }
 
 // ── COCKPIT ROOT ───────────────────────────────────────────────────────────────
-export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDone }) {
+export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDone, onHoldCase, onReleaseCase }) {
   const [cursor, setCursor]               = useState(0);
   const [decisions, setDecisions]         = useState({});
   const [actionState, setActionState]     = useState("idle");
@@ -2106,6 +2168,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
             onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); }}
             onNavigate={handleNavigate}
             hideQueueNav={!!hideQueueNav}
+            onHoldCase={kase.isLive ? onHoldCase : null}
+            onReleaseCase={kase.isLive ? onReleaseCase : null}
           />
         </div>
       </div>
