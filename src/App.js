@@ -2855,11 +2855,6 @@ function ReviewerShell({ user, token, onLogout }) {
 
   // ── Cockpit view (kept mounted while case active to preserve state) ──
   const cockpitVisible = revView === "cockpit" && !!assignedCase;
-  // ── other views ──
-        <ReviewerDashboard token={token} user={user} />
-      </div>
-    );
-  }
 
   // ── single unified return ──
   return (
