@@ -5213,9 +5213,10 @@ function ProviderPortal({ user, token, onLogout }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MASTER DASHBOARD (Phase 12)
 // ─────────────────────────────────────────────────────────────────────────────
-function MasterDashboard({ token }) {
+function MasterDashboard({ token, onReviewCase, onNavigate }) {
   const [stats, setStats]       = useState(null);
   const [tatStats, setTatStats] = useState(null);
+  const [brief, setBrief]       = useState(null);
   const [loading, setLoading]   = useState(true);
   const [period, setPeriod]     = useState("today");
   const [error, setError]       = useState("");
@@ -5225,9 +5226,11 @@ function MasterDashboard({ token }) {
     Promise.all([
       axios.get(`${API_BASE}/v1/master-stats`, { headers: h }),
       axios.get(`${API_BASE}/v1/tat-stats`,    { headers: h }).catch(() => null),
-    ]).then(([r1, r2]) => {
+      axios.get(`${API_BASE}/v1/ops-brief`,    { headers: h }).catch(() => null),
+    ]).then(([r1, r2, r3]) => {
       setStats(r1.data);
       if (r2) setTatStats(r2.data);
+      if (r3) setBrief(r3.data);
       setLoading(false);
     }).catch(() => { setError("Failed to load stats."); setLoading(false); });
   }, [token]);
@@ -5276,8 +5279,52 @@ function MasterDashboard({ token }) {
     ? Math.round(parseInt(totals.auto_approved_all) / parseInt(totals.all_time) * 100)
     : 0;
 
+  // Count total attention items
+  const briefCount = brief
+    ? (brief.breached?.length || 0) + (brief.awaitingMD?.length || 0) + (brief.rmiOverdue?.length || 0) + (brief.unassigned?.length || 0)
+    : 0;
+
   return (
-    <div style={{ maxWidth: 1000, margin: "28px auto", padding: "0 24px" }}>
+    <div style={{ maxWidth: 1100, margin: "28px auto", padding: "0 24px" }}>
+
+      {/* ── Ops Brief ── */}
+      {brief && briefCount > 0 && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", marginBottom: 24, overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", background: briefCount > 3 ? "#fef2f2" : "#fffbeb", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: briefCount > 3 ? "#dc2626" : "#92400e", fontFamily: "'Fraunces', Georgia, serif" }}>
+              {briefCount > 3 ? "⚠ " : "● "}{briefCount} item{briefCount !== 1 ? "s" : ""} need attention
+            </span>
+            <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>— Today's operational brief</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }}>
+            {[
+              { key: "breached",   label: "SLA Breached",       color: "#991b1b", bg: "#fef2f2", items: brief.breached },
+              { key: "awaitingMD", label: "Awaiting MD Co-Sign",color: "#7c3aed", bg: "#f5f3ff", items: brief.awaitingMD },
+              { key: "rmiOverdue", label: "RMI Overdue (3d+)",  color: "#92400e", bg: "#fffbeb", items: brief.rmiOverdue },
+              { key: "unassigned", label: "Unassigned",          color: "#1d4ed8", bg: "#eff6ff", items: brief.unassigned },
+            ].map((bucket, bi) => (
+              <div key={bucket.key} style={{ borderRight: bi < 3 ? "1px solid #e2e8f0" : "none", padding: "14px 16px", background: (bucket.items||[]).length > 0 ? bucket.bg : "#fafafa" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: (bucket.items||[]).length > 0 ? bucket.color : "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Public Sans', sans-serif" }}>{bucket.label}</span>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: (bucket.items||[]).length > 0 ? bucket.color : "#9ca3af", fontFamily: "'Fraunces', Georgia, serif" }}>{(bucket.items||[]).length}</span>
+                </div>
+                {(bucket.items||[]).slice(0, 3).map((c, ci) => (
+                  <div key={ci} style={{ fontSize: 11, color: "#374151", fontFamily: "'Public Sans', sans-serif", padding: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    · {c.member_name || c.submission_id?.slice(0,10) || "—"}
+                  </div>
+                ))}
+                {(bucket.items||[]).length > 3 && (
+                  <button onClick={() => onNavigate && onNavigate("queue")} style={{ marginTop: 4, fontSize: 10, color: bucket.color, background: "none", border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", padding: 0, fontWeight: 600 }}>
+                    +{(bucket.items||[]).length - 3} more → View All Cases
+                  </button>
+                )}
+                {(bucket.items||[]).length === 0 && <div style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic", fontFamily: "'Public Sans', sans-serif" }}>All clear</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Period selector + top stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
         {PERIODS.map(p => {
@@ -5421,8 +5468,8 @@ function MasterDashboard({ token }) {
           <div style={{ padding: "24px 20px", color: "#9ca3af", fontSize: 13, textAlign: "center", fontFamily: "'Public Sans', sans-serif" }}>No reviewer activity yet.</div>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-              {["Reviewer","Disc.","Today","Week","Month","All Time","Approved","Denied"].map(h => (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+              {["Reviewer","Disc.","Active","Today","Week","Month","All Time","Approved","Denied"].map(h => (
                 <span key={h} style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
               ))}
             </div>
@@ -5430,14 +5477,16 @@ function MasterDashboard({ token }) {
               const allTime = parseInt(r.all_time || 0);
               const approved = parseInt(r.approved || 0);
               const denied = parseInt(r.denied || 0);
+              const active = parseInt(r.active_cases || 0);
               const approvePct = allTime > 0 ? Math.round(approved / allTime * 100) : 0;
               return (
-                <div key={r.email} style={{ display: "grid", gridTemplateColumns: "1fr 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "12px 20px", borderBottom: i < revs.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+                <div key={r.email} style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px 70px 80px 90px 80px 80px 80px", gap: 0, padding: "12px 20px", borderBottom: i < revs.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.full_name || "—"}</div>
                     <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{r.email}</div>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "#eff6ff", color: discColor(r.discipline), fontFamily: "'DM Sans', sans-serif", width: "fit-content" }}>{r.discipline}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: active > 5 ? "#dc2626" : active > 2 ? "#92400e" : "#15803d", fontFamily: "'Fraunces', Georgia, serif" }}>{active}</span>
                   {[r.today, r.this_week, r.this_month, r.all_time].map((v, j) => (
                     <span key={j} style={{ fontSize: 13, fontWeight: j === 3 ? 700 : 400, color: j === 3 ? "#1a3a5c" : "#374151", fontFamily: j === 3 ? "'Fraunces', Georgia, serif" : "'Public Sans', sans-serif" }}>{parseInt(v || 0)}</span>
                   ))}
@@ -5458,12 +5507,63 @@ function MasterDashboard({ token }) {
   );
 }
 
-function MasterQueueView({ token }) {
+function AssignCaseModal({ submissionId, token, onClose, onAssigned }) {
+  const [reviewers, setReviewers] = useState([]);
+  const [selected, setSelected]   = useState("");
+  const [saving,   setSaving]     = useState(false);
+  const [error,    setError]      = useState("");
+
+  useEffect(() => {
+    axios.get(`${API_BASE}/v1/reviewers`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setReviewers(r.data.reviewers || []))
+      .catch(() => setError("Failed to load reviewers."));
+  }, [token]); // eslint-disable-line
+
+  const handleAssign = async () => {
+    if (!selected) { setError("Select a reviewer."); return; }
+    setSaving(true); setError("");
+    try {
+      await axios.patch(`${API_BASE}/v1/submissions/${submissionId}/assign`, { reviewerId: parseInt(selected, 10) }, { headers: { Authorization: `Bearer ${token}` } });
+      onAssigned();
+    } catch (err) {
+      setError(err.response?.data?.error || "Assignment failed.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "28px 32px", width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Assign Case</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20, fontFamily: "'Public Sans', sans-serif" }}>{submissionId}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Public Sans', sans-serif" }}>Assign to Reviewer</div>
+        <select value={selected} onChange={e => setSelected(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: 7, border: "1px solid #d1d5db", fontSize: 13, fontFamily: "'Public Sans', sans-serif", marginBottom: 16, boxSizing: "border-box", outline: "none" }}>
+          <option value="">— Select reviewer —</option>
+          {reviewers.map(r => (
+            <option key={r.id} value={r.id}>
+              {r.full_name || r.email} · {r.discipline || "PT"} · {r.active_cases} active
+            </option>
+          ))}
+        </select>
+        {error && <div style={{ marginBottom: 12, fontSize: 12, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handleAssign} disabled={saving} style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: saving ? "#94a3b8" : "#0d1b2a", color: "#fff", fontWeight: 700, fontSize: 13, border: "none", cursor: saving ? "not-allowed" : "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+            {saving ? "Assigning..." : "Assign"}
+          </button>
+          <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", fontSize: 13, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MasterQueueView({ token, onReviewCase }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [statusFilter, setStatusFilter]     = useState("all");
   const [discFilter, setDiscFilter]         = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [assignTarget, setAssignTarget]     = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -5500,6 +5600,14 @@ function MasterQueueView({ token }) {
 
   return (
     <div style={{ maxWidth: 1100, margin: "28px auto", padding: "0 24px" }}>
+      {assignTarget && (
+        <AssignCaseModal
+          submissionId={assignTarget.submission_id}
+          token={token}
+          onClose={() => setAssignTarget(null)}
+          onAssigned={() => { setAssignTarget(null); load(); }}
+        />
+      )}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selS}>
           <option value="all">All Statuses</option>
@@ -5526,8 +5634,8 @@ function MasterQueueView({ token }) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 120px 100px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-          {["Member","Case ID","Disc.","Status","Visits","TAT / SLA","Submitted"].map(h => (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 110px 90px 130px", gap: 0, padding: "8px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+          {["Member","Case ID","Disc.","Status","Visits","TAT / SLA","Submitted","Actions"].map(h => (
             <span key={h} style={{ fontSize: 9, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{h}</span>
           ))}
         </div>
@@ -5540,16 +5648,17 @@ function MasterQueueView({ token }) {
           const discC = s.discipline === "OT" ? "#c2410c" : s.discipline === "ST" ? "#15803d" : "#1a3a5c";
           const tat   = s._tat;
           const rowBg = tat?.status === "breached" ? "#fffafa" : tat?.status === "at_risk" ? "#fffef5" : "#fff";
+          const reviewable = ["submitted","pending_review","under_review","on_hold","rmi_pending"].includes(s.status);
           return (
-            <div key={s.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 120px 100px", gap: 0, padding: "12px 20px", borderBottom: i < visible.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: rowBg }}>
+            <div key={s.submission_id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 55px 120px 80px 110px 90px 130px", gap: 0, padding: "10px 20px", borderBottom: i < visible.length - 1 ? "1px solid #f1f5f9" : "none", alignItems: "center", background: rowBg }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{s.member_name || "—"}</span>
-                  {s.review_priority === "urgent" && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>⚡ URGENT</span>
+                  {(s.review_priority === "urgent" || s.review_priority === "expedited") && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>⚡ {(s.review_priority || "").toUpperCase()}</span>
                   )}
                   {s.review_type === "concurrent" && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>CONCURRENT</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>CONC.</span>
                   )}
                 </div>
                 <div style={{ fontSize: 10, color: "#9ca3af", fontFamily: "'DM Sans', sans-serif" }}>{s.member_id || "—"}</div>
@@ -5560,6 +5669,23 @@ function MasterQueueView({ token }) {
               <span style={{ fontSize: 12, color: "#374151", fontFamily: "'Public Sans', sans-serif" }}>{s.requested_visits || "—"}</span>
               <TatBadge sub={s} />
               <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}</span>
+              <div style={{ display: "flex", gap: 5 }}>
+                {reviewable && onReviewCase && (
+                  <button onClick={() => onReviewCase({
+                    caseId: s.submission_id, memberName: s.member_name || "Unknown",
+                    memberId: s.member_id || "—", dob: s.dob || "—",
+                    discipline: s.discipline || "PT", reviewType: "initial",
+                    submittedAt: s.submitted_at, documents: s.document_list || [],
+                    metrics: { primaryDiagnosisCode: (s.diagnosis_codes||[])[0] || null, diagnosisCodes: s.diagnosis_codes||[], requestedVisits: s.requested_visits||0, therapyType: s.discipline||"PT", functionalLimitations:[], sopIndicators:[], documentationQuality:{} },
+                    planRuleSet: s.plan_id ? { planId: s.plan_id } : null,
+                  })} style={{ padding: "4px 9px", borderRadius: 5, background: "#0d1b2a", color: "#fff", fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                    Review
+                  </button>
+                )}
+                <button onClick={() => setAssignTarget(s)} style={{ padding: "4px 9px", borderRadius: 5, background: "#fff", color: "#374151", fontSize: 10, fontWeight: 600, border: "1px solid #e2e8f0", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                  Assign
+                </button>
+              </div>
             </div>
           );
         })}
@@ -5587,10 +5713,8 @@ function MasterAppealsView({ token }) {
 
   useEffect(() => {
     fetchAppeals();
-    axios.get(`${API_BASE}/v1/search-cases?reviewersOnly=1`, { headers: { Authorization: `Bearer ${token}` } })
-      .catch(() => {});
-    // Fetch reviewer list from users (we'll use a simple approach)
-    fetch(`${API_BASE}/v1/admin/plans`, { headers: { Authorization: `Bearer ${token}` } })
+    axios.get(`${API_BASE}/v1/reviewers`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setReviewers(r.data.reviewers || []))
       .catch(() => {});
   }, [token]); // eslint-disable-line
 
@@ -5678,11 +5802,16 @@ function MasterAppealsView({ token }) {
           <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: "#0d1b2a", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Assign Appeal Reviewer</div>
             <div style={{ fontSize: 12, color: "#64748b", marginBottom: 20 }}>{selected.member_name} · Level {selected.level}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Enter Reviewer User ID</div>
-            <input value={assignTo} onChange={e => setAssignTo(e.target.value)}
-              placeholder="reviewer user_id UUID"
-              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, marginBottom: 20, boxSizing: "border-box" }} />
-            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 16 }}>Tip: Find reviewer IDs in the All Cases tab.</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>Select Reviewer</div>
+            <select value={assignTo} onChange={e => setAssignTo(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, marginBottom: 20, boxSizing: "border-box", outline: "none", cursor: "pointer" }}>
+              <option value="">— Select a reviewer —</option>
+              {reviewers.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.full_name || r.email} · {r.discipline || "PT"} · {r.active_cases} active
+                </option>
+              ))}
+            </select>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setSelected(null); setAssignTo(""); }} style={{ padding: "9px 18px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
               <button onClick={handleAssign} disabled={!assignTo || assigning} style={{ padding: "9px 18px", borderRadius: 7, background: "#1a3a5c", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: !assignTo || assigning ? "not-allowed" : "pointer", opacity: !assignTo || assigning ? 0.6 : 1 }}>
@@ -6206,41 +6335,39 @@ function ReportsView({ token }) {
 
 function MasterShell({ user, token, onLogout }) {
   const [masterView, setMasterView] = useState("dashboard");
+  const [cockpitCase, setCockpitCase] = useState(null); // set from case rows to open cockpit
 
-  // Cockpit full-screen override
-  if (masterView === "cockpit") {
+  // Cockpit overlay — opened on-demand from a specific case, not a nav tab
+  if (masterView === "cockpit" && cockpitCase) {
     return (
       <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#1a3a5c", padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ background: "#0d1b2a", padding: "8px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "'Fraunces', Georgia, serif" }}>CogentCR</span>
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>|</span>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>Master — Cockpit</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.8)", fontFamily: "'Public Sans', sans-serif" }}>Case Review — {cockpitCase.memberName}</span>
           <div style={{ flex: 1 }} />
           <NotificationBell token={token} />
-          <button onClick={() => setMasterView("dashboard")} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>← Dashboard</button>
+          <button onClick={() => { setMasterView("queue"); setCockpitCase(null); }} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>← Back to All Cases</button>
         </div>
         <div style={{ flex: 1, overflow: "hidden" }}>
-          <Cockpit user={user} onBack={() => setMasterView("dashboard")} />
+          <Cockpit user={user} liveCase={cockpitCase} hideQueueNav={true} onCaseDone={() => { setMasterView("queue"); setCockpitCase(null); }} onBack={() => { setMasterView("queue"); setCockpitCase(null); }} />
         </div>
       </div>
     );
   }
 
   const TABS = [
-    ["dashboard",  "Dashboard"],
-    ["queue",      "All Cases"],
-    ["ur_form",    "UR Form"],
-    ["cockpit",    "Cockpit"],
-    ["appeals",    "Appeals"],
-    ["reports",    "Reports"],
-    ["admin",      "Admin"],
-    ["criteria",    "Criteria"],
-    ["providers",   "Providers"],
-    ["state_rules",    "State Rules"],
-    ["integrations",   "Integrations"],
-    ["bulk_import",    "Bulk Import"],
-    ["users",          "Users"],
-    ["audit",          "Audit"],
+    ["dashboard",    "Dashboard"],
+    ["queue",        "All Cases"],
+    ["appeals",      "Appeals"],
+    ["reports",      "Reports"],
+    ["users",        "Users"],
+    ["admin",        "Plans"],
+    ["providers",    "Providers"],
+    ["bulk_import",  "Bulk Import"],
+    ["integrations", "Integrations"],
+    ["audit",        "Audit"],
+    ["ur_form",      "UR Form"],
   ];
 
   return (
@@ -6257,30 +6384,26 @@ function MasterShell({ user, token, onLogout }) {
       </div>
 
       {/* Tab bar */}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0 }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", gap: 0, overflowX: "auto" }}>
         {TABS.map(([v, label]) => (
           <button key={v} onClick={() => setMasterView(v)} style={{
-            padding: "12px 20px", fontSize: 13, fontWeight: masterView === v ? 700 : 500,
+            padding: "12px 18px", fontSize: 13, fontWeight: masterView === v ? 700 : 500,
             color: masterView === v ? "#0d1b2a" : "#6b7280", background: "none", border: "none",
             borderBottom: masterView === v ? "2.5px solid #0d1b2a" : "2.5px solid transparent",
-            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
+            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s", whiteSpace: "nowrap",
           }}>{label}</button>
         ))}
       </div>
 
       {/* Content */}
-      {masterView === "dashboard" && <MasterDashboard token={token} />}
-      {masterView === "queue"     && <MasterQueueView token={token} />}
-      {masterView === "ur_form"   && (
-        <div style={{ background: "#f8fafc" }}>
-          <URFormEmbed user={user} token={token} />
-        </div>
-      )}
-      {masterView === "appeals"   && <MasterAppealsView token={token} />}
-      {masterView === "reports"   && <ReportsView token={token} />}
-      {masterView === "admin"     && <AdminConsole token={token} />}
-      {masterView === "criteria"   && <CriteriaLibraryView token={token} />}
-      {masterView === "providers"   && <ProviderDirectoryView token={token} />}
+      {masterView === "dashboard"    && <MasterDashboard token={token} onReviewCase={(c) => { setCockpitCase(c); setMasterView("cockpit"); }} onNavigate={setMasterView} />}
+      {masterView === "queue"        && <MasterQueueView token={token} onReviewCase={(c) => { setCockpitCase(c); setMasterView("cockpit"); }} />}
+      {masterView === "ur_form"      && <div style={{ background: "#f8fafc" }}><URFormEmbed user={user} token={token} /></div>}
+      {masterView === "appeals"      && <MasterAppealsView token={token} />}
+      {masterView === "reports"      && <ReportsView token={token} />}
+      {masterView === "admin"        && <AdminConsole token={token} />}
+      {masterView === "criteria"     && <CriteriaLibraryView token={token} />}
+      {masterView === "providers"    && <ProviderDirectoryView token={token} />}
       {masterView === "state_rules"  && <StateRulesView token={token} />}
       {masterView === "integrations" && <IntegrationsView token={token} />}
       {masterView === "bulk_import"  && <BulkImportView token={token} />}
