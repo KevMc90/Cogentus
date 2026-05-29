@@ -1125,6 +1125,29 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   );
 }
 
+// ── RATIONALE EDITOR ───────────────────────────────────────────────────────────
+function RationaleEditor({ value, onChange, color }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: color || "#374151", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: FONTS.body, opacity: 0.75 }}>
+        Determination Letter Rationale (editable)
+      </div>
+      <textarea
+        value={value}
+        onChange={e => onChange && onChange(e.target.value)}
+        rows={3}
+        style={{
+          width: "100%", borderRadius: 6, border: "1.5px solid #e2e8f0",
+          padding: "7px 10px", fontSize: 11, fontFamily: FONTS.body, lineHeight: 1.5,
+          resize: "vertical", outline: "none", background: "#fffef9", color: "#374151",
+          boxSizing: "border-box",
+        }}
+        placeholder="Edit the AI-drafted rationale before it appears in the determination letter..."
+      />
+    </div>
+  );
+}
+
 // ── ACTION BUTTON ──────────────────────────────────────────────────────────────
 function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
   const [hover, setHover] = useState(false);
@@ -1156,13 +1179,13 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
 
 // ── DETERMINATION ZONE ─────────────────────────────────────────────────────────
 function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, actionState,
-  partialVisits, pendNote, approveChecks, denyNote,
+  partialVisits, pendNote, approveChecks, denyNote, rationaleEdit,
   onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm,
   onPendNoteChange, onPendSubmit,
   onApproveChecksChange, onApproveSubmit,
   onDenyNoteChange, onDenySignoffSubmit,
   onCancelAction, onNavigate, hideQueueNav,
-  onHoldCase, onReleaseCase }) {
+  onHoldCase, onReleaseCase, onRationaleChange }) {
 
   const decided    = decisions[kase.caseId];
   const rec        = kase.contract?.recommendation;
@@ -1286,6 +1309,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 boxSizing: "border-box",
               }}
             />
+            <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={onPendSubmit} style={{
                 flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
@@ -1329,7 +1353,8 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 </label>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} color="#166534" />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={onApproveSubmit} style={{
                 flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #22c55e",
                 background: "#22c55e", color: "#fff", fontSize: 12, fontWeight: 700,
@@ -1368,6 +1393,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 boxSizing: "border-box",
               }}
             />
+            <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} color="#991b1b" />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={onDenySignoffSubmit} style={{
                 flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #ef4444",
@@ -1417,6 +1443,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
               }}>Esc</button>
             </div>
+            <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} color="#92400e" />
           </div>
         )}
 
@@ -1513,54 +1540,103 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
 
 // ── DOCUMENTS PANEL ────────────────────────────────────────────────────────────
 function DocumentsPanel({ kase, onClose }) {
+  const [docs, setDocs]     = useState(kase.documents || []);
+  const [loading, setLoad]  = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  useEffect(() => {
+    // Fetch signed URLs from the backend if the case has a real caseId
+    if (!kase.caseId || kase.caseId.startsWith("SYNTH")) { setFetched(true); return; }
+    const token = localStorage.getItem("cogentus_token") || "";
+    if (!token) { setFetched(true); return; }
+    setLoad(true);
+    fetch(`${API_BASE}/v1/submissions/${kase.caseId}/documents`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.documents) setDocs(data.documents);
+        setFetched(true);
+      })
+      .catch(() => setFetched(true))
+      .finally(() => setLoad(false));
+  }, [kase.caseId]); // eslint-disable-line
+
   return (
     <div style={{
-      position: "fixed", top: 0, right: 0, bottom: 0, width: 360,
+      position: "fixed", top: 0, right: 0, bottom: 0, width: 380,
       background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
       display: "flex", flexDirection: "column", zIndex: 100,
       animation: "rn-slidein 0.18s ease-out",
     }}>
       <div style={{ padding: "14px 20px", background: NAVY, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>Documents</span>
-        <button onClick={onClose} style={{
-          background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)",
-          borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
-        }}>Esc / V</button>
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONTS.heading }}>Clinical Documents</span>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginLeft: 8, fontFamily: FONTS.body }}>{docs.length} file{docs.length !== 1 ? "s" : ""}</span>
+        </div>
+        <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 5, padding: "3px 10px", color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body }}>
+          Esc / V
+        </button>
       </div>
+
+      {loading && (
+        <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: 12, fontFamily: FONTS.body }}>
+          Loading secure document links…
+        </div>
+      )}
+
       <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-        {kase.documents && kase.documents.length > 0 ? kase.documents.map((doc, i) => {
-          const name = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
-          const type = typeof doc === "object" ? doc.type : null;
-          const date = typeof doc === "object" ? doc.date : null;
-          const url  = typeof doc === "object" ? (doc.url || doc.file_url) : null;
+        {!loading && fetched && docs.length === 0 && (
+          <div style={{ padding: "32px 0", textAlign: "center" }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>📄</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", fontFamily: FONTS.body }}>No documents attached</div>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, fontFamily: FONTS.body }}>The provider did not upload clinical documents with this submission.</div>
+          </div>
+        )}
+        {docs.map((doc, i) => {
+          const name      = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
+          const type      = typeof doc === "object" ? doc.type  : null;
+          const date      = typeof doc === "object" ? doc.date  : null;
+          const signedUrl = typeof doc === "object" ? (doc.signedUrl || doc.url || doc.file_url) : null;
+          const hasKey    = typeof doc === "object" && !!doc.key;
+          const sizeMB    = typeof doc === "object" && doc.size ? (doc.size / 1024 / 1024).toFixed(2) : null;
           return (
-            <div key={i} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", marginBottom: 10 }}>
+            <div key={i} style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${signedUrl ? "#bfdbfe" : "#e2e8f0"}`, background: signedUrl ? "#f0f9ff" : "#f8fafc", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 2 }}>{name}</div>
-                  {(type || date) && <div style={{ fontSize: 11, color: "#6b7280", fontFamily: FONTS.body }}>{type}{date ? ` · ${date}` : ""}</div>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: NAVY, fontFamily: FONTS.body, marginBottom: 3, wordBreak: "break-word" }}>
+                    📄 {name}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {type && <span style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body }}>{type}</span>}
+                    {date && <span style={{ fontSize: 10, color: "#64748b", fontFamily: FONTS.body }}>{date}</span>}
+                    {sizeMB && <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body }}>{sizeMB} MB</span>}
+                    {hasKey && <span style={{ fontSize: 10, fontWeight: 700, color: "#15803d", fontFamily: FONTS.body }}>✓ Stored</span>}
+                  </div>
                 </div>
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" style={{
-                    padding: "5px 12px", borderRadius: 6, background: NAVY, color: "#fff",
-                    fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: FONTS.body, flexShrink: 0,
-                  }}>Open PDF</a>
+                {signedUrl ? (
+                  <a
+                    href={signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 7, background: NAVY, color: "#fff", fontSize: 12, fontWeight: 700, textDecoration: "none", fontFamily: FONTS.body, display: "inline-flex", alignItems: "center", gap: 5 }}
+                  >
+                    Open PDF ↗
+                  </a>
                 ) : (
-                  <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body, padding: "5px 0", flexShrink: 0 }}>No URL</span>
+                  <div style={{ flexShrink: 0, textAlign: "right" }}>
+                    <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body }}>Not stored</div>
+                  </div>
                 )}
               </div>
-              {!url && (
-                <div style={{ marginTop: 8, padding: "7px 10px", background: "#f0f4f8", borderRadius: 6, fontSize: 11, color: "#64748b", fontFamily: FONTS.body, border: "1px dashed #cbd5e1" }}>
-                  Document listed but not stored — provider must re-upload for AI extraction.
+              {!hasKey && (
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#fef3c7", borderRadius: 6, fontSize: 11, color: "#92400e", fontFamily: FONTS.body }}>
+                  Provider listed this document but did not upload the file. Ask provider to re-submit with PDFs attached.
                 </div>
               )}
             </div>
           );
-        }) : (
-          <div style={{ padding: "24px 0", textAlign: "center", color: "#9ca3af", fontSize: 13, fontFamily: FONTS.body, fontStyle: "italic" }}>
-            No documents attached to this case
-          </div>
-        )}
+        })}
       </div>
     </div>
   );
@@ -1775,6 +1851,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   const [pendNote, setPendNote]           = useState("");
   const [approveChecks, setApproveChecks] = useState([]);
   const [denyNote, setDenyNote]           = useState("");
+  const [rationaleEdit, setRationaleEdit] = useState("");
   const [showDocs, setShowDocs]           = useState(false);
   const [liveContract, setLiveContract]   = useState(null);
   const [engineState, setEngineState]     = useState("idle");
@@ -1909,8 +1986,9 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           isOverride,
           discipline:    kase.discipline  || null,
           reviewType:    kase.reviewType  || null,
-          isSynthetic:   !kase.isLive,
-          reviewerNotes: extras.denyNote || "",
+          isSynthetic:    !kase.isLive,
+          reviewerNotes:  extras.denyNote || extras.pendNote || "",
+          reviewerRationale: extras.reviewerRationale || "",
         }),
       })
         .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -1922,6 +2000,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   const handleAction = useCallback((type) => {
     if (decisions[kase.caseId] || !kase.contract) return;
     const rec = kase.contract.recommendation;
+    // Pre-fill rationale from engine for reviewer to edit
+    setRationaleEdit(rec.rationale || "");
     if (type === "approve") {
       setApproveChecks([]);
       setActionState("approve_checklist");
@@ -1947,21 +2027,21 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   }, [partialVisits, kase, recordDecision]);
 
   const handlePendSubmit = useCallback(() => {
-    recordDecision("Pend", 0, { pendNote });
-  }, [pendNote, recordDecision]);
+    recordDecision("Pend", 0, { pendNote, reviewerRationale: rationaleEdit });
+  }, [pendNote, rationaleEdit, recordDecision]);
 
   const handleApproveSubmit = useCallback(() => {
     const rec = kase.contract?.recommendation;
     recordDecision(
       rec?.determination?.startsWith("Approved") ? rec.determination : "Approved",
       rec?.approvedVisits ?? 0,
-      { approveChecks: [...approveChecks] }
+      { approveChecks: [...approveChecks], reviewerRationale: rationaleEdit }
     );
-  }, [approveChecks, kase, recordDecision]);
+  }, [approveChecks, rationaleEdit, kase, recordDecision]);
 
   const handleDenySignoffSubmit = useCallback(() => {
-    recordDecision("Full Denial", 0, { denyNote });
-  }, [denyNote, recordDecision]);
+    recordDecision("Full Denial", 0, { denyNote, reviewerRationale: rationaleEdit });
+  }, [denyNote, rationaleEdit, recordDecision]);
 
   const handleNavigate = useCallback((i) => {
     setCursor(i);
@@ -2165,11 +2245,13 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
             onApproveSubmit={handleApproveSubmit}
             onDenyNoteChange={setDenyNote}
             onDenySignoffSubmit={handleDenySignoffSubmit}
-            onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); }}
+            onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); setRationaleEdit(""); }}
             onNavigate={handleNavigate}
             hideQueueNav={!!hideQueueNav}
             onHoldCase={kase.isLive ? onHoldCase : null}
             onReleaseCase={kase.isLive ? onReleaseCase : null}
+            rationaleEdit={rationaleEdit}
+            onRationaleChange={setRationaleEdit}
           />
         </div>
       </div>

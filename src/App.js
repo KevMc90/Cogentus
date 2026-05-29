@@ -2600,13 +2600,24 @@ function ReviewerShell({ user, token, onLogout }) {
   const [exitReason, setExitReason]         = useState("");
   const [exitLoading, setExitLoading]       = useState(false);
   const [exitError, setExitError]           = useState("");
+  const [isAvailable, setIsAvailable]       = useState(true);
   const DISC_COLOR = user.discipline === "OT" ? "#c2410c" : user.discipline === "ST" ? "#15803d" : "#1a3a5c";
 
   useEffect(() => {
-    axios.get(`${API_BASE}/v1/queue-stats`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => setQueueStats(r.data))
+    const h = { Authorization: `Bearer ${token}` };
+    axios.get(`${API_BASE}/v1/queue-stats`, { headers: h }).then(r => setQueueStats(r.data)).catch(() => {});
+    axios.get(`${API_BASE}/v1/my-availability`, { headers: h })
+      .then(r => setIsAvailable(r.data.availability?.is_available !== false))
       .catch(() => {});
-  }, [token, revView]);
+  }, [token, revView]); // eslint-disable-line
+
+  const toggleAvailability = async () => {
+    const next = !isAvailable;
+    setIsAvailable(next);
+    try {
+      await axios.patch(`${API_BASE}/v1/my-availability`, { isAvailable: next }, { headers: { Authorization: `Bearer ${token}` } });
+    } catch { setIsAvailable(!next); } // revert on error
+  };
 
   const handleGetCase = async () => {
     setGetCaseLoading(true);
@@ -2801,6 +2812,23 @@ function ReviewerShell({ user, token, onLogout }) {
       )}
       <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 12, background: DISC_COLOR, color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }}>{discLabel}</span>
       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
+      {/* Availability toggle */}
+      <button
+        onClick={toggleAvailability}
+        title={isAvailable ? "Click to mark yourself unavailable" : "Click to mark yourself available"}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "4px 12px", borderRadius: 20,
+          background: isAvailable ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
+          border: `1px solid ${isAvailable ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)"}`,
+          cursor: "pointer", transition: "all 0.15s",
+        }}
+      >
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: isAvailable ? "#22c55e" : "#ef4444", display: "inline-block", flexShrink: 0 }} />
+        <span style={{ fontSize: 11, fontWeight: 700, color: isAvailable ? "#86efac" : "#fca5a5", fontFamily: "'Public Sans', sans-serif" }}>
+          {isAvailable ? "Available" : "Unavailable"}
+        </span>
+      </button>
       <NotificationBell token={token} />
       <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
     </div>
@@ -4775,6 +4803,19 @@ function MyCasesView({ token }) {
                 <div style={{ marginTop: 10 }}>
                   <StatusProgressBar status={sub.status} />
                 </div>
+                {/* Auth expiry countdown */}
+                {sub.auth_expires_at && sub.status === "approved" && (() => {
+                  const daysLeft = Math.ceil((new Date(sub.auth_expires_at) - Date.now()) / 86400000);
+                  if (daysLeft > 60) return null;
+                  const urgent = daysLeft <= 14;
+                  return (
+                    <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: urgent ? "#fef2f2" : "#fef3c7", border: `1px solid ${urgent ? "#fca5a5" : "#fde68a"}` }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: urgent ? "#dc2626" : "#92400e", fontFamily: "'Public Sans', sans-serif" }}>
+                        {daysLeft > 0 ? `Auth expires in ${daysLeft}d` : "Auth EXPIRED"}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                 {EDITABLE_STATUSES.has(sub.status) && (
