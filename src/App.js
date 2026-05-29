@@ -2739,7 +2739,7 @@ function ReviewerShell({ user, token, onLogout }) {
           memberState:    sub.member_state || null,
           dob:            sub.dob         || "—",
           discipline:     sub.discipline  || user.discipline || "PT",
-          reviewType:     "initial",
+          reviewType:     sub.review_type || "initial",
           submittedAt:    sub.submitted_at,
           receivedAt:     sub.received_at || sub.submitted_at,
           reviewPriority: sub.review_priority || "standard",
