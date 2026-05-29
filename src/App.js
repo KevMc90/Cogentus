@@ -1647,8 +1647,9 @@ function ProviderDirectoryView({ token }) {
 // EPISODE CONTEXT BAR (Phase 21)
 // ─────────────────────────────────────────────────────────────────────────────
 function EpisodeContextBar({ memberId, discipline, token }) {
-  const [ctx, setCtx] = React.useState(null);
+  const [ctx, setCtx]         = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [expanded, setExpanded] = React.useState(false);
 
   React.useEffect(() => {
     if (!memberId || !discipline || memberId === "—") { setLoading(false); return; }
@@ -1658,39 +1659,143 @@ function EpisodeContextBar({ memberId, discipline, token }) {
     })
       .then(r => { setCtx(r.data); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [memberId, discipline, token]);
+  }, [memberId, discipline, token]); // eslint-disable-line
 
   if (loading || !ctx || !ctx.episode) return null;
 
-  const ep = ctx.episode;
-  const subs = ctx.submissions || [];
+  const ep       = ctx.episode;
+  const subs     = ctx.submissions || [];
   const cumVisits = ctx.cumulativeVisits || 0;
-  const isConcurrent = subs.length > 1;
+  const isSubseq  = subs.length > 1;
+  const isConcurrent = subs.length > 1 && subs.some(s => s.status === "under_review" || s.status === "submitted");
+
+  const detBg = (d) => {
+    if (!d) return { bg: "#f3f4f6", text: "#6b7280" };
+    const l = d.toLowerCase();
+    if (l.startsWith("approved"))    return { bg: "#dcfce7", text: "#15803d" };
+    if (l.includes("partial"))       return { bg: "#fef3c7", text: "#92400e" };
+    if (l.includes("denial") || l.includes("denied")) return { bg: "#fee2e2", text: "#991b1b" };
+    if (l.startsWith("pend"))        return { bg: "#eff6ff", text: "#1d4ed8" };
+    return { bg: "#f3f4f6", text: "#6b7280" };
+  };
+
+  // Prior auths = all submissions except the current one (last in list)
+  const priorSubs = isSubseq ? subs.slice(0, -1) : [];
+
+  const bannerBg    = isConcurrent ? "#fef3c7" : isSubseq ? "#fdf4ff" : "#f0f9ff";
+  const bannerBdr   = isConcurrent ? "#fde68a" : isSubseq ? "#e9d5ff" : "#bae6fd";
+  const bannerLabel = isConcurrent ? "CONCURRENT REVIEW" : isSubseq ? "SUBSEQUENT REVIEW" : null;
+  const labelColor  = isConcurrent ? { bg: "#fef3c7", text: "#92400e" } : { bg: "#f5f3ff", text: "#7c3aed" };
 
   return (
-    <div style={{
-      background: isConcurrent ? "#fffbeb" : "#f0f9ff",
-      borderBottom: `1px solid ${isConcurrent ? "#fde68a" : "#bae6fd"}`,
-      padding: "8px 20px",
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      flexWrap: "wrap",
-      fontFamily: "'Public Sans', sans-serif",
-      fontSize: 12,
-    }}>
-      {isConcurrent && (
-        <span style={{ fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 8px", fontSize: 11 }}>
-          CONCURRENT REVIEW
+    <div style={{ background: bannerBg, borderBottom: `1px solid ${bannerBdr}`, fontFamily: "'Public Sans', sans-serif", flexShrink: 0 }}>
+      {/* Summary row */}
+      <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {bannerLabel && (
+          <span style={{ fontSize: 10, fontWeight: 800, background: labelColor.bg, color: labelColor.text, borderRadius: 4, padding: "2px 8px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            {bannerLabel}
+          </span>
+        )}
+        <span style={{ fontSize: 12, color: "#374151" }}>
+          <strong>Episode #{ep.episode_number}</strong> · {discipline} · Started {ep.started_at ? new Date(ep.started_at).toLocaleDateString() : "—"}
         </span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>·</span>
+        <span style={{ fontSize: 12, color: "#374151" }}>{subs.length} auth request{subs.length !== 1 ? "s" : ""} this episode</span>
+        <span style={{ fontSize: 12, color: "#6b7280" }}>·</span>
+        <span style={{ fontSize: 12 }}>
+          <strong style={{ color: cumVisits > 0 ? "#1a3a5c" : "#9ca3af" }}>{cumVisits}</strong>
+          <span style={{ color: "#6b7280" }}> visits authorized to date</span>
+        </span>
+        {isSubseq && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: labelColor.text, background: "none", border: `1px solid ${bannerBdr}`, borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >
+            {expanded ? "Hide History ▲" : `View Prior Auth History (${priorSubs.length}) ▼`}
+          </button>
+        )}
+      </div>
+
+      {/* Expanded prior auth history */}
+      {isSubseq && expanded && (
+        <div style={{ borderTop: `1px solid ${bannerBdr}`, padding: "12px 20px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, fontFamily: "'Public Sans', sans-serif" }}>
+            Prior Authorization History
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {priorSubs.map((s, i) => {
+              const dc  = detBg(s.determination);
+              const diags = Array.isArray(s.diagnosis_codes) ? s.diagnosis_codes : [];
+              const approvedV = s.ae_approved_visits != null ? parseInt(s.ae_approved_visits, 10) : null;
+              const requestedV = s.requested_visits || 0;
+              const isPartial = approvedV != null && approvedV < requestedV;
+              return (
+                <div key={s.submission_id} style={{ background: "#fff", border: `1px solid ${bannerBdr}`, borderRadius: 8, padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                    {/* Auth # + date */}
+                    <div style={{ minWidth: 80 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>Auth #{i + 1}</div>
+                      <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}</div>
+                    </div>
+                    {/* Determination */}
+                    <div style={{ minWidth: 140 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Determination</div>
+                      {s.determination ? (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, background: dc.bg, color: dc.text }}>
+                          {s.determination}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "#9ca3af", fontStyle: "italic" }}>{s.status?.replace(/_/g, " ") || "Pending"}</span>
+                      )}
+                    </div>
+                    {/* Visits */}
+                    <div style={{ minWidth: 120 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Visits</div>
+                      <div style={{ fontSize: 12, color: "#374151" }}>
+                        <span style={{ fontWeight: 700, color: approvedV != null ? (isPartial ? "#92400e" : "#15803d") : "#9ca3af" }}>
+                          {approvedV != null ? approvedV : "—"}
+                        </span>
+                        <span style={{ color: "#9ca3af" }}> of {requestedV} requested</span>
+                      </div>
+                      {isPartial && <div style={{ fontSize: 10, color: "#92400e", marginTop: 1 }}>{requestedV - approvedV} visits not authorized</div>}
+                    </div>
+                    {/* Decided date */}
+                    {s.decided_at && (
+                      <div style={{ minWidth: 90 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Decided</div>
+                        <div style={{ fontSize: 11, color: "#374151" }}>{new Date(s.decided_at).toLocaleDateString()}</div>
+                      </div>
+                    )}
+                    {/* Diagnoses */}
+                    {diags.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Dx</div>
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {diags.slice(0, 3).map(d => (
+                            <span key={d} style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: "#eff6ff", color: "#1a3a5c", fontFamily: "monospace" }}>{d}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Rationale */}
+                  {(s.reviewer_rationale || s.reviewer_notes) && (
+                    <div style={{ marginTop: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 6, border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Prior Determination Rationale</div>
+                      <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
+                        {s.reviewer_rationale || s.reviewer_notes}
+                      </div>
+                      {s.reviewer_email && (
+                        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 6 }}>Reviewer: {s.reviewer_email}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
-      <span style={{ color: "#374151" }}>
-        <strong>Episode #{ep.episode_number}</strong> · {discipline} · Started {ep.started_at ? new Date(ep.started_at).toLocaleDateString() : "—"}
-      </span>
-      <span style={{ color: "#6b7280" }}>|</span>
-      <span style={{ color: "#374151" }}>{subs.length} auth request{subs.length !== 1 ? "s" : ""} this episode</span>
-      <span style={{ color: "#6b7280" }}>|</span>
-      <span style={{ color: "#374151" }}><strong>{cumVisits}</strong> visits authorized to date</span>
     </div>
   );
 }
@@ -3460,6 +3565,7 @@ function NewSubmissionForm({ token, onSubmitted, clinicProfile }) {
   const [documentNames,   setDocumentNames]   = useState([""]);
   const [providerNotes,   setProviderNotes]   = useState("");
   const [urgency,         setUrgency]         = useState("standard");
+  const [reviewType,      setReviewType]      = useState("initial");
   const [uploadedFiles,   setUploadedFiles]   = useState([]);
   const [dragOver,        setDragOver]        = useState(false);
   const [loading,         setLoading]         = useState(false);
@@ -3526,6 +3632,7 @@ function NewSubmissionForm({ token, onSubmitted, clinicProfile }) {
         fd.append("documentList", JSON.stringify(docList));
         fd.append("providerNotes", providerNotes);
         fd.append("urgency", urgency);
+        fd.append("reviewType", reviewType);
         uploadedFiles.forEach(f => fd.append("documents", f));
         res = await axios.post(`${API_BASE}/v1/submit-with-docs`, fd, {
           headers: { Authorization: `Bearer ${token}` },
@@ -3536,7 +3643,7 @@ function NewSubmissionForm({ token, onSubmitted, clinicProfile }) {
           providerName, providerNpi, memberName, memberId, dob, memberState,
           discipline, diagnosisCodes,
           requestedVisits: parseInt(requestedVisits) || 0,
-          planId: planId || null, documentList: docList, providerNotes, urgency,
+          planId: planId || null, documentList: docList, providerNotes, urgency, reviewType,
         }, { headers: { Authorization: `Bearer ${token}` } });
       }
       onSubmitted(res.data);
@@ -3621,6 +3728,35 @@ function NewSubmissionForm({ token, onSubmitted, clinicProfile }) {
             <input value={providerNpi} onChange={e => setProviderNpi(e.target.value)} placeholder="1234567890" style={inputS} />
             <NpiLookupWidget npi={providerNpi} token={token} onVerified={name => { if (!providerName) setProviderName(name); }} />
           </div>
+        </div>
+
+        {/* Review type selector — shown before member info for prominence */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 10, fontFamily: "'Fraunces', Georgia, serif", borderBottom: "1px solid #f1f5f9", paddingBottom: 8 }}>
+            Authorization Type
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            {[
+              { v: "initial",    label: "Initial Auth",     sub: "First request for this patient/episode",            border: "#bfdbfe", bg: "#eff6ff",  color: "#1d4ed8" },
+              { v: "subsequent", label: "Subsequent Auth",  sub: "Continuing care — prior auth exists for this member", border: "#c4b5fd", bg: "#f5f3ff",  color: "#7c3aed" },
+              { v: "concurrent", label: "Concurrent Review",sub: "Two or more active auths running simultaneously",    border: "#fde68a", bg: "#fffbeb",  color: "#92400e" },
+            ].map(opt => (
+              <button key={opt.v} onClick={() => setReviewType(opt.v)} style={{
+                flex: 1, padding: "11px 10px", borderRadius: 8, textAlign: "left",
+                border: `2px solid ${reviewType === opt.v ? opt.color : "#e2e8f0"}`,
+                background: reviewType === opt.v ? opt.bg : "#fff",
+                cursor: "pointer", transition: "all 0.1s",
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: reviewType === opt.v ? opt.color : "#374151", fontFamily: "'Public Sans', sans-serif" }}>{opt.label}</div>
+                <div style={{ fontSize: 10, color: reviewType === opt.v ? opt.color : "#9ca3af", marginTop: 3, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.3, opacity: reviewType === opt.v ? 0.8 : 1 }}>{opt.sub}</div>
+              </button>
+            ))}
+          </div>
+          {reviewType === "subsequent" && (
+            <div style={{ marginTop: 8, padding: "8px 12px", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: 7, fontSize: 11, color: "#6d28d9", fontFamily: "'Public Sans', sans-serif" }}>
+              Please attach updated progress notes, daily notes, or clinical documentation reflecting the member's current status.
+            </div>
+          )}
         </div>
 
         {/* Member info */}
