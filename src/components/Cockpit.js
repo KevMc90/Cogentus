@@ -1161,7 +1161,8 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
         width: "100%", padding: "11px 14px",
         border: `1.5px solid ${disabled ? "#e2e8f0" : border}`,
         borderRadius: 8, cursor: disabled ? "not-allowed" : "pointer",
-        background: disabled ? "#f8fafc" : hover ? bg + "dd" : bg,
+        background: disabled ? "#f8fafc" : hover ? bg : bg,
+        filter: !disabled && hover ? "brightness(0.93)" : "none",
         transition: "all 0.12s", opacity: disabled ? 0.45 : 1,
       }}
     >
@@ -2210,9 +2211,9 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
         </div>
       </div>
 
-      {/* ── Three-zone body ── */}
+      {/* ── Three-zone body — Evidence 30 / Recommendation 36 / Determination 34 ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", gap: 1 }}>
-        <div style={{ flex: "0 0 34%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <EvidenceZone
             kase={kase}
             onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}

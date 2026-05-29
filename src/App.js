@@ -583,7 +583,7 @@ function AuthPage({ onAuthSuccess }) {
         alignItems: "center",
         justifyContent: "center",
         padding: "24px 16px",
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: "'Public Sans', 'DM Sans', system-ui, sans-serif",
       }}
     >
       <div style={{ width: "100%", maxWidth: 400, animation: "rn-fadein 0.4s ease-out" }}>
@@ -1039,7 +1039,7 @@ function Dashboard({ user, token, onAuthError, onBack }) {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)",
         padding: "32px 16px 60px",
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: "'Public Sans', 'DM Sans', system-ui, sans-serif",
       }}
     >
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
@@ -2753,23 +2753,30 @@ function ReviewerShell({ user, token, onLogout }) {
     ["my_stats", "My Stats"],
     ["p2p", "P2P"],
     ["appeals", "Appeals"],
-    ["criteria", "Criteria"],
-    ["state_rules", "State Rules"],
   ];
 
   const NavBar = () => (
     <div style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 28px", display: "flex", alignItems: "center", gap: 0, flexShrink: 0, position: "relative" }}>
-      {PRIMARY_TABS.map(([v, label]) => (
-        <button key={v} onClick={() => setRevView(v)} style={{
-          padding: "12px 18px", fontSize: 13,
-          fontWeight: revView === v ? 700 : 500,
-          color: v === "cockpit" ? (revView === v ? "#1a3a5c" : "#c2410c") : (revView === v ? "#1a3a5c" : "#6b7280"),
-          background: "none", border: "none",
-          borderBottom: revView === v ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
-          cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.12s",
-          whiteSpace: "nowrap",
-        }}>{label}</button>
-      ))}
+      {PRIMARY_TABS.map(([v, label]) => {
+        const active = revView === v;
+        const isCockpit = v === "cockpit";
+        return (
+          <button key={v} onClick={() => setRevView(v)} style={{
+            padding: "12px 18px", fontSize: 13,
+            fontWeight: active ? 700 : 500,
+            color: isCockpit ? (active ? "#1a3a5c" : "#c2410c") : (active ? "#1a3a5c" : "#6b7280"),
+            background: active ? "transparent" : "transparent",
+            border: "none",
+            borderBottom: active ? "2.5px solid #1a3a5c" : "2.5px solid transparent",
+            cursor: "pointer", fontFamily: "'Public Sans', sans-serif", transition: "all 0.1s",
+            whiteSpace: "nowrap",
+            borderRadius: "4px 4px 0 0",
+          }}
+          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f8fafc"; }}
+          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+          >{label}</button>
+        );
+      })}
       <div style={{ flex: 1 }} />
       {/* Tools dropdown */}
       <div style={{ position: "relative" }}>
@@ -2830,7 +2837,10 @@ function ReviewerShell({ user, token, onLogout }) {
         </span>
       </button>
       <NotificationBell token={token} />
-      <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+      <button onClick={onLogout}
+  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+  style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", transition: "background 0.1s" }}>Logout</button>
     </div>
   );
 
@@ -5119,7 +5129,10 @@ function ProviderPortal({ user, token, onLogout }) {
       <span style={{ flex: 1 }} />
       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
       <NotificationBell token={token} />
-      <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+      <button onClick={onLogout}
+  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+  style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", transition: "background 0.1s" }}>Logout</button>
     </div>
   );
 
@@ -6421,7 +6434,10 @@ function MasterShell({ user, token, onLogout }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
         <NotificationBell token={token} />
-        <button onClick={onLogout} style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>Logout</button>
+        <button onClick={onLogout}
+  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
+  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+  style={{ fontSize: 11, background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", transition: "background 0.1s" }}>Logout</button>
       </div>
 
       {/* Tab bar */}
@@ -7111,7 +7127,7 @@ function App() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f0f4f8 100%)",
         padding: "0 0 60px",
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: "'Public Sans', 'DM Sans', system-ui, sans-serif",
       }}
     >
       {/* -- Sticky page header -- */}
