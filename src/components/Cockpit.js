@@ -606,7 +606,7 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <ZoneHeader title="Clinical Evidence" />
         <LoadingPulse label="Awaiting engine response..." />
       </div>
@@ -639,7 +639,7 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ZoneHeader title="Clinical Evidence" />
       <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
 
@@ -1073,7 +1073,7 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 function RecommendationZone({ kase, engineState, selectedPlan }) {
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <ZoneHeader title="Recommendation" />
         <LoadingPulse label="Calling live engine..." />
       </div>
@@ -1087,7 +1087,7 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   const cs   = confidenceStyle(rec.confidence);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ZoneHeader title="Recommendation" />
       <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
 
@@ -1286,7 +1286,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   const decColor = decided ? detColors(decided.determination) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ZoneHeader title="Determination" />
       <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
 
@@ -2352,17 +2352,22 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
 
       {/* ── Three-zone body — Evidence 30 / Recommendation 36 / Determination 34 ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden", gap: 1 }}>
-        <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", position: "relative" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <EvidenceZone
             kase={kase}
             onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
             showDocs={showDocs}
           />
+          </div>
         </div>
-        <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", position: "relative" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <RecommendationZone kase={kase} engineState={engineState} selectedPlan={selectedPlan} />
+          </div>
         </div>
-        <div style={{ flex: 1, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, background: "#fff", position: "relative" }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <DeterminationZone
             kase={kase}
             queue={queue}
@@ -2395,6 +2400,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
             rationaleEdit={rationaleEdit}
             onRationaleChange={setRationaleEdit}
           />
+          </div>
         </div>
       </div>
 
