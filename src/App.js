@@ -3152,11 +3152,11 @@ function CaseSearchView({ token, onOpenCase }) {
   const [error, setError]       = useState("");
 
   const statusColor = (s) => {
-    if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
-    if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
-    if (s === "pended")         return { bg: "#eff6ff", text: "#1d4ed8" };
-    if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
-    if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
+    if (s === "approved")        return { bg: "#dcfce7", text: "#15803d" };
+    if (s === "denied" || s === "partial_denial") return { bg: "#fee2e2", text: "#991b1b" };
+    if (s === "info_requested")  return { bg: "#fef3c7", text: "#92400e" };
+    if (s === "under_review" || s === "pending_md_review") return { bg: "#fef3c7", text: "#92400e" };
+    if (s === "pending_review" || s === "submitted") return { bg: "#eff6ff", text: "#1d4ed8" };
     return { bg: "#f3f4f6", text: "#374151" };
   };
 
@@ -3426,32 +3426,38 @@ function ReviewerDashboard({ token, user }) {
 // PROVIDER PORTAL (Phase 10)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STATUS_STEPS = ["submitted", "pending_review", "under_review", "decision"];
+// 5-step progress: Submitted → In Queue → Under Review → Info Requested → Decision
 function statusStep(s) {
-  if (s === "approved" || s === "denied" || s === "pended") return 3;
+  if (s === "approved" || s === "denied" || s === "partial_denial" || s === "pending_md_review") return 4;
+  if (s === "info_requested") return 3;
   if (s === "under_review")   return 2;
   if (s === "pending_review") return 1;
   return 0;
 }
 function StatusProgressBar({ status }) {
   const step = statusStep(status);
-  const isDecision = step === 3;
-  const decisionColor = status === "approved" ? "#15803d" : status === "denied" ? "#991b1b" : "#1d4ed8";
-  const LABELS = ["Submitted", "In Queue", "Under Review", status === "approved" ? "Approved" : status === "denied" ? "Denied" : status === "pended" ? "Pended" : "Decision"];
+  const isInfoReq  = status === "info_requested";
+  const isDecision = step === 4;
+  const decisionColor = status === "approved" ? "#15803d" : status === "denied" || status === "partial_denial" ? "#991b1b" : "#1a3a5c";
+  const LABELS = ["Submitted", "In Queue", "Under Review", "Info Requested",
+    status === "approved" ? "Approved" : (status === "denied" || status === "partial_denial") ? "Denied" : "Decision"];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%", marginTop: 8 }}>
       {LABELS.map((label, i) => {
         const done    = i < step;
         const current = i === step;
-        const dotColor = current && isDecision ? decisionColor : (done || current) ? "#1a3a5c" : "#d1d5db";
+        const isAmber = current && isInfoReq;
+        const dotColor = isAmber ? "#b45309"
+          : current && isDecision ? decisionColor
+          : (done || current) ? "#1a3a5c" : "#d1d5db";
         return (
           <React.Fragment key={i}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 48 }}>
               <div style={{
                 width: 12, height: 12, borderRadius: "50%",
                 background: dotColor,
-                border: current && !isDecision ? "2px solid #1a3a5c" : "none",
-                boxShadow: current ? "0 0 0 3px rgba(26,58,92,0.15)" : "none",
+                border: isAmber ? "2px solid #b45309" : current && !isDecision ? "2px solid #1a3a5c" : "none",
+                boxShadow: current ? `0 0 0 3px ${isAmber ? "rgba(180,83,9,0.15)" : "rgba(26,58,92,0.15)"}` : "none",
                 transition: "all 0.2s",
               }} />
               <span style={{ fontSize: 9, color: current ? dotColor : done ? "#1a3a5c" : "#9ca3af", fontWeight: current ? 700 : 500, marginTop: 3, fontFamily: "'DM Sans', sans-serif", textAlign: "center", lineHeight: 1.2 }}>{label}</span>
@@ -3467,14 +3473,14 @@ function StatusProgressBar({ status }) {
 }
 
 function DecisionLetter({ submission, decision }) {
-  const isApproved = submission.status === "approved";
-  const isDenied   = submission.status === "denied";
-  const isPended   = submission.status === "pended";
-  if (!isApproved && !isDenied && !isPended) return null;
+  const isApproved   = submission.status === "approved";
+  const isDenied     = ["denied", "partial_denial"].includes(submission.status);
+  const isInfoReq    = submission.status === "info_requested";
+  if (!isApproved && !isDenied && !isInfoReq) return null;
 
-  const decColor = isApproved ? "#15803d" : isDenied ? "#991b1b" : "#1d4ed8";
-  const decBg    = isApproved ? "#f0fdf4" : isDenied ? "#fef2f2" : "#eff6ff";
-  const decLabel = isApproved ? "APPROVED" : isDenied ? "DENIED" : "PENDED FOR ADDITIONAL INFORMATION";
+  const decColor = isApproved ? "#15803d" : isDenied ? "#991b1b" : "#b45309";
+  const decBg    = isApproved ? "#f0fdf4" : isDenied ? "#fef2f2" : "#fffbeb";
+  const decLabel = isApproved ? "APPROVED" : isDenied ? "DENIED" : "ADDITIONAL INFORMATION REQUESTED";
 
   const approvedVisits = decision?.approved_visits ?? null;
   const rationale      = decision?.rationale       ?? null;
@@ -3537,7 +3543,7 @@ function DecisionLetter({ submission, decision }) {
               ? "This authorization is valid for the services and dates specified. Contact CogentCR if clinical circumstances change."
               : isDenied
               ? "This determination is subject to appeal within 60 calendar days of receipt. Contact your case coordinator for appeal instructions."
-              : "Additional clinical documentation has been requested. Please respond within 5 business days to avoid case closure."}
+              : "Please upload the requested documentation and resubmit within 5 business days to avoid case closure."}
           </div>
           <button
             onClick={() => printDecisionLetter(submission, decision)}
@@ -4777,6 +4783,144 @@ function EditSubmissionModal({ submission, token, plans, onClose, onSaved }) {
   );
 }
 
+// ── INFO REQUESTED PANEL ──────────────────────────────────────────────────────
+// Shown inside the expanded case row when status === 'info_requested'.
+// Displays the pend reason/details and a document upload + resubmit flow.
+function InfoRequestedPanel({ submission, token, onResubmitted }) {
+  const [files, setFiles]       = React.useState([]);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError]       = React.useState("");
+
+  const PEND_REASON_LABELS = {
+    progress_note_missing:       "Most recent progress note missing",
+    poc_incomplete:              "Plan of care incomplete (frequency/duration/goals)",
+    functional_measures_missing: "Objective functional measures not documented",
+    physician_order_missing:     "Physician order / referral missing",
+    eval_outdated:               "Initial evaluation too old or not included",
+    outcome_measure_missing:     "Standardized outcome measure not included",
+    diagnosis_unsupported:       "Diagnosis codes not supported by documentation",
+    other:                       "Other",
+  };
+
+  const reasonLabel = submission.pend_reason
+    ? (PEND_REASON_LABELS[submission.pend_reason] || submission.pend_reason)
+    : null;
+
+  const handleFileChange = (e) => {
+    const picked = Array.from(e.target.files || []).filter(f => f.type === "application/pdf");
+    setFiles(picked);
+    setError("");
+  };
+
+  const handleResubmit = async () => {
+    if (files.length === 0) { setError("Please select at least one PDF to upload."); return; }
+    setSubmitting(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      files.forEach(f => fd.append("documents", f));
+      await axios.post(
+        `${API_BASE}/v1/submissions/${submission.submission_id}/resubmit`,
+        fd,
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" } }
+      );
+      onResubmitted();
+    } catch (e) {
+      setError(e.response?.data?.error || "Resubmit failed — please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 14, borderRadius: 10, border: "2px solid #f59e0b", overflow: "hidden" }}>
+      {/* Amber header banner */}
+      <div style={{ background: "#92400e", padding: "12px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 16 }}>⚠</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", fontFamily: "'Public Sans', sans-serif" }}>
+            Action Required — Additional Information Requested
+          </div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", fontFamily: "'Public Sans', sans-serif", marginTop: 1 }}>
+            Upload the requested documentation and resubmit to continue review
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: "#fffbeb", padding: "16px 18px" }}>
+        {/* Reason */}
+        {reasonLabel && (
+          <div style={{ marginBottom: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>
+              Reason for pend
+            </span>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginTop: 3, fontFamily: "'Public Sans', sans-serif" }}>
+              {reasonLabel}
+            </div>
+          </div>
+        )}
+
+        {/* Details */}
+        {submission.pend_details && (
+          <div style={{ marginBottom: 14, padding: "10px 14px", background: "#fff", borderRadius: 7, border: "1px solid #fde68a" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: "'DM Sans', sans-serif" }}>
+              What to submit
+            </span>
+            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6, marginTop: 4, fontFamily: "'Public Sans', sans-serif" }}>
+              {submission.pend_details}
+            </div>
+          </div>
+        )}
+
+        {/* Upload area */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 6, fontFamily: "'Public Sans', sans-serif" }}>
+            Upload documents (PDF only)
+          </div>
+          <label style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "14px 18px", borderRadius: 8, border: "2px dashed #f59e0b",
+            background: "#fff", cursor: "pointer", fontFamily: "'Public Sans', sans-serif",
+          }}>
+            <span style={{ fontSize: 20 }}>📎</span>
+            <span style={{ fontSize: 13, color: files.length > 0 ? "#1e293b" : "#9ca3af", fontWeight: files.length > 0 ? 600 : 400 }}>
+              {files.length > 0
+                ? files.map(f => f.name).join(", ")
+                : "Click to select PDF files (up to 5)"}
+            </span>
+            <input type="file" accept="application/pdf" multiple style={{ display: "none" }} onChange={handleFileChange} />
+          </label>
+          {files.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>
+              {files.length} file{files.length > 1 ? "s" : ""} selected · {(files.reduce((a, f) => a + f.size, 0) / 1024).toFixed(0)} KB total
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div style={{ marginBottom: 10, padding: "8px 12px", background: "#fef2f2", borderRadius: 6, border: "1px solid #fca5a5", fontSize: 12, color: "#991b1b", fontFamily: "'Public Sans', sans-serif" }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleResubmit}
+          disabled={files.length === 0 || submitting}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 8,
+            background: files.length === 0 || submitting ? "#d1d5db" : "#b45309",
+            color: "#fff", fontSize: 13, fontWeight: 700, border: "none",
+            cursor: files.length === 0 || submitting ? "not-allowed" : "pointer",
+            fontFamily: "'Public Sans', sans-serif", letterSpacing: "0.02em",
+          }}
+        >
+          {submitting ? "Submitting…" : "Resubmit for Review"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MyCasesView({ token }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -4786,8 +4930,9 @@ function MyCasesView({ token }) {
   const [p2pSuccess, setP2pSuccess]   = useState({});
   const [appealModal, setAppealModal] = useState(null);
   const [appealSuccess, setAppealSuccess] = useState({});
-  const [editTarget, setEditTarget]   = useState(null); // submission being edited
-  const [plans, setPlans]             = useState([]);
+  const [editTarget, setEditTarget]     = useState(null);
+  const [resubmitSuccess, setResubmitSuccess] = useState({});
+  const [plans, setPlans]               = useState([]);
 
   const loadSubmissions = () => {
     setLoading(true);
@@ -4819,13 +4964,13 @@ function MyCasesView({ token }) {
   const [searchQ,      setSearchQ]      = useState("");
 
   const STATUS_FILTERS = [
-    { v: "all",          label: "All" },
-    { v: "queued",       label: "In Queue",   match: s => ["submitted","pending_review","rmi_pending","on_hold"].includes(s) },
-    { v: "under_review", label: "In Review",  match: s => ["under_review","pending_md_review"].includes(s) },
-    { v: "approved",     label: "Approved",   match: s => s === "approved" },
-    { v: "denied",       label: "Denied",     match: s => ["denied","partial_denial"].includes(s) },
-    { v: "pended",       label: "Pended",     match: s => s === "pended" },
-    { v: "needs_action", label: "Needs Action", match: s => ["rmi_pending","on_hold","pended"].includes(s) },
+    { v: "all",           label: "All" },
+    { v: "queued",        label: "In Queue",      match: s => ["submitted","pending_review","on_hold"].includes(s) },
+    { v: "under_review",  label: "In Review",     match: s => ["under_review","pending_md_review"].includes(s) },
+    { v: "approved",      label: "Approved",      match: s => s === "approved" },
+    { v: "denied",        label: "Denied",        match: s => ["denied","partial_denial"].includes(s) },
+    { v: "info_requested",label: "Info Requested",match: s => s === "info_requested" },
+    { v: "needs_action",  label: "Needs Action",  match: s => ["rmi_pending","on_hold","info_requested"].includes(s) },
   ];
 
   const filteredSubs = submissions.filter(sub => {
@@ -4935,6 +5080,12 @@ function MyCasesView({ token }) {
                   {sub.review_type === "concurrent" && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>CONCURRENT</span>
                   )}
+                  {sub.status === "info_requested" && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px", border: "1px solid #fcd34d" }}>⚠ ACTION REQUIRED</span>
+                  )}
+                  {resubmitSuccess[sub.submission_id] && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#d1fae5", color: "#065f46", borderRadius: 5, padding: "2px 7px" }}>✓ RESUBMITTED</span>
+                  )}
                   {canRequestP2P(sub) && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>P2P AVAILABLE</span>
                   )}
@@ -4988,6 +5139,22 @@ function MyCasesView({ token }) {
                   </div>
                 )}
                 <DecisionLetter submission={sub} decision={decisions[sub.submission_id]} />
+                {/* Info Requested — upload + resubmit */}
+                {sub.status === "info_requested" && !resubmitSuccess[sub.submission_id] && (
+                  <InfoRequestedPanel
+                    submission={sub}
+                    token={token}
+                    onResubmitted={() => {
+                      setResubmitSuccess(prev => ({ ...prev, [sub.submission_id]: true }));
+                      loadSubmissions();
+                    }}
+                  />
+                )}
+                {resubmitSuccess[sub.submission_id] && (
+                  <div style={{ marginTop: 14, padding: "14px 16px", background: "#d1fae5", borderRadius: 8, border: "1px solid #6ee7b7", fontSize: 13, color: "#065f46", fontFamily: "'Public Sans', sans-serif" }}>
+                    ✓ Documents submitted — your case has returned to the review queue.
+                  </div>
+                )}
                 {/* P2P request */}
                 {canRequestP2P(sub) && (
                   <div style={{ marginTop: 14, padding: "14px 16px", background: "#fffbeb", borderRadius: 8, border: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -5024,7 +5191,7 @@ function MyCasesView({ token }) {
                     ✓ Level 1 appeal filed — you will be notified of the decision within 30 days.
                   </div>
                 )}
-                {!["approved","denied","pended","pending_md_review","partial_denial"].includes(sub.status) && (
+                {!["approved","denied","info_requested","pending_md_review","partial_denial"].includes(sub.status) && !resubmitSuccess[sub.submission_id] && (
                   <div style={{ marginTop: 12, padding: "12px 16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                     <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'Public Sans', sans-serif" }}>
                       Your case is in queue. You will be notified once a determination is made.
@@ -5052,11 +5219,11 @@ function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
   }, [token]); // eslint-disable-line
 
   const bs = stats?.byStatus || {};
-  const pending  = (bs.submitted || 0) + (bs.pending_review || 0) + (bs.rmi_pending || 0) + (bs.on_hold || 0);
-  const approved = (bs.approved || 0);
-  const denied   = (bs.denied || 0) + (bs.partial_denial || 0);
-  const inReview = (bs.under_review || 0) + (bs.pending_md_review || 0);
-  const needsAttn = (bs.rmi_pending || 0) + (bs.on_hold || 0);
+  const pending    = (bs.submitted || 0) + (bs.pending_review || 0) + (bs.on_hold || 0);
+  const approved   = (bs.approved || 0);
+  const denied     = (bs.denied || 0) + (bs.partial_denial || 0);
+  const inReview   = (bs.under_review || 0) + (bs.pending_md_review || 0);
+  const needsAttn  = (bs.rmi_pending || 0) + (bs.on_hold || 0) + (bs.info_requested || 0);
 
   const statCards = [
     { label: "In Queue",    value: pending,   color: "#1a3a5c", bg: "#eff6ff",  border: "#bfdbfe" },
@@ -5126,8 +5293,10 @@ function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
           const statusColors = {
             approved:         { bg: "#f0fdf4", text: "#15803d" },
             denied:           { bg: "#fef2f2", text: "#991b1b" },
-            pended:           { bg: "#eff6ff", text: "#1d4ed8" },
+            partial_denial:   { bg: "#fef2f2", text: "#991b1b" },
+            info_requested:   { bg: "#fef3c7", text: "#92400e" },
             under_review:     { bg: "#fffbeb", text: "#92400e" },
+            pending_md_review:{ bg: "#fffbeb", text: "#92400e" },
             submitted:        { bg: "#eff6ff", text: "#1d4ed8" },
             pending_review:   { bg: "#eff6ff", text: "#1d4ed8" },
             rmi_pending:      { bg: "#fef3c7", text: "#b45309" },
