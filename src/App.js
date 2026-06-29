@@ -3154,6 +3154,7 @@ function CaseSearchView({ token, onOpenCase }) {
   const statusColor = (s) => {
     if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
     if (s === "denied")         return { bg: "#fee2e2", text: "#991b1b" };
+    if (s === "pended")         return { bg: "#eff6ff", text: "#1d4ed8" };
     if (s === "under_review")   return { bg: "#fef3c7", text: "#92400e" };
     if (s === "pending_review") return { bg: "#eff6ff", text: "#1d4ed8" };
     return { bg: "#f3f4f6", text: "#374151" };
@@ -4823,7 +4824,8 @@ function MyCasesView({ token }) {
     { v: "under_review", label: "In Review",  match: s => ["under_review","pending_md_review"].includes(s) },
     { v: "approved",     label: "Approved",   match: s => s === "approved" },
     { v: "denied",       label: "Denied",     match: s => ["denied","partial_denial"].includes(s) },
-    { v: "needs_action", label: "Needs Action", match: s => ["rmi_pending","on_hold"].includes(s) },
+    { v: "pended",       label: "Pended",     match: s => s === "pended" },
+    { v: "needs_action", label: "Needs Action", match: s => ["rmi_pending","on_hold","pended"].includes(s) },
   ];
 
   const filteredSubs = submissions.filter(sub => {
@@ -5124,6 +5126,7 @@ function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
           const statusColors = {
             approved:         { bg: "#f0fdf4", text: "#15803d" },
             denied:           { bg: "#fef2f2", text: "#991b1b" },
+            pended:           { bg: "#eff6ff", text: "#1d4ed8" },
             under_review:     { bg: "#fffbeb", text: "#92400e" },
             submitted:        { bg: "#eff6ff", text: "#1d4ed8" },
             pending_review:   { bg: "#eff6ff", text: "#1d4ed8" },

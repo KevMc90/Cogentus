@@ -4,6 +4,18 @@ const API_BASE =
   process.env.REACT_APP_API_BASE ||
   "https://cogentus-backend.onrender.com";
 
+// ── PEND REASONS ───────────────────────────────────────────────────────────────
+const PEND_REASONS = [
+  { value: "progress_note_missing",       label: "Most recent progress note missing",                  defaultDetail: "Please include the most recent signed progress note from the treating therapist." },
+  { value: "poc_incomplete",              label: "Plan of care incomplete (frequency/duration/goals)", defaultDetail: "Please resubmit with a complete plan of care including frequency, duration, and measurable treatment goals." },
+  { value: "functional_measures_missing", label: "Objective functional measures not documented",       defaultDetail: "Please include objective functional measures (e.g. ROM, MMT, standardized outcome scores) in the submitted documentation." },
+  { value: "physician_order_missing",     label: "Physician order / referral missing",                 defaultDetail: "Please include a signed physician order or referral authorizing the requested therapy services." },
+  { value: "eval_outdated",               label: "Initial evaluation too old or not included",          defaultDetail: "Please include a current initial evaluation or re-evaluation performed within the last 90 days." },
+  { value: "outcome_measure_missing",     label: "Standardized outcome measure not included",           defaultDetail: "Please include a validated standardized outcome measure (e.g. DASH, KOOS, FIM, ARAT) in the submitted documentation." },
+  { value: "diagnosis_unsupported",       label: "Diagnosis codes not supported by documentation",     defaultDetail: "The submitted documentation does not support the diagnosis codes provided. Please include documentation that clearly supports the listed diagnosis." },
+  { value: "other",                       label: "Other (describe below)",                              defaultDetail: "" },
+];
+
 // ── DESIGN TOKENS ──────────────────────────────────────────────────────────────
 const NAVY      = "#1a3a5c";
 const NAVY_DARK = "#0d1b2a";
@@ -1180,9 +1192,9 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
 
 // ── DETERMINATION ZONE ─────────────────────────────────────────────────────────
 function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, actionState,
-  partialVisits, pendNote, approveChecks, denyNote, rationaleEdit,
+  partialVisits, pendReason, pendDetails, approveChecks, denyNote, rationaleEdit,
   onAction, onPartialVisitsChange, onPartialSubmit, onDenyConfirm,
-  onPendNoteChange, onPendSubmit,
+  onPendReasonChange, onPendDetailsChange, onPendSubmit,
   onApproveChecksChange, onApproveSubmit,
   onDenyNoteChange, onDenySignoffSubmit,
   onCancelAction, onNavigate, hideQueueNav,
@@ -1237,9 +1249,13 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
                 )}
               </div>
             )}
-            {decided.pendNote && (
+            {decided.pendReason && (
               <div style={{ marginTop: 8, fontSize: 11, color: decColor.text, fontFamily: FONTS.body, textAlign: "left", background: "rgba(255,255,255,0.55)", borderRadius: 5, padding: "6px 8px" }}>
-                <span style={{ fontWeight: 700 }}>Pending reason: </span>{decided.pendNote}
+                <span style={{ fontWeight: 700 }}>Pend reason: </span>
+                {PEND_REASONS.find(r => r.value === decided.pendReason)?.label || decided.pendReason}
+                {decided.pendDetails && (
+                  <div style={{ marginTop: 3, color: decColor.text, opacity: 0.85 }}>{decided.pendDetails}</div>
+                )}
               </div>
             )}
             {decided.approveChecks && decided.approveChecks.length > 0 && (
@@ -1285,7 +1301,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
           </div>
         )}
 
-        {/* Pend input — what is missing */}
+        {/* Pend input — structured reason + optional details */}
         {actionState === "pend_input" && !decided && (
           <div style={{
             padding: "12px 14px", borderRadius: 8, border: "1.5px solid #93c5fd",
@@ -1294,14 +1310,37 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", fontFamily: FONTS.heading, marginBottom: 4 }}>
               Pend — Additional Information Required
             </div>
-            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 8 }}>
-              Describe what information is needed from the provider:
+            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 6 }}>
+              Select the reason for this pend:
+            </div>
+            <select
+              autoFocus
+              value={pendReason}
+              onChange={e => {
+                const selected = PEND_REASONS.find(r => r.value === e.target.value);
+                onPendReasonChange(e.target.value);
+                if (selected && selected.defaultDetail) onPendDetailsChange(selected.defaultDetail);
+                else if (!selected) onPendDetailsChange("");
+              }}
+              style={{
+                width: "100%", borderRadius: 6, border: "1.5px solid #93c5fd",
+                padding: "7px 10px", fontSize: 12, fontFamily: FONTS.body,
+                outline: "none", background: "#fff", color: pendReason ? "#1e293b" : "#9ca3af",
+                boxSizing: "border-box", marginBottom: 8, cursor: "pointer",
+              }}
+            >
+              <option value="">— Select reason —</option>
+              {PEND_REASONS.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 4 }}>
+              Instructions for provider{pendReason === "other" ? " (required)" : " (optional — edit if needed)"}:
             </div>
             <textarea
-              autoFocus
-              value={pendNote}
-              onChange={e => onPendNoteChange(e.target.value)}
-              placeholder="e.g. Missing plan of care frequency and duration; please resubmit with complete documentation..."
+              value={pendDetails}
+              onChange={e => onPendDetailsChange(e.target.value)}
+              placeholder="Describe exactly what documents or information are needed..."
               rows={3}
               style={{
                 width: "100%", borderRadius: 6, border: "1.5px solid #93c5fd",
@@ -1312,11 +1351,17 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             />
             <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={onPendSubmit} style={{
-                flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
-                background: "#3b82f6", color: "#fff", fontSize: 12, fontWeight: 700,
-                cursor: "pointer", fontFamily: FONTS.body,
-              }}>Record Pend</button>
+              <button
+                onClick={onPendSubmit}
+                disabled={!pendReason || (pendReason === "other" && !pendDetails.trim())}
+                style={{
+                  flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
+                  background: (!pendReason || (pendReason === "other" && !pendDetails.trim())) ? "#93c5fd" : "#3b82f6",
+                  color: "#fff", fontSize: 12, fontWeight: 700,
+                  cursor: (!pendReason || (pendReason === "other" && !pendDetails.trim())) ? "not-allowed" : "pointer",
+                  fontFamily: FONTS.body,
+                }}
+              >Record Pend</button>
               <button onClick={onCancelAction} style={{
                 padding: "7px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0",
                 background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
@@ -1849,7 +1894,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   const [decisions, setDecisions]         = useState({});
   const [actionState, setActionState]     = useState("idle");
   const [partialVisits, setPartialVisits] = useState("");
-  const [pendNote, setPendNote]           = useState("");
+  const [pendReason, setPendReason]       = useState("");
+  const [pendDetails, setPendDetails]     = useState("");
   const [approveChecks, setApproveChecks] = useState([]);
   const [denyNote, setDenyNote]           = useState("");
   const [rationaleEdit, setRationaleEdit] = useState("");
@@ -1958,7 +2004,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
     }));
     setActionState("idle");
     setPartialVisits("");
-    setPendNote("");
+    setPendReason("");
+    setPendDetails("");
     setApproveChecks([]);
     setDenyNote("");
 
@@ -1987,9 +2034,11 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           isOverride,
           discipline:    kase.discipline  || null,
           reviewType:    kase.reviewType  || null,
-          isSynthetic:    !kase.isLive,
-          reviewerNotes:  extras.denyNote || extras.pendNote || "",
+          isSynthetic:       !kase.isLive,
+          reviewerNotes:     extras.denyNote || extras.pendDetails || "",
           reviewerRationale: extras.reviewerRationale || "",
+          pendReason:        extras.pendReason  || null,
+          pendDetails:       extras.pendDetails || null,
         }),
       })
         .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -2012,7 +2061,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
     } else if (type === "deny") {
       setActionState("deny_confirm");
     } else if (type === "pend") {
-      setPendNote("");
+      setPendReason("");
+      setPendDetails("");
       setActionState("pend_input");
     }
   }, [kase, decisions]);
@@ -2028,8 +2078,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   }, [partialVisits, kase, recordDecision]);
 
   const handlePendSubmit = useCallback(() => {
-    recordDecision("Pend", 0, { pendNote, reviewerRationale: rationaleEdit });
-  }, [pendNote, rationaleEdit, recordDecision]);
+    recordDecision("Pend", 0, { pendReason, pendDetails, reviewerRationale: rationaleEdit });
+  }, [pendReason, pendDetails, rationaleEdit, recordDecision]);
 
   const handleApproveSubmit = useCallback(() => {
     const rec = kase.contract?.recommendation;
@@ -2048,7 +2098,8 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
     setCursor(i);
     setActionState("idle");
     setPartialVisits("");
-    setPendNote("");
+    setPendReason("");
+    setPendDetails("");
     setApproveChecks([]);
     setDenyNote("");
   }, []);
@@ -2059,7 +2110,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       const key = e.key.toLowerCase();
-      if (key === "escape") { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
+      if (key === "escape") { setActionState("idle"); setPendReason(""); setPendDetails(""); setApproveChecks([]); setDenyNote(""); setShowDocs(false); setShowAuditLog(false); setShowSubmissions(false); return; }
       if (key === "v") { setShowDocs(s => !s); return; }
       if (!hideQueueNav && key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
       if (!hideQueueNav && key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
@@ -2233,20 +2284,22 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
             auditState={auditStates[kase.caseId]}
             actionState={actionState}
             partialVisits={partialVisits}
-            pendNote={pendNote}
+            pendReason={pendReason}
+            pendDetails={pendDetails}
             approveChecks={approveChecks}
             denyNote={denyNote}
             onAction={handleAction}
             onPartialVisitsChange={setPartialVisits}
             onPartialSubmit={handlePartialSubmit}
             onDenyConfirm={handleDenyConfirm}
-            onPendNoteChange={setPendNote}
+            onPendReasonChange={setPendReason}
+            onPendDetailsChange={setPendDetails}
             onPendSubmit={handlePendSubmit}
             onApproveChecksChange={setApproveChecks}
             onApproveSubmit={handleApproveSubmit}
             onDenyNoteChange={setDenyNote}
             onDenySignoffSubmit={handleDenySignoffSubmit}
-            onCancelAction={() => { setActionState("idle"); setPendNote(""); setApproveChecks([]); setDenyNote(""); setRationaleEdit(""); }}
+            onCancelAction={() => { setActionState("idle"); setPendReason(""); setPendDetails(""); setApproveChecks([]); setDenyNote(""); setRationaleEdit(""); }}
             onNavigate={handleNavigate}
             hideQueueNav={!!hideQueueNav}
             onHoldCase={kase.isLive ? onHoldCase : null}
