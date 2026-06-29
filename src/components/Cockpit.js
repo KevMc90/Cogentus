@@ -2355,18 +2355,18 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
       </div>
 
       {/* ── Three-zone body — Evidence 30 / Recommendation 36 / Determination 34 ── */}
-      <div style={{ display: "flex", gap: 1, overflow: "hidden" }}>
-        <div style={{ width: "30%", height: "calc(100vh - 52px)", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 1, overflow: "hidden" }}>
+        <div style={{ width: "30%", minHeight: 0, height: "100%", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
           <EvidenceZone
             kase={kase}
             onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
             showDocs={showDocs}
           />
         </div>
-        <div style={{ width: "36%", height: "calc(100vh - 52px)", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ width: "36%", minHeight: 0, height: "100%", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
           <RecommendationZone kase={kase} engineState={engineState} selectedPlan={selectedPlan} />
         </div>
-        <div style={{ flex: 1, height: "calc(100vh - 52px)", background: "#fff", overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ flex: 1, minHeight: 0, height: "100%", background: "#fff", overflowY: "auto", overflowX: "hidden" }}>
           <DeterminationZone
             kase={kase}
             queue={queue}
