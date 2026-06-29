@@ -576,7 +576,7 @@ function KbdChip({ k, label, style }) {
 // ── ZONE HEADER ────────────────────────────────────────────────────────────────
 function ZoneHeader({ title }) {
   return (
-    <div style={{ padding: "12px 20px 11px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
+    <div style={{ padding: "12px 20px 11px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
       <span style={{
         fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
         textTransform: "uppercase", color: "#64748b", fontFamily: FONTS.body,
@@ -606,9 +606,11 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div>
         <ZoneHeader title="Clinical Evidence" />
-        <LoadingPulse label="Awaiting engine response..." />
+        <div style={{ padding: "16px 20px" }}>
+          <LoadingPulse label="Awaiting engine response..." />
+        </div>
       </div>
     );
   }
@@ -639,9 +641,9 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div>
       <ZoneHeader title="Clinical Evidence" />
-      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div style={{ padding: "16px 20px" }}>
 
         <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: NAVY, fontFamily: FONTS.heading, lineHeight: 1.2 }}>
@@ -1073,9 +1075,11 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 function RecommendationZone({ kase, engineState, selectedPlan }) {
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div>
         <ZoneHeader title="Recommendation" />
-        <LoadingPulse label="Calling live engine..." />
+        <div style={{ padding: "16px 20px" }}>
+          <LoadingPulse label="Calling live engine..." />
+        </div>
       </div>
     );
   }
@@ -1087,9 +1091,9 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   const cs   = confidenceStyle(rec.confidence);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div>
       <ZoneHeader title="Recommendation" />
-      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div style={{ padding: "16px 20px" }}>
 
         {kase.isLive && engineState === "offline" && (
           <div style={{
@@ -1286,9 +1290,9 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   const decColor = decided ? detColors(decided.determination) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div>
       <ZoneHeader title="Determination" />
-      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
 
         {/* Decided overlay with audit status */}
         {decided && (
@@ -2352,22 +2356,17 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
 
       {/* ── Three-zone body — Evidence 30 / Recommendation 36 / Determination 34 ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden", gap: 1 }}>
-        <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", position: "relative" }}>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
           <EvidenceZone
             kase={kase}
             onToggleDocs={() => { setShowDocs(s => !s); setShowAuditLog(false); setShowSubmissions(false); }}
             showDocs={showDocs}
           />
-          </div>
         </div>
-        <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", position: "relative" }}>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: "0 0 36%", background: "#fff", borderRight: "1px solid #e2e8f0", overflowY: "auto", overflowX: "hidden" }}>
           <RecommendationZone kase={kase} engineState={engineState} selectedPlan={selectedPlan} />
-          </div>
         </div>
-        <div style={{ flex: 1, background: "#fff", position: "relative" }}>
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ flex: 1, background: "#fff", overflowY: "auto", overflowX: "hidden" }}>
           <DeterminationZone
             kase={kase}
             queue={queue}
@@ -2400,7 +2399,6 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
             rationaleEdit={rationaleEdit}
             onRationaleChange={setRationaleEdit}
           />
-          </div>
         </div>
       </div>
 
