@@ -1395,7 +1395,7 @@ function printDecisionLetter(submission, decision) {
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATION BELL
 // ─────────────────────────────────────────────────────────────────────────────
-function NotificationBell({ token }) {
+function NotificationBell({ token, onNavigateToCase }) {
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread]               = useState(0);
   const [open, setOpen]                   = useState(false);
@@ -1428,7 +1428,8 @@ function NotificationBell({ token }) {
   };
 
   const typeColor = (type) => {
-    if (type === "determination") return "#1a3a5c";
+    if (type === "info_requested") return "#b45309";
+    if (type === "determination")  return "#1a3a5c";
     return "#6b7280";
   };
 
@@ -1473,15 +1474,27 @@ function NotificationBell({ token }) {
             ) : notifications.map(n => (
               <div key={n.id} style={{
                 padding: "10px 14px", borderBottom: "1px solid #f8fafc",
-                background: n.is_read ? "#fff" : "#eff6ff",
+                background: n.type === "info_requested" && !n.is_read ? "#fffbeb" : n.is_read ? "#fff" : "#eff6ff",
                 display: "flex", gap: 8, alignItems: "flex-start",
+                borderLeft: n.type === "info_requested" ? "3px solid #f59e0b" : "none",
               }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: n.is_read ? "#d1d5db" : typeColor(n.type), marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
+                  {n.type === "info_requested" && (
+                    <div style={{ fontSize: 9, fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2, fontFamily: "'DM Sans', sans-serif" }}>⚠ Action Required</div>
+                  )}
                   <div style={{ fontSize: 12, color: "#1e293b", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.4 }}>{n.message}</div>
                   <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
                     {n.created_at ? new Date(n.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
                   </div>
+                  {n.type === "info_requested" && n.case_id && onNavigateToCase && (
+                    <button
+                      onClick={() => { setOpen(false); onNavigateToCase(n.case_id); }}
+                      style={{ marginTop: 6, padding: "4px 10px", background: "#b45309", color: "#fff", border: "none", borderRadius: 5, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
+                    >
+                      View Case →
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -4921,7 +4934,7 @@ function InfoRequestedPanel({ submission, token, onResubmitted }) {
   );
 }
 
-function MyCasesView({ token }) {
+function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [expanded, setExpanded]       = useState(null);
@@ -4942,6 +4955,22 @@ function MyCasesView({ token }) {
   };
 
   useEffect(() => { loadSubmissions(); }, [token]); // eslint-disable-line
+
+  // Auto-expand case when navigating from a notification
+  useEffect(() => {
+    if (!deepLinkCaseId || submissions.length === 0) return;
+    const match = submissions.find(s => s.submission_id === deepLinkCaseId);
+    if (match) {
+      setExpanded(deepLinkCaseId);
+      setFilterStatus("all");
+      if (onDeepLinkConsumed) onDeepLinkConsumed();
+      setTimeout(() => {
+        const el = document.getElementById(`case-row-${deepLinkCaseId}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [deepLinkCaseId, submissions]); // eslint-disable-line
+
   useEffect(() => {
     axios.get(`${API_BASE}/v1/plans`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => setPlans(r.data.plans || []))
@@ -5068,7 +5097,7 @@ function MyCasesView({ token }) {
           ? { urgent: { bg: "#fffbeb", text: "#92400e", label: "URGENT" }, expedited: { bg: "#fef2f2", text: "#dc2626", label: "EXPEDITED" } }[sub.review_priority]
           : null;
         return (
-          <div key={sub.submission_id} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", marginBottom: 14, overflow: "hidden" }}>
+          <div key={sub.submission_id} id={`case-row-${sub.submission_id}`} style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: sub.submission_id === deepLinkCaseId ? "2px solid #f59e0b" : "1px solid #e2e8f0", marginBottom: 14, overflow: "hidden" }}>
             <div onClick={() => handleExpand(sub)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2, flexWrap: "wrap" }}>
@@ -5408,9 +5437,16 @@ function ClinicSettingsView({ token, profile, onSaved }) {
 }
 
 function ProviderPortal({ user, token, onLogout }) {
-  const [provView, setProvView] = useState("dashboard");
+  const [provView, setProvView]         = useState("dashboard");
   const [confirmation, setConfirmation] = useState(null);
   const [clinicProfile, setClinicProfile] = useState(null);
+  const [deepLinkCaseId, setDeepLinkCaseId] = useState(null);
+
+  const handleNavigateToCase = (caseId) => {
+    setDeepLinkCaseId(caseId);
+    setProvView("my_cases");
+    setConfirmation(null);
+  };
 
   useEffect(() => {
     axios.get(`${API_BASE}/v1/clinic-profile`, { headers: { Authorization: `Bearer ${token}` } })
@@ -5436,7 +5472,7 @@ function ProviderPortal({ user, token, onLogout }) {
       )}
       <span style={{ flex: 1 }} />
       <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontFamily: "'Public Sans', sans-serif" }}>{user.name || user.email}</span>
-      <NotificationBell token={token} />
+      <NotificationBell token={token} onNavigateToCase={handleNavigateToCase} />
       <button onClick={onLogout}
   onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; }}
   onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
@@ -5566,7 +5602,7 @@ function ProviderPortal({ user, token, onLogout }) {
       {HEADER}{TABS}
       {provView === "dashboard"      && <ProviderDashboard token={token} clinicProfile={clinicProfile} onNewAuth={() => setProvView("new_submission")} onViewCases={v => setProvView(v)} />}
       {provView === "new_submission" && <NewSubmissionForm token={token} clinicProfile={clinicProfile} onSubmitted={handleSubmitted} />}
-      {provView === "my_cases"       && <MyCasesView token={token} />}
+      {provView === "my_cases"       && <MyCasesView token={token} deepLinkCaseId={deepLinkCaseId} onDeepLinkConsumed={() => setDeepLinkCaseId(null)} />}
       {provView === "settings"       && <ClinicSettingsView token={token} profile={clinicProfile} onSaved={p => setClinicProfile(p)} />}
     </div>
   );

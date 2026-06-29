@@ -651,23 +651,57 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
           </div>
         </div>
 
-        {/* No-extraction notice for form-only submissions */}
+        {/* Form submission data — shown when no PDF clinical metrics were extracted */}
         {!hasAnyClinicalData && (
-          <div style={{ padding: "14px 16px", borderRadius: 8, border: "1.5px dashed #c7d2fe", background: "#eef2ff", marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#4338ca", fontFamily: FONTS.body, marginBottom: 4 }}>
-              No clinical metrics extracted
-            </div>
-            <div style={{ fontSize: 11, color: "#6366f1", fontFamily: FONTS.body, lineHeight: 1.5, marginBottom: 10 }}>
-              This case was submitted via form without PDF upload. To populate objective findings (ROM, MMT, pain), the provider must upload clinical documents — or use the UR Form in Tools to manually process PDFs.
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#4338ca", fontFamily: FONTS.body, marginBottom: 4 }}>Submitted documents:</div>
-            {docs.length > 0 ? docs.map((d, i) => (
-              <div key={i} style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, padding: "3px 0" }}>
-                · {typeof d === "string" ? d : d.name || "Unnamed document"}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ padding: "10px 14px", borderRadius: 8, border: "1.5px dashed #c7d2fe", background: "#eef2ff", marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#4338ca", fontFamily: FONTS.body, marginBottom: 2 }}>No clinical metrics extracted from PDF</div>
+              <div style={{ fontSize: 10, color: "#6366f1", fontFamily: FONTS.body, lineHeight: 1.5 }}>
+                Showing submitted form data below. Upload clinical documents for objective findings (ROM, MMT, pain).
               </div>
-            )) : (
-              <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents listed</div>
-            )}
+            </div>
+
+            {/* Submitted form fields as structured evidence rows */}
+            {(() => {
+              const rows = [];
+              const addRow = (label, value) => { if (value) rows.push({ label, value }); };
+              addRow("Member Name",   kase.memberName);
+              addRow("Member ID",     kase.memberId);
+              addRow("Date of Birth", kase.dob);
+              addRow("Discipline",    kase.discipline);
+              addRow("Review Type",   kase.reviewType);
+              addRow("Provider",      kase.providerName);
+              addRow("Requested Visits", kase.requestedVisits != null ? String(kase.requestedVisits) : null);
+              const diagCodes = (ex.diagnosisCodes || kase.diagnosisCodes || []);
+              if (diagCodes.length > 0) addRow("Diagnosis Codes", diagCodes.join(", "));
+              addRow("Provider Notes", kase.providerNotes);
+              return rows.length > 0 ? (
+                <div style={{ borderRadius: 7, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+                  {rows.map(({ label, value }, i) => (
+                    <div key={label} style={{
+                      display: "flex", gap: 8, padding: "7px 12px",
+                      background: i % 2 === 0 ? "#f8fafc" : "#fff",
+                      borderBottom: i < rows.length - 1 ? "1px solid #f1f5f9" : "none",
+                    }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body, minWidth: 110, flexShrink: 0, paddingTop: 1 }}>{label}</span>
+                      <span style={{ fontSize: 11, color: "#1e293b", fontFamily: FONTS.body, lineHeight: 1.5, wordBreak: "break-word" }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+
+            {/* Document list */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONTS.body, marginBottom: 4 }}>Submitted Documents</div>
+              {docs.length > 0 ? docs.map((d, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, padding: "2px 0" }}>
+                  · {typeof d === "string" ? d : d.name || "Unnamed document"}
+                </div>
+              )) : (
+                <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents listed</div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1928,16 +1962,20 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   const liveCaseId = liveCase?.caseId ?? null;
 
   const liveCaseEntry = liveCase ? {
-    caseId:      liveCase.caseId,
-    memberName:  liveCase.memberName  || "Live Case",
-    memberId:    liveCase.memberId    || "—",
-    dob:         liveCase.dob         || "—",
-    discipline:  liveCase.discipline  || "PT",
-    reviewType:  liveCase.reviewType  || "initial",
-    submittedAt: liveCase.submittedAt || new Date().toISOString(),
-    documents:   liveCase.documents   || [],
-    contract:    liveContract,
-    isLive:      true,
+    caseId:          liveCase.caseId,
+    memberName:      liveCase.memberName      || "Live Case",
+    memberId:        liveCase.memberId        || "—",
+    dob:             liveCase.dob             || "—",
+    discipline:      liveCase.discipline      || "PT",
+    reviewType:      liveCase.reviewType      || "initial",
+    submittedAt:     liveCase.submittedAt     || new Date().toISOString(),
+    documents:       liveCase.documents       || [],
+    contract:        liveContract,
+    isLive:          true,
+    providerName:    liveCase.providerName    || null,
+    diagnosisCodes:  liveCase.diagnosisCodes  || [],
+    requestedVisits: liveCase.requestedVisits || null,
+    providerNotes:   liveCase.providerNotes   || null,
   } : null;
 
   const queue = hideQueueNav
@@ -2336,17 +2374,20 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           onRefresh={() => fetchSubmissions(setSubmissions)}
           onForward={sub => {
             const entry = {
-              caseId:      `SUB-${sub.submission_id.substring(0, 8).toUpperCase()}`,
-              memberName:  sub.member_name  || "Unknown",
-              memberId:    sub.member_id    || "—",
-              dob:         sub.dob          || "—",
-              discipline:  sub.discipline   || "PT",
-              reviewType:  "initial",
-              submittedAt: sub.submitted_at,
-              documents:   (sub.document_list || []).map(name => ({ name, type: "Provider Document", date: null })),
-              contract:    buildSubmissionContract(sub),
-              isSubmission: true,
-              providerName: sub.provider_name,
+              caseId:          `SUB-${sub.submission_id.substring(0, 8).toUpperCase()}`,
+              memberName:      sub.member_name       || "Unknown",
+              memberId:        sub.member_id         || "—",
+              dob:             sub.dob               || "—",
+              discipline:      sub.discipline        || "PT",
+              reviewType:      sub.review_type       || "initial",
+              submittedAt:     sub.submitted_at,
+              documents:       (sub.document_list || []).map(name => ({ name, type: "Provider Document", date: null })),
+              contract:        buildSubmissionContract(sub),
+              isSubmission:    true,
+              providerName:    sub.provider_name     || null,
+              diagnosisCodes:  sub.diagnosis_codes   || [],
+              requestedVisits: sub.requested_visits  || null,
+              providerNotes:   sub.provider_notes    || null,
             };
             setSubmissionCases(prev => {
               if (prev.some(c => c.caseId === entry.caseId)) return prev;
