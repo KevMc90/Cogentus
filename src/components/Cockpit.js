@@ -1087,9 +1087,9 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   const cs   = confidenceStyle(rec.confidence);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <ZoneHeader title="Recommendation" />
-      <div style={{ padding: "16px 20px", flex: 1 }}>
+      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
 
         {kase.isLive && engineState === "offline" && (
           <div style={{
@@ -1286,9 +1286,9 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   const decColor = decided ? detColors(decided.determination) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <ZoneHeader title="Determination" />
-      <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
 
         {/* Decided overlay with audit status */}
         {decided && (
@@ -2351,7 +2351,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
       </div>
 
       {/* ── Three-zone body — Evidence 30 / Recommendation 36 / Determination 34 ── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", gap: 1 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden", gap: 1 }}>
         <div style={{ flex: "0 0 30%", background: "#fff", borderRight: "1px solid #e2e8f0", overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <EvidenceZone
             kase={kase}
