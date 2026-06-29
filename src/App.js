@@ -7310,7 +7310,11 @@ function App() {
 
   // Cockpit view
   if (view === "cockpit") {
-    return <Cockpit user={user} onBack={() => setView("reviews")} liveCase={pendingCockpitCase} />;
+    return (
+      <div style={{ height: "100vh" }}>
+        <Cockpit user={user} onBack={() => setView("reviews")} liveCase={pendingCockpitCase} />
+      </div>
+    );
   }
 
   // Submit view
