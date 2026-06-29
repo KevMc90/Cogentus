@@ -2226,7 +2226,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
   const decidedCount = Object.keys(decisions).length;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: NAVY_DARK, fontFamily: FONTS.body }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: NAVY_DARK, fontFamily: FONTS.body, overflow: "hidden" }}>
 
       {/* ── Top bar ── */}
       <div style={{
