@@ -2745,8 +2745,10 @@ function ReviewerShell({ user, token, onLogout }) {
       if (res.data.case) {
         const sub = res.data.case;
         const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
+        const storedMetrics = sub.extracted_metrics || {};
         setAssignedCase({
           caseId:         sub.submission_id,
+          submissionId:   sub.submission_id,
           memberName:     sub.member_name || "Unknown Member",
           memberId:       sub.member_id   || "—",
           memberState:    sub.member_state || null,
@@ -2760,13 +2762,18 @@ function ReviewerShell({ user, token, onLogout }) {
           rmiRespondedAt: sub.rmi_responded_at || null,
           documents:      sub.document_list || [],
           metrics: {
-            primaryDiagnosisCode: diags[0] || null,
+            // Base fields always from submission form
             diagnosisCodes:       diags,
             requestedVisits:      sub.requested_visits || 0,
             therapyType:          sub.discipline || user.discipline || "PT",
             functionalLimitations: [],
             sopIndicators: [],
             documentationQuality: {},
+            // Spread stored Claude extraction on top — populates ROM, MMT, pain, goals etc.
+            ...storedMetrics,
+            // Keep form diags as authoritative if extraction didn't find them
+            diagnosisCodes: (storedMetrics.diagnosisCodes?.length ? storedMetrics.diagnosisCodes : diags),
+            primaryDiagnosisCode: storedMetrics.primaryDiagnosisCode || diags[0] || null,
           },
           planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
         });
@@ -2799,14 +2806,16 @@ function ReviewerShell({ user, token, onLogout }) {
 
   const handleOpenSearchCase = (sub) => {
     const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
+    const storedMetrics = sub.extracted_metrics || {};
     setAssignedCase({
       caseId:         sub.submission_id,
+      submissionId:   sub.submission_id,
       memberName:     sub.member_name    || "Unknown Member",
       memberId:       sub.member_id      || "—",
       memberState:    sub.member_state   || null,
       dob:            sub.dob            || "—",
       discipline:     sub.discipline     || user.discipline || "PT",
-      reviewType:     "initial",
+      reviewType:     sub.review_type    || "initial",
       submittedAt:    sub.submitted_at,
       receivedAt:     sub.received_at    || sub.submitted_at,
       reviewPriority: sub.review_priority || "standard",
@@ -2814,13 +2823,15 @@ function ReviewerShell({ user, token, onLogout }) {
       rmiRespondedAt: sub.rmi_responded_at || null,
       documents:      sub.document_list  || [],
       metrics: {
-        primaryDiagnosisCode: diags[0]    || null,
         diagnosisCodes:       diags,
         requestedVisits:      sub.requested_visits || 0,
         therapyType:          sub.discipline || user.discipline || "PT",
         functionalLimitations: [],
         sopIndicators: [],
         documentationQuality: {},
+        ...storedMetrics,
+        diagnosisCodes: (storedMetrics.diagnosisCodes?.length ? storedMetrics.diagnosisCodes : diags),
+        primaryDiagnosisCode: storedMetrics.primaryDiagnosisCode || diags[0] || null,
       },
       planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
     });
@@ -6069,14 +6080,14 @@ function MasterQueueView({ token, onReviewCase }) {
               <span style={{ fontSize: 11, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>{s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : "—"}</span>
               <div style={{ display: "flex", gap: 5 }}>
                 {reviewable && onReviewCase && (
-                  <button onClick={() => onReviewCase({
-                    caseId: s.submission_id, memberName: s.member_name || "Unknown",
+                  <button onClick={() => { const sm = s.extracted_metrics || {}; const diags = s.diagnosis_codes||[]; onReviewCase({
+                    caseId: s.submission_id, submissionId: s.submission_id, memberName: s.member_name || "Unknown",
                     memberId: s.member_id || "—", dob: s.dob || "—",
-                    discipline: s.discipline || "PT", reviewType: "initial",
+                    discipline: s.discipline || "PT", reviewType: s.review_type || "initial",
                     submittedAt: s.submitted_at, documents: s.document_list || [],
-                    metrics: { primaryDiagnosisCode: (s.diagnosis_codes||[])[0] || null, diagnosisCodes: s.diagnosis_codes||[], requestedVisits: s.requested_visits||0, therapyType: s.discipline||"PT", functionalLimitations:[], sopIndicators:[], documentationQuality:{} },
+                    metrics: { diagnosisCodes: diags, requestedVisits: s.requested_visits||0, therapyType: s.discipline||"PT", functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null },
                     planRuleSet: s.plan_id ? { planId: s.plan_id } : null,
-                  })} style={{ padding: "4px 9px", borderRadius: 5, background: "#0d1b2a", color: "#fff", fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                  }); }} style={{ padding: "4px 9px", borderRadius: 5, background: "#0d1b2a", color: "#fff", fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
                     Review
                   </button>
                 )}

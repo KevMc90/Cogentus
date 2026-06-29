@@ -587,6 +587,23 @@ function ZoneHeader({ title }) {
 
 // ── EVIDENCE ZONE ──────────────────────────────────────────────────────────────
 function EvidenceZone({ kase, onToggleDocs, showDocs }) {
+  const [inlineDocs, setInlineDocs]       = React.useState(kase.documents || []);
+  const [inlineDocsReady, setInlineDo]    = React.useState(false);
+
+  React.useEffect(() => {
+    setInlineDocs(kase.documents || []);
+    setInlineDo(false);
+    const realId = kase.submissionId || kase.caseId;
+    if (!realId || realId.startsWith("SYNTH") || realId.startsWith("SUB-")) { setInlineDo(true); return; }
+    const token = localStorage.getItem("cogentus_token") || "";
+    if (!token) { setInlineDo(true); return; }
+    fetch(`${API_BASE}/v1/submissions/${realId}/documents`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.documents) setInlineDocs(data.documents); })
+      .catch(() => {})
+      .finally(() => setInlineDo(true));
+  }, [kase.caseId]); // eslint-disable-line
+
   if (!kase.contract) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -1008,23 +1025,52 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
         )}
       </div>
 
-      {/* Docs footer */}
-      <div style={{ padding: "10px 16px", borderTop: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <button
-          onClick={onToggleDocs}
-          style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 7, border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`, background: showDocs ? NAVY : "#f8fafc", cursor: "pointer", transition: "all 0.15s" }}
-        >
-          <span style={{ fontSize: 12, fontWeight: 600, color: showDocs ? "#fff" : "#374151", fontFamily: FONTS.body }}>
-            {showDocs ? "Hide Docs" : "Docs"}
+      {/* Inline document list */}
+      <div style={{ borderTop: "1px solid #e2e8f0", flexShrink: 0 }}>
+        <div style={{ padding: "8px 16px 4px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.body }}>
+            Clinical Documents ({inlineDocs.length})
           </span>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: showDocs ? "rgba(255,255,255,0.2)" : "#e2e8f0", color: showDocs ? "#fff" : "#64748b", fontFamily: FONTS.body }}>
-            {(kase.documents || []).length}
-          </span>
-          <span style={{ fontSize: 10, color: showDocs ? "rgba(255,255,255,0.6)" : "#9ca3af", fontFamily: FONTS.body }}>V</span>
-        </button>
-        <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body }}>
-          Click Docs to view attached clinical documents
-        </span>
+          {inlineDocs.length > 0 && (
+            <button onClick={onToggleDocs} style={{ fontSize: 10, color: NAVY, background: "none", border: "none", cursor: "pointer", fontFamily: FONTS.body, fontWeight: 600, padding: "2px 0" }}>
+              {showDocs ? "Hide viewer" : "Open viewer ↗"}
+            </button>
+          )}
+        </div>
+        {!inlineDocsReady && (
+          <div style={{ padding: "6px 16px 10px", fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body }}>Loading…</div>
+        )}
+        {inlineDocsReady && inlineDocs.length === 0 && (
+          <div style={{ padding: "6px 16px 10px", fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents attached</div>
+        )}
+        {inlineDocsReady && inlineDocs.map((doc, i) => {
+          const name      = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
+          const signedUrl = typeof doc === "object" ? (doc.signedUrl || doc.url || doc.file_url) : null;
+          const sizeMB    = typeof doc === "object" && doc.size ? (doc.size / 1024 / 1024).toFixed(1) : null;
+          return (
+            <div key={i} style={{ padding: "6px 16px", borderTop: i === 0 ? "none" : "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, wordBreak: "break-word", flex: 1 }}>
+                📄 {name}{sizeMB ? ` · ${sizeMB} MB` : ""}
+              </span>
+              {signedUrl ? (
+                <a href={signedUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: NAVY, textDecoration: "none", fontFamily: FONTS.body, whiteSpace: "nowrap", padding: "3px 8px", borderRadius: 5, background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                  Open ↗
+                </a>
+              ) : (
+                <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body, flexShrink: 0 }}>Not stored</span>
+              )}
+            </div>
+          );
+        })}
+        {inlineDocs.length > 0 && (
+          <div style={{ padding: "6px 16px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={onToggleDocs}
+              style={{ fontSize: 11, fontWeight: 600, color: showDocs ? "#fff" : "#374151", background: showDocs ? NAVY : "#f8fafc", border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: FONTS.body }}>
+              {showDocs ? "▼ Hide Docs" : "▶ View All Docs"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1635,12 +1681,12 @@ function DocumentsPanel({ kase, onClose }) {
   const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
-    // Fetch signed URLs from the backend if the case has a real caseId
-    if (!kase.caseId || kase.caseId.startsWith("SYNTH")) { setFetched(true); return; }
+    const realId = kase.submissionId || kase.caseId;
+    if (!realId || realId.startsWith("SYNTH") || realId.startsWith("SUB-")) { setFetched(true); return; }
     const token = localStorage.getItem("cogentus_token") || "";
     if (!token) { setFetched(true); return; }
     setLoad(true);
-    fetch(`${API_BASE}/v1/submissions/${kase.caseId}/documents`, {
+    fetch(`${API_BASE}/v1/submissions/${realId}/documents`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.ok ? r.json() : null)
@@ -1963,6 +2009,7 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
 
   const liveCaseEntry = liveCase ? {
     caseId:          liveCase.caseId,
+    submissionId:    liveCase.submissionId || liveCase.caseId,
     memberName:      liveCase.memberName      || "Live Case",
     memberId:        liveCase.memberId        || "—",
     dob:             liveCase.dob             || "—",
@@ -2373,21 +2420,25 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           onClose={() => setShowSubmissions(false)}
           onRefresh={() => fetchSubmissions(setSubmissions)}
           onForward={sub => {
+            const sm = sub.extracted_metrics || {};
+            const diags = sub.diagnosis_codes || [];
             const entry = {
               caseId:          `SUB-${sub.submission_id.substring(0, 8).toUpperCase()}`,
+              submissionId:    sub.submission_id,
               memberName:      sub.member_name       || "Unknown",
               memberId:        sub.member_id         || "—",
               dob:             sub.dob               || "—",
               discipline:      sub.discipline        || "PT",
               reviewType:      sub.review_type       || "initial",
               submittedAt:     sub.submitted_at,
-              documents:       (sub.document_list || []).map(name => ({ name, type: "Provider Document", date: null })),
+              documents:       (sub.document_list || []).map(name => typeof name === "string" ? { name, type: "Provider Document", date: null } : name),
               contract:        buildSubmissionContract(sub),
               isSubmission:    true,
               providerName:    sub.provider_name     || null,
-              diagnosisCodes:  sub.diagnosis_codes   || [],
-              requestedVisits: sub.requested_visits  || null,
+              diagnosisCodes:  sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags,
+              requestedVisits: sm.requestedVisits    || sub.requested_visits || null,
               providerNotes:   sub.provider_notes    || null,
+              metrics:         { diagnosisCodes: diags, requestedVisits: sub.requested_visits||0, functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null },
             };
             setSubmissionCases(prev => {
               if (prev.some(c => c.caseId === entry.caseId)) return prev;
