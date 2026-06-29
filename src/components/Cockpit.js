@@ -606,7 +606,7 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <ZoneHeader title="Clinical Evidence" />
         <LoadingPulse label="Awaiting engine response..." />
       </div>
@@ -639,9 +639,9 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
     : rec.determination.toLowerCase().startsWith("pend") ? "#1d4ed8" : "#92400e";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <ZoneHeader title="Clinical Evidence" />
-      <div style={{ padding: "16px 20px", flex: 1, overflowY: "auto" }}>
+      <div style={{ padding: "16px 20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
 
         <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #f1f5f9" }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: NAVY, fontFamily: FONTS.heading, lineHeight: 1.2 }}>
@@ -1023,54 +1023,47 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
             )}
           </div>
         )}
-      </div>
 
-      {/* Inline document list */}
-      <div style={{ borderTop: "1px solid #e2e8f0", flexShrink: 0 }}>
-        <div style={{ padding: "8px 16px 4px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.body }}>
-            Clinical Documents ({inlineDocs.length})
-          </span>
-          {inlineDocs.length > 0 && (
-            <button onClick={onToggleDocs} style={{ fontSize: 10, color: NAVY, background: "none", border: "none", cursor: "pointer", fontFamily: FONTS.body, fontWeight: 600, padding: "2px 0" }}>
-              {showDocs ? "Hide viewer" : "Open viewer ↗"}
-            </button>
-          )}
-        </div>
-        {!inlineDocsReady && (
-          <div style={{ padding: "6px 16px 10px", fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body }}>Loading…</div>
-        )}
-        {inlineDocsReady && inlineDocs.length === 0 && (
-          <div style={{ padding: "6px 16px 10px", fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents attached</div>
-        )}
-        {inlineDocsReady && inlineDocs.map((doc, i) => {
-          const name      = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
-          const signedUrl = typeof doc === "object" ? (doc.signedUrl || doc.url || doc.file_url) : null;
-          const sizeMB    = typeof doc === "object" && doc.size ? (doc.size / 1024 / 1024).toFixed(1) : null;
-          return (
-            <div key={i} style={{ padding: "6px 16px", borderTop: i === 0 ? "none" : "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, wordBreak: "break-word", flex: 1 }}>
-                📄 {name}{sizeMB ? ` · ${sizeMB} MB` : ""}
-              </span>
-              {signedUrl ? (
-                <a href={signedUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: NAVY, textDecoration: "none", fontFamily: FONTS.body, whiteSpace: "nowrap", padding: "3px 8px", borderRadius: 5, background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                  Open ↗
-                </a>
-              ) : (
-                <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body, flexShrink: 0 }}>Not stored</span>
-              )}
-            </div>
-          );
-        })}
-        {inlineDocs.length > 0 && (
-          <div style={{ padding: "6px 16px 10px", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={onToggleDocs}
-              style={{ fontSize: 11, fontWeight: 600, color: showDocs ? "#fff" : "#374151", background: showDocs ? NAVY : "#f8fafc", border: `1px solid ${showDocs ? NAVY : "#e2e8f0"}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: FONTS.body }}>
-              {showDocs ? "▼ Hide Docs" : "▶ View All Docs"}
-            </button>
+        {/* ── Inline document list — inside the scroll area so it's always reachable ── */}
+        <div style={{ marginTop: 20, paddingTop: 14, borderTop: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONTS.body }}>
+              Clinical Documents ({inlineDocs.length})
+            </span>
+            {inlineDocs.length > 0 && (
+              <button onClick={onToggleDocs} style={{ fontSize: 10, color: NAVY, background: "none", border: "none", cursor: "pointer", fontFamily: FONTS.body, fontWeight: 600, padding: 0 }}>
+                {showDocs ? "Hide viewer" : "Full viewer ↗"}
+              </button>
+            )}
           </div>
-        )}
+          {!inlineDocsReady && (
+            <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, padding: "4px 0" }}>Loading documents…</div>
+          )}
+          {inlineDocsReady && inlineDocs.length === 0 && (
+            <div style={{ fontSize: 11, color: "#94a3b8", fontFamily: FONTS.body, fontStyle: "italic" }}>No documents attached</div>
+          )}
+          {inlineDocsReady && inlineDocs.map((doc, i) => {
+            const name      = typeof doc === "string" ? doc : (doc.name || "Unnamed document");
+            const signedUrl = typeof doc === "object" ? (doc.signedUrl || doc.url || doc.file_url) : null;
+            const sizeMB    = typeof doc === "object" && doc.size ? (doc.size / 1024 / 1024).toFixed(1) : null;
+            return (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
+                <span style={{ fontSize: 11, color: "#374151", fontFamily: FONTS.body, wordBreak: "break-word", flex: 1, minWidth: 0 }}>
+                  📄 {name}{sizeMB ? ` · ${sizeMB} MB` : ""}
+                </span>
+                {signedUrl ? (
+                  <a href={signedUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: NAVY, textDecoration: "none", fontFamily: FONTS.body, whiteSpace: "nowrap", padding: "3px 8px", borderRadius: 5, background: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                    Open ↗
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 10, color: "#94a3b8", fontFamily: FONTS.body, flexShrink: 0 }}>Not stored</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
       </div>
     </div>
   );
@@ -1080,7 +1073,7 @@ function EvidenceZone({ kase, onToggleDocs, showDocs }) {
 function RecommendationZone({ kase, engineState, selectedPlan }) {
   if (!kase.contract) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <ZoneHeader title="Recommendation" />
         <LoadingPulse label="Calling live engine..." />
       </div>
@@ -1094,7 +1087,7 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   const cs   = confidenceStyle(rec.confidence);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
       <ZoneHeader title="Recommendation" />
       <div style={{ padding: "16px 20px", flex: 1 }}>
 
@@ -1293,7 +1286,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
   const decColor = decided ? detColors(decided.determination) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflowY: "auto" }}>
       <ZoneHeader title="Determination" />
       <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
 
