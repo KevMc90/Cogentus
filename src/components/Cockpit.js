@@ -1319,8 +1319,13 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
               onChange={e => {
                 const selected = PEND_REASONS.find(r => r.value === e.target.value);
                 onPendReasonChange(e.target.value);
-                if (selected && selected.defaultDetail) onPendDetailsChange(selected.defaultDetail);
-                else if (!selected) onPendDetailsChange("");
+                if (e.target.value === "") {
+                  // Blank option selected — clear details
+                  onPendDetailsChange("");
+                } else if (selected && selected.defaultDetail && !pendDetails.trim()) {
+                  // Only auto-fill if the reviewer hasn't typed anything custom yet
+                  onPendDetailsChange(selected.defaultDetail);
+                }
               }}
               style={{
                 width: "100%", borderRadius: 6, border: "1.5px solid #93c5fd",
@@ -1335,7 +1340,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
               ))}
             </select>
             <div style={{ fontSize: 11, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 4 }}>
-              Instructions for provider{pendReason === "other" ? " (required)" : " (optional — edit if needed)"}:
+              Instructions for provider (required — edit if needed):
             </div>
             <textarea
               value={pendDetails}
@@ -1351,17 +1356,22 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             />
             <RationaleEditor value={rationaleEdit} onChange={onRationaleChange} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                onClick={onPendSubmit}
-                disabled={!pendReason || (pendReason === "other" && !pendDetails.trim())}
-                style={{
-                  flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
-                  background: (!pendReason || (pendReason === "other" && !pendDetails.trim())) ? "#93c5fd" : "#3b82f6",
-                  color: "#fff", fontSize: 12, fontWeight: 700,
-                  cursor: (!pendReason || (pendReason === "other" && !pendDetails.trim())) ? "not-allowed" : "pointer",
-                  fontFamily: FONTS.body,
-                }}
-              >Record Pend</button>
+              {(() => {
+                const isPendDisabled = !pendReason || !pendDetails.trim();
+                return (
+                  <button
+                    onClick={onPendSubmit}
+                    disabled={isPendDisabled}
+                    style={{
+                      flex: 1, padding: "7px 0", borderRadius: 6, border: "1.5px solid #3b82f6",
+                      background: isPendDisabled ? "#93c5fd" : "#3b82f6",
+                      color: "#fff", fontSize: 12, fontWeight: 700,
+                      cursor: isPendDisabled ? "not-allowed" : "pointer",
+                      fontFamily: FONTS.body,
+                    }}
+                  >Record Pend</button>
+                );
+              })()}
               <button onClick={onCancelAction} style={{
                 padding: "7px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0",
                 background: "#fff", color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: FONTS.body,
