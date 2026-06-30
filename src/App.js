@@ -7219,12 +7219,6 @@ function App() {
     catch { return null; }
   });
 
-  // View state
-  const [view, setView] = useState("reviews"); // "reviews" | "dashboard" | "cockpit"
-
-  // Live case forwarded to cockpit from form result
-  const [pendingCockpitCase, setPendingCockpitCase] = useState(null);
-
   // Plan config
   const [plans, setPlans]               = useState([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
@@ -7279,48 +7273,7 @@ function App() {
     return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
 
-  // Role-based shell routing
-  if (user.role === "reviewer") {
-    return <ReviewerShell user={user} token={token} onLogout={handleLogout} />;
-  }
-  if (user.role === "provider") {
-    return <ProviderPortal user={user} token={token} onLogout={handleLogout} />;
-  }
-  if (user.role === "master" || user.role === "admin") {
-    return <MasterShell user={user} token={token} onLogout={handleLogout} />;
-  }
-  if (user.role === "medical_director") {
-    return <MDShell user={user} token={token} onLogout={handleLogout} />;
-  }
-  // legacy / unknown role → existing UI below
-
   const authHeaders = { Authorization: `Bearer ${token}` };
-
-  // Dashboard view
-  if (view === "dashboard") {
-    return (
-      <Dashboard
-        user={user}
-        token={token}
-        onAuthError={handleAuthError}
-        onBack={() => setView("reviews")}
-      />
-    );
-  }
-
-  // Cockpit view
-  if (view === "cockpit") {
-    return (
-      <div style={{ height: "100vh" }}>
-        <Cockpit user={user} onBack={() => setView("reviews")} liveCase={pendingCockpitCase} />
-      </div>
-    );
-  }
-
-  // Submit view
-  if (view === "submit") {
-    return <SubmitCaseView user={user} token={token} plans={plans} onBack={() => setView("reviews")} />;
-  }
 
   const buildFormData = () => {
     const fd = new FormData();
@@ -7534,36 +7487,8 @@ function App() {
             </div>
           </div>
 
-          {/* Reviewer info + nav + logout */}
+          {/* User info + logout */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              onClick={() => setView("dashboard")}
-              style={{
-                background: "none",
-                border: "1px solid #cbd5e1",
-                borderRadius: 6,
-                padding: "5px 12px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "#1a3a5c",
-                cursor: "pointer",
-                fontFamily: '"DM Sans", sans-serif',
-              }}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setView("cockpit")}
-              style={{ background: "none", border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "#1a3a5c", cursor: "pointer", fontFamily: '"DM Sans", sans-serif' }}
-            >
-              Cockpit
-            </button>
-            <button
-              onClick={() => setView("submit")}
-              style={{ background: "none", border: "1px solid #cbd5e1", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "#1a3a5c", cursor: "pointer", fontFamily: '"DM Sans", sans-serif' }}
-            >
-              Submit Case
-            </button>
             <span style={{ fontSize: 13, color: "#64748b" }}>
               {user.name || user.email}
             </span>
@@ -7818,44 +7743,6 @@ function App() {
                 Generated Review
               </span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => {
-                    if (!reviewMetrics) return;
-                    const chosenPlan = plans.find(p => p.plan_id === selectedPlanId);
-                    setPendingCockpitCase({
-                      caseId:      `LIVE-${reviewId || Date.now()}`,
-                      memberName:  "Live Case",
-                      memberId:    reviewId ? `RID-${reviewId}` : "—",
-                      dob:         "—",
-                      discipline:  reviewMetrics.therapyType || "PT",
-                      reviewType,
-                      submittedAt: new Date().toISOString(),
-                      documents:   [],
-                      metrics:     reviewMetrics,
-                      ruling,
-                      planRuleSet: chosenPlan ? {
-                        planId:               chosenPlan.plan_id,
-                        planName:             chosenPlan.plan_name,
-                        payer:                chosenPlan.payer,
-                        autoApproveThreshold: chosenPlan.auto_approve_threshold,
-                        maxVisitsPerEpisode:  chosenPlan.max_visits_per_episode,
-                      } : null,
-                    });
-                    setView("cockpit");
-                  }}
-                  style={{
-                    background: "rgba(255,255,255,0.18)",
-                    border: "1px solid rgba(255,255,255,0.4)",
-                    borderRadius: 6,
-                    padding: "6px 14px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  Send to Cockpit
-                </button>
                 <button
                   onClick={handleExport}
                   style={{
