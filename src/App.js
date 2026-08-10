@@ -3498,17 +3498,29 @@ function StatusProgressBar({ status }) {
 
 function DecisionLetter({ submission, decision }) {
   const isApproved   = submission.status === "approved";
-  const isDenied     = ["denied", "partial_denial"].includes(submission.status);
+  const isPartial    = submission.status === "partial_denial";
+  const isFullDenied = submission.status === "denied";
+  const isDenied     = isPartial || isFullDenied;
   const isInfoReq    = submission.status === "info_requested";
   if (!isApproved && !isDenied && !isInfoReq) return null;
 
   const decColor = isApproved ? "#15803d" : isDenied ? "#991b1b" : "#b45309";
   const decBg    = isApproved ? "#f0fdf4" : isDenied ? "#fef2f2" : "#fffbeb";
-  const decLabel = isApproved ? "APPROVED" : isDenied ? "DENIED" : "ADDITIONAL INFORMATION REQUESTED";
+  const decLabel = isApproved ? "APPROVED" : isPartial ? "PARTIALLY APPROVED" : isDenied ? "DENIED" : "ADDITIONAL INFORMATION REQUESTED";
 
-  const approvedVisits = decision?.approved_visits ?? null;
-  const rationale      = decision?.rationale       ?? null;
-  const decidedAt      = decision?.recorded_at     ?? submission.updated_at;
+  const approvedVisits  = decision?.approved_visits ?? (isFullDenied ? 0 : null);
+  const requestedVisits = submission.requested_visits ?? null;
+  const rationale        = decision?.rationale       ?? null;
+  const decidedAt        = decision?.recorded_at     ?? submission.updated_at;
+
+  const summarySentence = (() => {
+    if (!isApproved && !isDenied) return null;
+    if (requestedVisits == null || approvedVisits == null) return null;
+    const plural = n => `${n} visit${n === 1 ? "" : "s"}`;
+    if (approvedVisits <= 0) return `This request was not approved (0 of ${plural(requestedVisits)} requested).`;
+    if (approvedVisits >= requestedVisits) return `Reviewer approved all ${plural(requestedVisits)} requested.`;
+    return `Reviewer approved ${approvedVisits} of ${plural(requestedVisits)} requested.`;
+  })();
 
   return (
     <div style={{ marginTop: 20, border: `1.5px solid ${decColor}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
@@ -3542,13 +3554,22 @@ function DecisionLetter({ submission, decision }) {
           ))}
         </div>
 
-        {/* Approved visits */}
-        {isApproved && approvedVisits != null && (
-          <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "12px 16px", marginBottom: 14 }}>
-            <span style={{ fontSize: 11, color: "#15803d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>Authorized Visits</span>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#15803d", fontFamily: "'Fraunces', Georgia, serif", lineHeight: 1.1, marginTop: 2 }}>
-              {approvedVisits} <span style={{ fontSize: 14, fontWeight: 600 }}>visits</span>
+        {/* Requested vs Approved */}
+        {(isApproved || isDenied) && requestedVisits != null && approvedVisits != null && (
+          <div style={{ background: decBg, border: `1px solid ${decColor}`, borderRadius: 8, padding: "12px 16px", marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: decColor, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'DM Sans', sans-serif" }}>Visits Requested vs. Approved</span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#6b7280", fontFamily: "'Fraunces', Georgia, serif" }}>
+                {requestedVisits} <span style={{ fontSize: 12, fontWeight: 600 }}>requested</span>
+              </div>
+              <span style={{ fontSize: 16, color: "#9ca3af" }}>→</span>
+              <div style={{ fontSize: 28, fontWeight: 800, color: decColor, fontFamily: "'Fraunces', Georgia, serif" }}>
+                {approvedVisits} <span style={{ fontSize: 14, fontWeight: 600 }}>approved</span>
+              </div>
             </div>
+            {summarySentence && (
+              <div style={{ fontSize: 12, color: "#374151", marginTop: 8, fontFamily: "'Public Sans', sans-serif" }}>{summarySentence}</div>
+            )}
           </div>
         )}
 
@@ -3566,7 +3587,7 @@ function DecisionLetter({ submission, decision }) {
             {isApproved
               ? "This authorization is valid for the services and dates specified. Contact CogentCR if clinical circumstances change."
               : isDenied
-              ? "This determination is subject to appeal within 60 calendar days of receipt. Contact your case coordinator for appeal instructions."
+              ? "You may accept the authorized visits above, or request a peer-to-peer review with the reviewing clinician from the case detail below."
               : "Please upload the requested documentation and resubmit within 5 business days to avoid case closure."}
           </div>
           <button
@@ -4056,6 +4077,43 @@ function P2PRequestModal({ submissionId, memberName, token, onClose, onSuccess }
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCEPT VISITS MODAL (provider)
+// ─────────────────────────────────────────────────────────────────────────────
+function AcceptVisitsModal({ submission, token, onClose, onSuccess }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState("");
+
+  const handleConfirm = () => {
+    setSubmitting(true); setError("");
+    axios.post(`${API_BASE}/v1/submissions/${submission.submission_id}/accept`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(() => onSuccess())
+      .catch(err => { setError(err.response?.data?.error || "Failed to accept visits."); setSubmitting(false); });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000, padding: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 28, maxWidth: 460, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Accept Authorized Visits</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16, fontFamily: "'Public Sans', sans-serif" }}>{submission.member_name} · {submission.discipline}</div>
+        <div style={{ fontSize: 13, color: "#374151", marginBottom: 20, fontFamily: "'Public Sans', sans-serif", lineHeight: 1.6 }}>
+          This confirms you are accepting the visits authorized on this case as final, in lieu of requesting a peer-to-peer review. This action is recorded on the case's audit trail.
+        </div>
+        {error && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, color: "#dc2626", fontFamily: "'Public Sans', sans-serif" }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Cancel</button>
+          <button onClick={handleConfirm} disabled={submitting}
+            style={{ padding: "10px 20px", borderRadius: 8, background: "#15803d", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, fontFamily: "'Public Sans', sans-serif" }}>
+            {submitting ? "Accepting…" : "Accept Visits"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -4951,9 +5009,7 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
   const [expanded, setExpanded]       = useState(null);
   const [decisions, setDecisions]     = useState({});
   const [p2pModal, setP2pModal]       = useState(null);
-  const [p2pSuccess, setP2pSuccess]   = useState({});
-  const [appealModal, setAppealModal] = useState(null);
-  const [appealSuccess, setAppealSuccess] = useState({});
+  const [acceptModal, setAcceptModal] = useState(null);
   const [editTarget, setEditTarget]     = useState(null);
   const [resubmitSuccess, setResubmitSuccess] = useState({});
   const [plans, setPlans]               = useState([]);
@@ -5026,10 +5082,10 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
   if (loading) return <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 13, fontFamily: "'Public Sans', sans-serif" }}>Loading...</div>;
 
   const canRequestP2P = (sub) =>
-    ["denied", "pending_md_review"].includes(sub.status) && !p2pSuccess[sub.submission_id];
+    ["denied", "partial_denial"].includes(sub.status) && !sub.p2p_requested;
 
-  const canFileAppeal = (sub) =>
-    ["denied", "partial_denial"].includes(sub.status) && !appealSuccess[sub.submission_id];
+  const canAcceptVisits = (sub) =>
+    ["denied", "partial_denial"].includes(sub.status) && sub.provider_response !== "accepted";
 
   return (
     <div style={{ maxWidth: 760, margin: "28px auto", padding: "0 24px" }}>
@@ -5085,21 +5141,15 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
           memberName={p2pModal.member_name}
           token={token}
           onClose={() => setP2pModal(null)}
-          onSuccess={() => {
-            setP2pSuccess(prev => ({ ...prev, [p2pModal.submission_id]: true }));
-            setP2pModal(null);
-          }}
+          onSuccess={() => { setP2pModal(null); loadSubmissions(); }}
         />
       )}
-      {appealModal && (
-        <AppealModal
-          submission={appealModal}
+      {acceptModal && (
+        <AcceptVisitsModal
+          submission={acceptModal}
           token={token}
-          onClose={() => setAppealModal(null)}
-          onSuccess={() => {
-            setAppealSuccess(prev => ({ ...prev, [appealModal.submission_id]: true }));
-            setAppealModal(null);
-          }}
+          onClose={() => setAcceptModal(null)}
+          onSuccess={() => { setAcceptModal(null); loadSubmissions(); }}
         />
       )}
       {filteredSubs.map(sub => {
@@ -5129,11 +5179,14 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
                   {canRequestP2P(sub) && (
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#fef3c7", color: "#92400e", borderRadius: 5, padding: "2px 7px" }}>P2P AVAILABLE</span>
                   )}
-                  {canFileAppeal(sub) && (
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "#fef2f2", color: "#dc2626", borderRadius: 5, padding: "2px 7px" }}>APPEAL AVAILABLE</span>
+                  {sub.p2p_requested && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#d1fae5", color: "#065f46", borderRadius: 5, padding: "2px 7px" }}>P2P REQUESTED</span>
                   )}
-                  {appealSuccess[sub.submission_id] && (
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "#d1fae5", color: "#065f46", borderRadius: 5, padding: "2px 7px" }}>APPEAL FILED</span>
+                  {canAcceptVisits(sub) && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#f0fdf4", color: "#15803d", borderRadius: 5, padding: "2px 7px", border: "1px solid #86efac" }}>ACCEPT AVAILABLE</span>
+                  )}
+                  {sub.provider_response === "accepted" && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#d1fae5", color: "#065f46", borderRadius: 5, padding: "2px 7px" }}>VISITS ACCEPTED</span>
                   )}
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>
@@ -5208,27 +5261,27 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
                     </button>
                   </div>
                 )}
-                {p2pSuccess[sub.submission_id] && (
+                {sub.p2p_requested && (
                   <div style={{ marginTop: 12, padding: "12px 16px", background: "#d1fae5", borderRadius: 8, border: "1px solid #6ee7b7", fontSize: 13, color: "#065f46", fontFamily: "'Public Sans', sans-serif" }}>
                     ✓ P2P request submitted — you will be notified when a time is confirmed.
                   </div>
                 )}
-                {/* Appeal filing */}
-                {canFileAppeal(sub) && (
-                  <div style={{ marginTop: 10, padding: "14px 16px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fca5a5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                {/* Accept visits */}
+                {canAcceptVisits(sub) && (
+                  <div style={{ marginTop: 10, padding: "14px 16px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #86efac", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", fontFamily: "'Public Sans', sans-serif" }}>Not satisfied with this outcome?</div>
-                      <div style={{ fontSize: 12, color: "#7f1d1d", marginTop: 2 }}>You may file a formal Level 1 appeal within 60 days of this determination.</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#15803d", fontFamily: "'Public Sans', sans-serif" }}>Ready to move forward?</div>
+                      <div style={{ fontSize: 12, color: "#166534", marginTop: 2 }}>Accept the authorized visits to close this case without a P2P.</div>
                     </div>
-                    <button onClick={e => { e.stopPropagation(); setAppealModal(sub); }}
-                      style={{ flexShrink: 0, marginLeft: 16, padding: "8px 16px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
-                      File Appeal
+                    <button onClick={e => { e.stopPropagation(); setAcceptModal(sub); }}
+                      style={{ flexShrink: 0, marginLeft: 16, padding: "8px 16px", background: "#15803d", color: "#fff", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                      Accept Visits
                     </button>
                   </div>
                 )}
-                {appealSuccess[sub.submission_id] && (
+                {sub.provider_response === "accepted" && (
                   <div style={{ marginTop: 10, padding: "12px 16px", background: "#d1fae5", borderRadius: 8, border: "1px solid #6ee7b7", fontSize: 13, color: "#065f46", fontFamily: "'Public Sans', sans-serif" }}>
-                    ✓ Level 1 appeal filed — you will be notified of the decision within 30 days.
+                    ✓ Visits accepted{sub.provider_responded_at ? ` on ${new Date(sub.provider_responded_at).toLocaleDateString()}` : ""}.
                   </div>
                 )}
                 {!["approved","denied","info_requested","pending_md_review","partial_denial"].includes(sub.status) && !resubmitSuccess[sub.submission_id] && (
@@ -5248,7 +5301,7 @@ function MyCasesView({ token, deepLinkCaseId, onDeepLinkConsumed }) {
 }
 
 // ── PROVIDER DASHBOARD ────────────────────────────────────────────────────────
-function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
+function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases, onNavigateToCase }) {
   const [stats, setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -5344,7 +5397,13 @@ function ProviderDashboard({ token, clinicProfile, onNewAuth, onViewCases }) {
           };
           const sc = statusColors[r.status] || { bg: "#f3f4f6", text: "#374151" };
           return (
-            <div key={r.submission_id} style={{ padding: "13px 20px", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", gap: 14 }}>
+            <div
+              key={r.submission_id}
+              onClick={() => onNavigateToCase && onNavigateToCase(r.submission_id)}
+              style={{ padding: "13px 20px", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "background 0.1s" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#f8fafc"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'Public Sans', sans-serif" }}>{r.member_name || "Unknown Member"}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, fontFamily: "'DM Sans', monospace" }}>{r.discipline} · {r.requested_visits} visits · {diags[0] || "—"}</div>
@@ -5611,7 +5670,7 @@ function ProviderPortal({ user, token, onLogout }) {
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "'Public Sans', system-ui, sans-serif" }}>
       {HEADER}{TABS}
-      {provView === "dashboard"      && <ProviderDashboard token={token} clinicProfile={clinicProfile} onNewAuth={() => setProvView("new_submission")} onViewCases={v => setProvView(v)} />}
+      {provView === "dashboard"      && <ProviderDashboard token={token} clinicProfile={clinicProfile} onNewAuth={() => setProvView("new_submission")} onViewCases={v => setProvView(v)} onNavigateToCase={handleNavigateToCase} />}
       {provView === "new_submission" && <NewSubmissionForm token={token} clinicProfile={clinicProfile} onSubmitted={handleSubmitted} />}
       {provView === "my_cases"       && <MyCasesView token={token} deepLinkCaseId={deepLinkCaseId} onDeepLinkConsumed={() => setDeepLinkCaseId(null)} />}
       {provView === "settings"       && <ClinicSettingsView token={token} profile={clinicProfile} onSaved={p => setClinicProfile(p)} />}
