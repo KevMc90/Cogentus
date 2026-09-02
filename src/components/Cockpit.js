@@ -71,7 +71,7 @@ const SYNTH_QUEUE = [
           "Pain 6/10; ROM: Flex 110°/180°, Abd 95°/180°, ER 55°/90°",
           "MMT: Supraspinatus 3/5, Deltoid 4−/5, Biceps 4/5",
           "Skilled: Manual therapy, Therapeutic exercise, NMR",
-          "APTA CPG Shoulder (2021): MCG typical 10 visits (p75: 16)",
+          "APTA CPG Shoulder (2021): benchmark typical 10 visits (p75: 16)",
         ],
         rationale: "Approved — Skilled PT is supported for Left shoulder pain (M25.561) with pain of 6/10, significant ROM deficits, and MMT averaging 3.7/5. Per APTA CPG, 2x/week is supported for severe presentation. Approving 12 visits at 2x/week × 6 weeks.",
         confidence: "high",
@@ -137,7 +137,7 @@ const SYNTH_QUEUE = [
           "ROM: Knee Flex 108°/135°, Ext -5°/0°; KOOS 52/100",
           "Pain 4/10; 2 functional limitations; 8 VTD",
           "Requested 3x/week > CPG max 2x/week for moderate presentation",
-          "APTA CPG Knee OA (2021): MCG typical 8 visits (p75: 12)",
+          "APTA CPG Knee OA (2021): benchmark typical 8 visits (p75: 12)",
         ],
         rationale: "Partial Denial — Unsupported Frequency: Skilled PT is supported for right knee OA (M17.11). Requested 3x/week exceeds the evidence-supported maximum of 2x/week per APTA CPG. Approving 11 visits at 2x/week × 6 weeks.",
         confidence: "high",
@@ -258,7 +258,7 @@ const SYNTH_QUEUE = [
           "FIM 68/126 (severe functional impairment)",
           "ADL: Max Assist dressing/grooming; Dependent meal prep",
           "Skilled: NMR, ADL training, CIMT",
-          "AOTA CPG Stroke Rehab (2022): MCG typical 20 visits (p75: 32)",
+          "AOTA CPG Stroke Rehab (2022): benchmark typical 20 visits (p75: 32)",
         ],
         rationale: "Approved — Skilled OT is supported for right hemiplegia post-CVA (G81.91). FIM score of 68 indicates severe functional impairment across ADLs. Per AOTA CPG Stroke Rehab (2022), 5x/week is supported for severe presentation. Approving 20 visits at 5x/week × 4 weeks.",
         confidence: "high",
@@ -321,7 +321,7 @@ const SYNTH_QUEUE = [
           "CELF-5 SS 64 / PLS-5 AC SS 62 (both severe range, <70)",
           "Language age equivalent 2y 4m vs. chronological age 7y 0m",
           "Skilled: Structured language therapy, AAC training, parent education",
-          "ASHA CPG Language Disorders (2021): MCG typical 20 visits (p75: 36)",
+          "ASHA CPG Language Disorders (2021): benchmark typical 20 visits (p75: 36)",
         ],
         rationale: "Approved — Skilled ST is supported for mixed receptive-expressive language disorder (F80.2). CELF-5 Core Language SS of 64 indicates severe impairment with language age equivalent 2y 4m vs. chronological age 7y 0m. Per ASHA CPG, 3x/week is supported for severe presentation. Approving 32 visits at 3x/week × 12 weeks.",
         confidence: "high",
@@ -1195,7 +1195,7 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
           <div style={{ marginBottom: 16, padding: "8px 10px", background: "#eff6ff", borderRadius: 6, border: "1px solid #bfdbfe" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 2 }}>CPG Reference</div>
             <div style={{ fontSize: 11, color: "#1e3a5f", fontFamily: FONTS.body }}>
-              {cpg.cpgCitation} · MCG typical: <strong>{cpg.mcgTypical}</strong> · p75: <strong>{cpg.mcgP75}</strong>
+              {cpg.cpgCitation} · benchmark typical: <strong>{cpg.mcgTypical}</strong> · p75: <strong>{cpg.mcgP75}</strong>
             </div>
           </div>
         )}

@@ -2472,7 +2472,7 @@ function CriteriaLibraryView({ token }) {
   const DISC_TABS = [["","All"], ["PT","PT"], ["OT","OT"], ["ST","ST"]];
 
   const ex = detail?.criteria_json || {};
-  const mcg = ex.mcg || {};
+  const vb = ex.visit_benchmarks || ex.mcg || {};
   const cpg = ex.cpg || {};
   const freqBySev = ex.frequency_by_severity || {};
   const severityRows = Object.entries(freqBySev);
@@ -2577,17 +2577,17 @@ function CriteriaLibraryView({ token }) {
                 </div>
               </div>
 
-              {/* MCG benchmarks */}
-              {(mcg.typical_visits || mcg.median_visits) && (
+              {/* Visit benchmarks */}
+              {(vb.typical_visits || vb.median_visits) && (
                 <>
-                  <SectionHead>MCG Visit Benchmarks</SectionHead>
+                  <SectionHead>Visit Benchmarks</SectionHead>
                   <Card>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 0" }}>
                       {[
-                        ["Typical", mcg.typical_visits],
-                        ["Median",  mcg.median_visits],
-                        ["P75",     mcg.p75_visits],
-                        ["Episode Max", mcg.max_visits_episode],
+                        ["Typical", vb.typical_visits],
+                        ["Median",  vb.median_visits],
+                        ["P75",     vb.p75_visits],
+                        ["Episode Max", vb.max_visits_episode],
                       ].filter(([,v]) => v).map(([label, val]) => (
                         <div key={label} style={{ textAlign: "center" }}>
                           <div style={{ fontSize: 24, fontWeight: 800, color: "#1a3a5c", fontFamily: "'Fraunces', Georgia, serif" }}>{val}</div>
@@ -2595,7 +2595,8 @@ function CriteriaLibraryView({ token }) {
                         </div>
                       ))}
                     </div>
-                    {mcg.notes && <div style={{ marginTop: 12, fontSize: 12, color: "#4b5563", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.6, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>{mcg.notes}</div>}
+                    {vb.notes && <div style={{ marginTop: 12, fontSize: 12, color: "#4b5563", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.6, borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>{vb.notes}</div>}
+                    {vb.provenance_note && <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af", fontFamily: "'Public Sans', sans-serif", lineHeight: 1.5, fontStyle: "italic" }}>Provenance{vb.provenance ? ` (${vb.provenance})` : ""}: {vb.provenance_note}</div>}
                   </Card>
                 </>
               )}
@@ -4450,7 +4451,7 @@ function AppealModal({ submission, token, onClose, onSuccess }) {
   const GROUNDS_OPTIONS = [
     "Determination not supported by clinical evidence",
     "Documentation was complete; re-review requested",
-    "Incorrect application of MCG/clinical criteria",
+    "Incorrect application of clinical criteria",
     "Benefit coverage dispute",
     "Other",
   ];
