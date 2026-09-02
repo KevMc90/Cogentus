@@ -2472,7 +2472,7 @@ function CriteriaLibraryView({ token }) {
   const DISC_TABS = [["","All"], ["PT","PT"], ["OT","OT"], ["ST","ST"]];
 
   const ex = detail?.criteria_json || {};
-  const vb = ex.visit_benchmarks || ex.mcg || {};
+  const vb = ex.visit_benchmarks || {};
   const cpg = ex.cpg || {};
   const freqBySev = ex.frequency_by_severity || {};
   const severityRows = Object.entries(freqBySev);

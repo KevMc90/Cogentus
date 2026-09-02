@@ -77,7 +77,7 @@ const SYNTH_QUEUE = [
         confidence: "high",
         autoApprovalEligible: true,
       },
-      cpgInfo: { diagCode: "M25.561", conditionLabel: "Shoulder pain — non-operative", mcgTypical: 10, mcgP75: 16, mcgMax: 28, cpgCitation: "APTA CPG Shoulder (2021)" },
+      cpgInfo: { diagCode: "M25.561", conditionLabel: "Shoulder pain — non-operative", typicalVisits: 10, p75Visits: 16, maxEpisodeVisits: 28, cpgCitation: "APTA CPG Shoulder (2021)" },
     },
   },
   {
@@ -143,7 +143,7 @@ const SYNTH_QUEUE = [
         confidence: "high",
         autoApprovalEligible: false,
       },
-      cpgInfo: { diagCode: "M17.11", conditionLabel: "Knee osteoarthritis — non-operative", mcgTypical: 8, mcgP75: 12, mcgMax: 20, cpgCitation: "APTA CPG Knee OA (2021)" },
+      cpgInfo: { diagCode: "M17.11", conditionLabel: "Knee osteoarthritis — non-operative", typicalVisits: 8, p75Visits: 12, maxEpisodeVisits: 20, cpgCitation: "APTA CPG Knee OA (2021)" },
     },
   },
   {
@@ -197,7 +197,7 @@ const SYNTH_QUEUE = [
         confidence: "low",
         autoApprovalEligible: false,
       },
-      cpgInfo: { diagCode: "M51.16", conditionLabel: "Lumbar disc degeneration — non-operative", mcgTypical: 10, mcgP75: 14, mcgMax: 20, cpgCitation: "APTA CPG Lumbar Spine (2021)" },
+      cpgInfo: { diagCode: "M51.16", conditionLabel: "Lumbar disc degeneration — non-operative", typicalVisits: 10, p75Visits: 14, maxEpisodeVisits: 20, cpgCitation: "APTA CPG Lumbar Spine (2021)" },
     },
   },
   {
@@ -264,7 +264,7 @@ const SYNTH_QUEUE = [
         confidence: "high",
         autoApprovalEligible: false,
       },
-      cpgInfo: { diagCode: "G81.91", conditionLabel: "Hemiplegia — CVA (OT)", mcgTypical: 20, mcgP75: 32, mcgMax: 48, cpgCitation: "AOTA CPG Stroke Rehab (2022)" },
+      cpgInfo: { diagCode: "G81.91", conditionLabel: "Hemiplegia — CVA (OT)", typicalVisits: 20, p75Visits: 32, maxEpisodeVisits: 48, cpgCitation: "AOTA CPG Stroke Rehab (2022)" },
     },
   },
   {
@@ -327,7 +327,7 @@ const SYNTH_QUEUE = [
         confidence: "high",
         autoApprovalEligible: false,
       },
-      cpgInfo: { diagCode: "F80.2", conditionLabel: "Mixed receptive-expressive language disorder (ST)", mcgTypical: 20, mcgP75: 36, mcgMax: 52, cpgCitation: "ASHA CPG Language Disorders (2021)" },
+      cpgInfo: { diagCode: "F80.2", conditionLabel: "Mixed receptive-expressive language disorder (ST)", typicalVisits: 20, p75Visits: 36, maxEpisodeVisits: 52, cpgCitation: "ASHA CPG Language Disorders (2021)" },
     },
   },
 ];
@@ -1195,7 +1195,7 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
           <div style={{ marginBottom: 16, padding: "8px 10px", background: "#eff6ff", borderRadius: 6, border: "1px solid #bfdbfe" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#1d4ed8", fontFamily: FONTS.body, marginBottom: 2 }}>CPG Reference</div>
             <div style={{ fontSize: 11, color: "#1e3a5f", fontFamily: FONTS.body }}>
-              {cpg.cpgCitation} · benchmark typical: <strong>{cpg.mcgTypical}</strong> · p75: <strong>{cpg.mcgP75}</strong>
+              {cpg.cpgCitation} · benchmark typical: <strong>{cpg.typicalVisits}</strong> · p75: <strong>{cpg.p75Visits}</strong>
             </div>
           </div>
         )}
