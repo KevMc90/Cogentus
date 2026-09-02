@@ -5,7 +5,7 @@ import Cockpit from "./components/Cockpit";
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.NEXT_PUBLIC_API_BASE ||
-  "https://cogentus-backend.onrender.com";
+  "https://rapidnote-backend.onrender.com";
 
 // ── TAT helpers (mirrors backend computeTatStatus) ───────────────────────────
 function computeTat(sub) {
