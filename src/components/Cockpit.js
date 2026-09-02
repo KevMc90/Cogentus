@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
-  "https://cogentus-backend.onrender.com";
+  "https://rapidnote-backend.onrender.com";
 
 // ── PEND REASONS ───────────────────────────────────────────────────────────────
 const PEND_REASONS = [
