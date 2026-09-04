@@ -7920,6 +7920,32 @@ function App() {
 
             <DocumentSummary summary={documentSummary} />
 
+            {/* ISSUE 3 — Requested (provider) vs. Recommended (ruling) side-by-side.
+                This is the actual live demo UR form output (the legacy single-page
+                App() form) -- distinct from URFormEmbed, the reviewer-tools-tab copy
+                of this same form reachable only from inside ReviewerShell. Both got
+                this fix; this is the one demo-ur-only's App() actually renders. */}
+            {ruling && reviewMetrics && (() => {
+              const reqText = [reviewMetrics.requestedFrequency, reviewMetrics.poc].filter(Boolean).join(" ");
+              const { freqPerWeek: reqFreq, durationWeeks: reqWeeks } = parseRequestedFreqWeeks(reqText);
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "16px 28px 0" }}>
+                  <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: '"DM Sans", sans-serif' }}>Requested (provider)</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", fontFamily: '"DM Sans", sans-serif' }}>
+                      {formatVisitLine(reviewMetrics.requestedVisits, reqFreq, reqWeeks)}
+                    </div>
+                  </div>
+                  <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: '"DM Sans", sans-serif' }}>Recommended</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", fontFamily: '"DM Sans", sans-serif' }}>
+                      {formatVisitLine(ruling.visitsApproved, ruling.approvedFrequency, ruling.approvedDurationWeeks)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {sections.map(({ label: secLabel, content }, idx) => (
               <ReviewSection
                 key={secLabel}
