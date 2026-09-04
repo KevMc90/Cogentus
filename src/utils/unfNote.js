@@ -62,6 +62,63 @@ export function formatPoc(raw) {
 }
 
 /**
+ * Auto-generate the HPI/Care History sentence from structured data, for when
+ * no HPI text was entered manually. All inputs are already-resolved values
+ * (age as a number, diagnosisDescription as lowercased text, ieDate as
+ * MM/DD/YYYY) — computing them from raw extraction/episode data is backend
+ * work (age math, the ICD reference table, episode lookups; see
+ * rapidnote-backend/utils/hpiData.js and GET /v1/episode-context) attached to
+ * the contract/response, never duplicated here. This function only assembles
+ * the sentence, so it's identical on the cockpit and the demo form.
+ *
+ * Format: "[age] year old [sex], [diagnosis], IE [date]." — and, only for a
+ * subsequent review with a known total, " Total Approved [N] visits." Any
+ * missing piece is dropped gracefully (no "undefined", no dangling comma);
+ * returns null (never an empty string) when nothing at all is available, so
+ * the caller can fall back to "[No HPI provided]".
+ *
+ * @param {object} input
+ * @param {number|null} input.age
+ * @param {string|null} input.sex
+ * @param {string|null} input.diagnosisDescription
+ * @param {string|null} input.ieDate
+ * @param {number|null} input.totalApprovedVisits
+ * @param {boolean} input.isSubsequent
+ * @returns {string|null}
+ */
+export function buildAutoHpi({ age, sex, diagnosisDescription, ieDate, totalApprovedVisits, isSubsequent } = {}) {
+  const ageSexParts = [];
+  if (typeof age === "number" && Number.isFinite(age) && age >= 0) {
+    ageSexParts.push(`${age} year old`);
+  }
+  if (typeof sex === "string" && sex.trim()) {
+    ageSexParts.push(sex.trim());
+  }
+
+  const clauses = [];
+  if (ageSexParts.length > 0) clauses.push(ageSexParts.join(" "));
+  if (typeof diagnosisDescription === "string" && diagnosisDescription.trim()) {
+    clauses.push(diagnosisDescription.trim());
+  }
+
+  let sentence = clauses.join(", ");
+
+  const ieDateClean = typeof ieDate === "string" && ieDate.trim() ? ieDate.trim() : null;
+  if (ieDateClean) {
+    sentence = sentence ? `${sentence}, IE ${ieDateClean}.` : `IE ${ieDateClean}.`;
+  } else if (sentence) {
+    sentence = `${sentence}.`;
+  }
+
+  if (isSubsequent && typeof totalApprovedVisits === "number" && Number.isFinite(totalApprovedVisits)) {
+    const visitsClause = `Total Approved ${totalApprovedVisits} visit${totalApprovedVisits === 1 ? "" : "s"}.`;
+    sentence = sentence ? `${sentence} ${visitsClause}` : visitsClause;
+  }
+
+  return sentence || null;
+}
+
+/**
  * Build the Universal Note Format text block:
  *
  *   HPI/Care History:
@@ -83,7 +140,10 @@ export function formatPoc(raw) {
  *   ...
  *
  * @param {object} input
- * @param {string|null} input.hpi
+ * @param {string|null} input.hpi — manually-entered HPI text; takes precedence
+ *   verbatim over autoHpiData whenever non-empty (reviewer/provider always wins)
+ * @param {object|null} input.autoHpiData — passed to buildAutoHpi() when `hpi`
+ *   is empty/whitespace-only; see that function for shape
  * @param {string|null} input.clinicalSummary
  * @param {string|null} input.poc — raw/verbatim POC text (cleaned/formatted here)
  * @param {number|null} input.requestedVisits
@@ -91,11 +151,13 @@ export function formatPoc(raw) {
  * @param {number|null} input.approvedVisits
  * @returns {string}
  */
-export function buildUNFNote({ hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits }) {
+export function buildUNFNote({ hpi, autoHpiData, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits }) {
   const pocFormatted = formatPoc(cleanPoc(poc));
+  const manualHpi = typeof hpi === "string" ? hpi.trim() : "";
+  const hpiText = manualHpi || buildAutoHpi(autoHpiData || {}) || "[No HPI provided]";
   return [
     "HPI/Care History:",
-    (hpi || "").trim() || "[No HPI provided]",
+    hpiText,
     "",
     "Clinical Summary:",
     clinicalSummary || "[Unable to extract clinical summary from document]",

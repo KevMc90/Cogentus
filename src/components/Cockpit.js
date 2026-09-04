@@ -1322,23 +1322,61 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, compact }
 function UNFNotePanel({ kase }) {
   const rec = kase.contract.recommendation;
   const ext = kase.contract.extraction || {};
+  const isSubsequent = kase.reviewType === "subsequent";
 
-  // Recomputed only when kase.contract or kase.providerNotes actually change (a
-  // new case loaded, or the engine re-evaluating after a plan change) -- never
-  // on every render, so an in-progress edit below isn't silently overwritten by
+  // Auto-HPI (subsequent only) — the current submission's own hpiData.ieDate is
+  // frequently null for a subsequent review (only populated when the document
+  // itself restates the original IE date), and it never carries "visits
+  // authorized to date" at all. This reuses GET /v1/episode-context (Issue 1's
+  // endpoint) for the true initial IE date/age and the SAME cumulativeVisits
+  // the header bar shows -- not recomputed here. Best-effort: any failure just
+  // leaves the override empty, falling back to the current submission's own
+  // hpiData (or, failing that, "[No HPI provided]" via buildUNFNote).
+  const [episodeOverride, setEpisodeOverride] = useState(null);
+  useEffect(() => {
+    setEpisodeOverride(null);
+    if (!isSubsequent || !kase.memberId || kase.memberId === "—" || !kase.discipline) return;
+    const token = localStorage.getItem("cogentus_token") || "";
+    if (!token) return;
+    let cancelled = false;
+    fetch(`${API_BASE}/v1/episode-context?memberId=${encodeURIComponent(kase.memberId)}&discipline=${encodeURIComponent(kase.discipline)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled && data) setEpisodeOverride(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isSubsequent, kase.memberId, kase.discipline]);
+
+  // Recomputed only when kase.contract, kase.providerNotes, or the episode
+  // override actually change (a new case loaded, the engine re-evaluating
+  // after a plan change, or the episode fetch above resolving) -- never on
+  // every render, so an in-progress edit below isn't silently overwritten by
   // unrelated cockpit state changes (e.g. typing in a pend-detail box). Reads
   // the raw kase.contract.* paths directly (not the ext/rec aliases declared
-  // above, which are only for the JSX below) so the dependency array only
-  // needs kase.contract itself -- no derived locals to keep in sync by hand,
-  // and no eslint-disable needed.
-  const builtNote = useMemo(() => buildUNFNote({
-    hpi:               kase.providerNotes,
-    clinicalSummary:   kase.contract.clinicalSummary,
-    poc:               kase.contract.extraction?.poc,
-    requestedVisits:   kase.contract.extraction?.requestedVisits,
-    determinationLine: kase.contract.recommendation.rationale,
-    approvedVisits:    kase.contract.recommendation.approvedVisits,
-  }), [kase.contract, kase.providerNotes]);
+  // above, which are only for the JSX below) so the dependency array doesn't
+  // need to track them separately, and no eslint-disable is needed.
+  const builtNote = useMemo(() => {
+    const base = kase.contract.hpiData || {};
+    const override = episodeOverride?.subsequentHpiOverride;
+    const autoHpiData = {
+      age:                   override?.age ?? base.age ?? null,
+      sex:                   base.sex ?? null,
+      diagnosisDescription:  base.diagnosisDescription ?? null,
+      ieDate:                override?.ieDate ?? base.ieDate ?? null,
+      totalApprovedVisits:   isSubsequent ? (episodeOverride?.cumulativeVisits ?? null) : null,
+      isSubsequent,
+    };
+    return buildUNFNote({
+      hpi:               kase.providerNotes,
+      autoHpiData,
+      clinicalSummary:   kase.contract.clinicalSummary,
+      poc:               kase.contract.extraction?.poc,
+      requestedVisits:   kase.contract.extraction?.requestedVisits,
+      determinationLine: kase.contract.recommendation.rationale,
+      approvedVisits:    kase.contract.recommendation.approvedVisits,
+    });
+  }, [kase.contract, kase.providerNotes, isSubsequent, episodeOverride]);
 
   const [noteText, setNoteText] = useState(builtNote);
   const [copied, setCopied]     = useState(false);

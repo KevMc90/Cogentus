@@ -3120,6 +3120,7 @@ function URFormEmbed({ user, token }) {
   const [files, setFiles]             = useState([]);
   const [review, setReview]           = useState("");
   const [clinicalSummary, setClinicalSummary] = useState("");
+  const [hpiData, setHpiData]         = useState(null);
   const [ruling, setRuling]           = useState(null);
   const [metrics, setMetrics]         = useState(null);
   const [loading, setLoading]         = useState(false);
@@ -3127,7 +3128,7 @@ function URFormEmbed({ user, token }) {
   const authHeaders = { Authorization: `Bearer ${token}` };
 
   const handleSubmit = async () => {
-    setError(""); setReview(""); setClinicalSummary(""); setRuling(null); setMetrics(null);
+    setError(""); setReview(""); setClinicalSummary(""); setHpiData(null); setRuling(null); setMetrics(null);
     if (files.length === 0) { setError("Please attach at least one PDF."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
     setLoading(true);
@@ -3141,6 +3142,7 @@ function URFormEmbed({ user, token }) {
       const res = await axios.post(`${API_BASE}/api/generate-review`, fd, { headers: { "Content-Type": "multipart/form-data", ...authHeaders } });
       setReview(res.data.review || "");
       setClinicalSummary(res.data.clinicalSummary || "");
+      setHpiData(res.data.hpiData || null);
       setRuling(res.data.ruling || null);
       setMetrics(res.data.metrics || null);
     } catch (err) {
@@ -3201,10 +3203,20 @@ function URFormEmbed({ user, token }) {
         })()}
         {/* UNF panel — same note-builder as the main cockpit (src/utils/unfNote.js).
             review (the old pre-formatted string) is no longer rendered directly;
-            the note is built from the same resolved values ruling/metrics carry. */}
+            the note is built from the same resolved values ruling/metrics carry.
+            Auto-HPI: hpiData (age/sex/diagnosis/ieDate) comes from the backend's
+            shared utils/hpiData.js, same as the cockpit. There's no episode/DB
+            here to look up a true prior-visits total, so totalApprovedVisits uses
+            metrics.previouslyApprovedVisits -- what the document itself states,
+            the best available signal for a standalone demo submission. */}
         {ruling && metrics && (
           <UNFNoteBox
             hpi={hpi}
+            autoHpiData={{
+              ...(hpiData || {}),
+              totalApprovedVisits: reviewType === "subsequent" ? (metrics.previouslyApprovedVisits ?? null) : null,
+              isSubsequent: reviewType === "subsequent",
+            }}
             clinicalSummary={clinicalSummary}
             poc={metrics.poc}
             requestedVisits={metrics.requestedVisits}
@@ -3224,10 +3236,10 @@ function URFormEmbed({ user, token }) {
 // from src/utils/unfNote.js so the two surfaces can never show different note
 // text for the same underlying values. Edits are local UI state only and
 // never write back to ruling/metrics.
-function UNFNoteBox({ hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits, exportFileName }) {
+function UNFNoteBox({ hpi, autoHpiData, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits, exportFileName }) {
   const builtNote = useMemo(() => buildUNFNote({
-    hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits,
-  }), [hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits]);
+    hpi, autoHpiData, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits,
+  }), [hpi, autoHpiData, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits]);
 
   const [noteText, setNoteText] = useState(builtNote);
   const [copied, setCopied]     = useState(false);
@@ -7428,6 +7440,7 @@ function App() {
   const [files, setFiles]                     = useState([]);
   const [review, setReview]                   = useState("");
   const [clinicalSummary, setClinicalSummary] = useState("");
+  const [hpiData, setHpiData]                 = useState(null);
   const [ruling, setRuling]                   = useState(null);
   const [reviewId, setReviewId]               = useState(null);
   const [reviewMetrics, setReviewMetrics]     = useState(null);
@@ -7481,6 +7494,7 @@ function App() {
     setError("");
     setReview("");
     setClinicalSummary("");
+    setHpiData(null);
     setRuling(null);
     setReviewId(null);
     setReviewMetrics(null);
@@ -7497,6 +7511,7 @@ function App() {
         { headers: { "Content-Type": "multipart/form-data", ...authHeaders } }
       );
       setReview(res.data.review || "");
+      setHpiData(res.data.hpiData || null);
       setClinicalSummary(res.data.clinicalSummary || "");
       setRuling(res.data.ruling || null);
       setReviewId(res.data.reviewId || null);
@@ -7981,6 +7996,11 @@ function App() {
               <div style={{ padding: "0 28px 20px" }}>
                 <UNFNoteBox
                   hpi={hpi}
+                  autoHpiData={{
+                    ...(hpiData || {}),
+                    totalApprovedVisits: reviewType === "subsequent" ? (reviewMetrics.previouslyApprovedVisits ?? null) : null,
+                    isSubsequent: reviewType === "subsequent",
+                  }}
                   clinicalSummary={clinicalSummary}
                   poc={reviewMetrics.poc}
                   requestedVisits={reviewMetrics.requestedVisits}
