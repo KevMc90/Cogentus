@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Cockpit from "./components/Cockpit";
+import { parseRequestedFreqWeeks, formatVisitLine } from "./utils/visitComparison";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -3103,12 +3104,13 @@ function URFormEmbed({ user, token }) {
   const [files, setFiles]             = useState([]);
   const [review, setReview]           = useState("");
   const [ruling, setRuling]           = useState(null);
+  const [metrics, setMetrics]         = useState(null);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
   const authHeaders = { Authorization: `Bearer ${token}` };
 
   const handleSubmit = async () => {
-    setError(""); setReview(""); setRuling(null);
+    setError(""); setReview(""); setRuling(null); setMetrics(null);
     if (files.length === 0) { setError("Please attach at least one PDF."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
     setLoading(true);
@@ -3122,6 +3124,7 @@ function URFormEmbed({ user, token }) {
       const res = await axios.post(`${API_BASE}/api/generate-review`, fd, { headers: { "Content-Type": "multipart/form-data", ...authHeaders } });
       setReview(res.data.review || "");
       setRuling(res.data.ruling || null);
+      setMetrics(res.data.metrics || null);
     } catch (err) {
       setError(err.response?.data?.error || "Review generation failed.");
     } finally {
@@ -3154,6 +3157,30 @@ function URFormEmbed({ user, token }) {
           {loading ? "Processing..." : "Generate Review"}
         </button>
         {error && <div style={{ marginTop: 12, color: "#dc2626", fontSize: 13 }}>{error}</div>}
+        {/* ISSUE 3 — Requested (provider) vs. Recommended (ruling) side-by-side, same
+            values/formatting as the main cockpit's comparison (rapidnote1/src/components/Cockpit.js).
+            Requested frequency/duration is parsed from whatever POC text the extraction
+            found; falls back to the visit count alone when nothing could be parsed. */}
+        {ruling && metrics && (() => {
+          const reqText = [metrics.requestedFrequency, metrics.poc].filter(Boolean).join(" ");
+          const { freqPerWeek: reqFreq, durationWeeks: reqWeeks } = parseRequestedFreqWeeks(reqText);
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 20 }}>
+              <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Requested (provider)</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'DM Sans', sans-serif" }}>
+                  {formatVisitLine(metrics.requestedVisits, reqFreq, reqWeeks)}
+                </div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Recommended</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", fontFamily: "'DM Sans', sans-serif" }}>
+                  {formatVisitLine(ruling.visitsApproved, ruling.approvedFrequency, ruling.approvedDurationWeeks)}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {review && (
           <div style={{ marginTop: 20, padding: "16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap", color: "#1e293b" }}>
             {review}

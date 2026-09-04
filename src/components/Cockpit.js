@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { parseRequestedFreqWeeks, formatVisitLine } from "../utils/visitComparison";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -429,8 +430,11 @@ function buildFallbackContract(metrics, ruling) {
     recommendation: {
       determination:        r.determination   || "Pend",
       approvedVisits:       r.visitsApproved  || 0,
-      frequency:            null,
-      durationWeeks:        null,
+      // Same fields the live /v1/evaluate contract carries (see ISSUE 2 FIX) — read
+      // straight off the ruling, never recomputed, so the chip/comparison stay
+      // consistent even when the engine is offline and this fallback is in use.
+      frequency:            r.approvedFrequency     ?? null,
+      durationWeeks:        r.approvedDurationWeeks ?? null,
       criteria:             [],
       rationale:            r.determinationLine || "Engine offline — determination from prior form review.",
       confidence:           "low",
@@ -1149,6 +1153,34 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
             </div>
           )}
         </div>
+
+        {/* ISSUE 3 — Requested (provider) vs. Recommended (ruling) side-by-side.
+            Requested comes from the submitted request (extraction.requestedVisits +
+            frequency/duration parsed from the POC); Recommended reads straight off
+            rec (same approvedVisits/frequency/durationWeeks the chip above uses).
+            Falls back to the visit count alone when a frequency/duration can't be
+            parsed or wasn't approved (e.g. Pend, transition visits). */}
+        {(() => {
+          const ext = kase.contract.extraction || {};
+          const { freqPerWeek: reqFreq, durationWeeks: reqWeeks } =
+            parseRequestedFreqWeeks(ext.requestedFrequency);
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+              <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #f1f5f9", background: "#fafafa" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: FONTS.body }}>Requested (provider)</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", fontFamily: FONTS.body }}>
+                  {formatVisitLine(ext.requestedVisits, reqFreq, reqWeeks)}
+                </div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #f1f5f9", background: "#fafafa" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontFamily: FONTS.body }}>Recommended</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", fontFamily: FONTS.body }}>
+                  {formatVisitLine(rec.approvedVisits, rec.frequency, rec.durationWeeks)}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8, fontFamily: FONTS.body }}>Three Domain Assessment</div>
