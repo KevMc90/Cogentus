@@ -1323,18 +1323,22 @@ function UNFNotePanel({ kase }) {
   const rec = kase.contract.recommendation;
   const ext = kase.contract.extraction || {};
 
-  // Recomputed only when the case identity or its contract changes (a new case
-  // loaded, or the engine re-evaluating after a plan change) -- never on every
-  // render, so an in-progress edit below isn't silently overwritten by
-  // unrelated cockpit state changes (e.g. typing in a pend-detail box).
+  // Recomputed only when kase.contract or kase.providerNotes actually change (a
+  // new case loaded, or the engine re-evaluating after a plan change) -- never
+  // on every render, so an in-progress edit below isn't silently overwritten by
+  // unrelated cockpit state changes (e.g. typing in a pend-detail box). Reads
+  // the raw kase.contract.* paths directly (not the ext/rec aliases declared
+  // above, which are only for the JSX below) so the dependency array only
+  // needs kase.contract itself -- no derived locals to keep in sync by hand,
+  // and no eslint-disable needed.
   const builtNote = useMemo(() => buildUNFNote({
     hpi:               kase.providerNotes,
     clinicalSummary:   kase.contract.clinicalSummary,
-    poc:               ext.poc,
-    requestedVisits:   ext.requestedVisits,
-    determinationLine: rec.rationale,
-    approvedVisits:    rec.approvedVisits,
-  }), [kase.caseId, kase.contract, kase.providerNotes]); // eslint-disable-line react-hooks/exhaustive-deps
+    poc:               kase.contract.extraction?.poc,
+    requestedVisits:   kase.contract.extraction?.requestedVisits,
+    determinationLine: kase.contract.recommendation.rationale,
+    approvedVisits:    kase.contract.recommendation.approvedVisits,
+  }), [kase.contract, kase.providerNotes]);
 
   const [noteText, setNoteText] = useState(builtNote);
   const [copied, setCopied]     = useState(false);
