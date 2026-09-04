@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { parseRequestedFreqWeeks, formatVisitLine } from "../utils/visitComparison";
+import { buildUNFNote } from "../utils/unfNote";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -1270,14 +1271,25 @@ function RationaleEditor({ value, onChange, color }) {
 }
 
 // ── ACTION BUTTON ──────────────────────────────────────────────────────────────
-function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
+function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, compact }) {
   const [hover, setHover] = useState(false);
+  // UNF panel — compact mode renders a slim horizontal-row button (used in the
+  // footer action row) instead of the full-width stacked button (used while an
+  // action is mid-flow, e.g. the pend/partial/deny detail panels).
   return (
     <button
       onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{
+      style={compact ? {
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+        flex: 1, padding: "7px 4px", minWidth: 0,
+        border: `1.5px solid ${disabled ? "#e2e8f0" : border}`,
+        borderRadius: 7, cursor: disabled ? "not-allowed" : "pointer",
+        background: disabled ? "#f8fafc" : bg,
+        filter: !disabled && hover ? "brightness(0.93)" : "none",
+        transition: "all 0.12s", opacity: disabled ? 0.45 : 1,
+      } : {
         display: "flex", alignItems: "center", gap: 10,
         width: "100%", padding: "11px 14px",
         border: `1.5px solid ${disabled ? "#e2e8f0" : border}`,
@@ -1288,14 +1300,96 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled }) {
       }}
     >
       <span style={{
-        width: 24, height: 24, borderRadius: 5,
+        width: compact ? 18 : 24, height: compact ? 18 : 24, borderRadius: 5,
         background: disabled ? "#e2e8f0" : border,
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        fontSize: 12, fontWeight: 800, color: disabled ? "#9ca3af" : color,
+        fontSize: compact ? 10 : 12, fontWeight: 800, color: disabled ? "#9ca3af" : color,
         fontFamily: FONTS.body, flexShrink: 0,
       }}>{kbd}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: disabled ? "#9ca3af" : color, fontFamily: FONTS.body }}>{label}</span>
+      <span style={{
+        fontSize: compact ? 11 : 13, fontWeight: 600, color: disabled ? "#9ca3af" : color, fontFamily: FONTS.body,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{label}</span>
     </button>
+  );
+}
+
+// ── UNF NOTE PANEL ─────────────────────────────────────────────────────────────
+// Universal Note Format — primary content of the Determination (right) panel.
+// A reviewer reads the generated note, edits it in place if needed, copies it,
+// and pastes it directly into BBI. Nothing here writes back to BBI; the paste
+// is manual. Edits are local UI state only and never touch kase.contract.
+function UNFNotePanel({ kase }) {
+  const rec = kase.contract.recommendation;
+  const ext = kase.contract.extraction || {};
+
+  // Recomputed only when the case identity or its contract changes (a new case
+  // loaded, or the engine re-evaluating after a plan change) -- never on every
+  // render, so an in-progress edit below isn't silently overwritten by
+  // unrelated cockpit state changes (e.g. typing in a pend-detail box).
+  const builtNote = useMemo(() => buildUNFNote({
+    hpi:               kase.providerNotes,
+    clinicalSummary:   kase.contract.clinicalSummary,
+    poc:               ext.poc,
+    requestedVisits:   ext.requestedVisits,
+    determinationLine: rec.rationale,
+    approvedVisits:    rec.approvedVisits,
+  }), [kase.caseId, kase.contract, kase.providerNotes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [noteText, setNoteText] = useState(builtNote);
+  const [copied, setCopied]     = useState(false);
+
+  useEffect(() => { setNoteText(builtNote); setCopied(false); }, [builtNote]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(noteText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([noteText], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `UNF_${kase.caseId || "note"}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <button onClick={handleCopy} style={{
+          flex: 1, padding: "9px 0", borderRadius: 7, border: "none",
+          background: copied ? "#166534" : NAVY_MID, color: "#fff",
+          fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body,
+          transition: "background 0.15s",
+        }}>
+          {copied ? "✓ Copied" : "Copy Note"}
+        </button>
+        <button onClick={handleExport} style={{
+          padding: "9px 14px", borderRadius: 7, border: "1px solid #e2e8f0",
+          background: "#fff", color: "#374151", fontSize: 12, fontWeight: 600,
+          cursor: "pointer", fontFamily: FONTS.body, whiteSpace: "nowrap",
+        }}>
+          Export .txt
+        </button>
+      </div>
+      <textarea
+        value={noteText}
+        onChange={e => setNoteText(e.target.value)}
+        spellCheck={false}
+        style={{
+          width: "100%", minHeight: 280, maxHeight: 480, boxSizing: "border-box",
+          resize: "vertical", overflowY: "auto",
+          fontFamily: "'SF Mono', 'Consolas', 'Menlo', monospace", fontSize: 12, lineHeight: 1.6,
+          padding: "14px 16px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+          background: "#fff", color: "#1e293b", outline: "none",
+        }}
+      />
+    </div>
   );
 }
 
@@ -1382,6 +1476,11 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
             )}
           </div>
         )}
+
+        {/* UNF panel — primary content. Always visible once the engine has a
+            contract (before AND after a decision is recorded), since copying
+            the note into BBI isn't tied to which button the reviewer clicked. */}
+        {kase.contract && <UNFNotePanel kase={kase} />}
 
         {/* Deny confirmation */}
         {actionState === "deny_confirm" && !decided && (
@@ -1612,28 +1711,31 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
           </div>
         )}
 
-        {/* Action buttons */}
+        {/* UNF panel — determination actions demoted to a slim footer row.
+            The note above is the primary content; this row (plus the transient
+            deny_confirm/pend_input/approve_checklist/deny_signoff/partial_input
+            panels above, when an action is mid-flow) is the footer. Keyboard
+            shortcuts (A/P/D/N) are unchanged — they're wired in the keydown
+            handler below, not on these buttons directly. */}
         {!decided && actionState === "idle" && kase.contract && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <ActionBtn kbd="A" label="Approve"        color="#166534" bg="#dcfce7" border="#86efac" onClick={() => onAction("approve")} />
-            <ActionBtn kbd="P" label="Partial Denial"  color="#92400e" bg="#fef3c7" border="#fcd34d" onClick={() => onAction("partial")} />
-            <ActionBtn kbd="D" label="Full Denial"     color="#991b1b" bg="#fee2e2" border="#fca5a5" onClick={() => onAction("deny")} />
-            <ActionBtn kbd="N" label="Pend"            color="#1d4ed8" bg="#eff6ff" border="#93c5fd" onClick={() => onAction("pend")} />
-            {/* Hold / Release — only for live assigned cases */}
-            {kase.isLive && (onHoldCase || onReleaseCase) && (
-              <div style={{ marginTop: 4, paddingTop: 10, borderTop: "1px dashed #e2e8f0", display: "flex", gap: 6 }}>
-                {onHoldCase && (
-                  <button onClick={onHoldCase} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
-                    Hold (1 day)
-                  </button>
-                )}
-                {onReleaseCase && (
-                  <button onClick={onReleaseCase} style={{ flex: 1, padding: "8px 0", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body }}>
-                    Return to Queue
-                  </button>
-                )}
-              </div>
-            )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 10, borderTop: "1px dashed #e2e8f0" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <ActionBtn compact kbd="A" label="Approve"        color="#166534" bg="#dcfce7" border="#86efac" onClick={() => onAction("approve")} />
+              <ActionBtn compact kbd="P" label="Partial"        color="#92400e" bg="#fef3c7" border="#fcd34d" onClick={() => onAction("partial")} />
+              <ActionBtn compact kbd="D" label="Deny"           color="#991b1b" bg="#fee2e2" border="#fca5a5" onClick={() => onAction("deny")} />
+              <ActionBtn compact kbd="N" label="Pend"           color="#1d4ed8" bg="#eff6ff" border="#93c5fd" onClick={() => onAction("pend")} />
+              {/* Hold / Release — only for live assigned cases, same row */}
+              {kase.isLive && onHoldCase && (
+                <button onClick={onHoldCase} style={{ flex: 1, minWidth: 0, padding: "7px 4px", borderRadius: 7, border: "1px solid #c7d2fe", background: "#eef2ff", color: "#4338ca", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Hold
+                </button>
+              )}
+              {kase.isLive && onReleaseCase && (
+                <button onClick={onReleaseCase} style={{ flex: 1, minWidth: 0, padding: "7px 4px", borderRadius: 7, border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONTS.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Return to Queue
+                </button>
+              )}
+            </div>
           </div>
         )}
 
