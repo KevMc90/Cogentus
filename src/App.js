@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import Cockpit from "./components/Cockpit";
 import { parseRequestedFreqWeeks, formatVisitLine } from "./utils/visitComparison";
+import { buildUNFNote } from "./utils/unfNote";
 
 const API_BASE =
   process.env.REACT_APP_API_BASE ||
@@ -3118,6 +3119,7 @@ function URFormEmbed({ user, token }) {
   const [requestedVisits, setRequestedVisits] = useState("");
   const [files, setFiles]             = useState([]);
   const [review, setReview]           = useState("");
+  const [clinicalSummary, setClinicalSummary] = useState("");
   const [ruling, setRuling]           = useState(null);
   const [metrics, setMetrics]         = useState(null);
   const [loading, setLoading]         = useState(false);
@@ -3125,7 +3127,7 @@ function URFormEmbed({ user, token }) {
   const authHeaders = { Authorization: `Bearer ${token}` };
 
   const handleSubmit = async () => {
-    setError(""); setReview(""); setRuling(null); setMetrics(null);
+    setError(""); setReview(""); setClinicalSummary(""); setRuling(null); setMetrics(null);
     if (files.length === 0) { setError("Please attach at least one PDF."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
     setLoading(true);
@@ -3138,6 +3140,7 @@ function URFormEmbed({ user, token }) {
       fd.append("requestedVisits", String(parseInt(requestedVisits || "0", 10)));
       const res = await axios.post(`${API_BASE}/api/generate-review`, fd, { headers: { "Content-Type": "multipart/form-data", ...authHeaders } });
       setReview(res.data.review || "");
+      setClinicalSummary(res.data.clinicalSummary || "");
       setRuling(res.data.ruling || null);
       setMetrics(res.data.metrics || null);
     } catch (err) {
@@ -3196,12 +3199,89 @@ function URFormEmbed({ user, token }) {
             </div>
           );
         })()}
-        {review && (
-          <div style={{ marginTop: 20, padding: "16px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap", color: "#1e293b" }}>
-            {review}
-          </div>
+        {/* UNF panel — same note-builder as the main cockpit (src/utils/unfNote.js).
+            review (the old pre-formatted string) is no longer rendered directly;
+            the note is built from the same resolved values ruling/metrics carry. */}
+        {ruling && metrics && (
+          <UNFNoteBox
+            hpi={hpi}
+            clinicalSummary={clinicalSummary}
+            poc={metrics.poc}
+            requestedVisits={metrics.requestedVisits}
+            determinationLine={ruling.determinationLine}
+            approvedVisits={ruling.visitsApproved}
+            exportFileName={`UNF_${metrics.primaryDiagnosisCode || "note"}.txt`}
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+// ── UNF NOTE BOX ─────────────────────────────────────────────────────────────
+// Shared within App.js by URFormEmbed and the legacy single-page form (the
+// form demo-ur-only's App() actually renders) -- both call buildUNFNote()
+// from src/utils/unfNote.js so the two surfaces can never show different note
+// text for the same underlying values. Edits are local UI state only and
+// never write back to ruling/metrics.
+function UNFNoteBox({ hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits, exportFileName }) {
+  const builtNote = useMemo(() => buildUNFNote({
+    hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits,
+  }), [hpi, clinicalSummary, poc, requestedVisits, determinationLine, approvedVisits]);
+
+  const [noteText, setNoteText] = useState(builtNote);
+  const [copied, setCopied]     = useState(false);
+
+  useEffect(() => { setNoteText(builtNote); setCopied(false); }, [builtNote]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(noteText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([noteText], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = exportFileName || "UNF_note.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <button onClick={handleCopy} style={{
+          flex: 1, padding: "10px 0", borderRadius: 7, border: "none",
+          background: copied ? "#166534" : "#1a3a5c", color: "#fff",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Public Sans', sans-serif",
+          transition: "background 0.15s",
+        }}>
+          {copied ? "✓ Copied" : "Copy Note"}
+        </button>
+        <button onClick={handleExport} style={{
+          padding: "10px 16px", borderRadius: 7, border: "1px solid #e2e8f0",
+          background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600,
+          cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap",
+        }}>
+          Export .txt
+        </button>
+      </div>
+      <textarea
+        value={noteText}
+        onChange={e => setNoteText(e.target.value)}
+        spellCheck={false}
+        style={{
+          width: "100%", minHeight: 280, maxHeight: 480, boxSizing: "border-box",
+          resize: "vertical", overflowY: "auto",
+          fontFamily: "'SF Mono', 'Consolas', 'Menlo', monospace", fontSize: 12.5, lineHeight: 1.6,
+          padding: "14px 16px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+          background: "#f8fafc", color: "#1e293b", outline: "none",
+        }}
+      />
     </div>
   );
 }
@@ -7347,13 +7427,13 @@ function App() {
   const [requestedVisits, setRequestedVisits] = useState("");
   const [files, setFiles]                     = useState([]);
   const [review, setReview]                   = useState("");
+  const [clinicalSummary, setClinicalSummary] = useState("");
   const [ruling, setRuling]                   = useState(null);
   const [reviewId, setReviewId]               = useState(null);
   const [reviewMetrics, setReviewMetrics]     = useState(null);
   const [documentSummary, setDocumentSummary] = useState(null);
   const [error, setError]                     = useState("");
   const [loading, setLoading]                 = useState(false);
-  const [copied, setCopied]                   = useState(false);
   const [historyRefresh, setHistoryRefresh]   = useState(0);
 
   const handleAuthSuccess = (tok, userData) => {
@@ -7400,11 +7480,11 @@ function App() {
   const handleSubmit = async () => {
     setError("");
     setReview("");
+    setClinicalSummary("");
     setRuling(null);
     setReviewId(null);
     setReviewMetrics(null);
     setDocumentSummary(null);
-    setCopied(false);
 
     if (files.length === 0) { setError("At least one supporting PDF is required."); return; }
     if (!requestedVisits)   { setError("Requested Visits is required."); return; }
@@ -7417,6 +7497,7 @@ function App() {
         { headers: { "Content-Type": "multipart/form-data", ...authHeaders } }
       );
       setReview(res.data.review || "");
+      setClinicalSummary(res.data.clinicalSummary || "");
       setRuling(res.data.ruling || null);
       setReviewId(res.data.reviewId || null);
       setReviewMetrics(res.data.metrics || null);
@@ -7434,18 +7515,12 @@ function App() {
     }
   };
 
-  const handleCopy = () => {
-    if (!review) return;
-    const secs = parseReview(review);
-    const text = secs
-      ? secs.map(({ label, content }) => `${label}:\n${content}`).join("\n\n")
-      : review;
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  };
-
+  // UNF panel — this is the richer "COGENTUS CLINICAL DETERMINATION" letterhead
+  // export (kept as-is, still wired to the card header's Export .txt button
+  // below); it's independent of the UNF note text and still reads the raw
+  // `review` string, which the backend still returns unchanged. UNFNoteBox
+  // below gets its own separate, plain-text Copy Note button that copies
+  // whatever's currently in the (possibly edited) note textarea.
   const handleExport = () => {
     if (!review) return;
     const secs = parseReview(review);
@@ -7854,6 +7929,7 @@ function App() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={handleExport}
+                  title="Export the full letterhead-formatted determination"
                   style={{
                     background: "rgba(255,255,255,0.12)",
                     border: "1px solid rgba(255,255,255,0.25)",
@@ -7865,23 +7941,7 @@ function App() {
                     cursor: "pointer",
                   }}
                 >
-                  Export .txt
-                </button>
-                <button
-                  onClick={handleCopy}
-                  style={{
-                    background: copied ? "#22c55e" : "rgba(255,255,255,0.12)",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    borderRadius: 6,
-                    padding: "6px 14px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#fff",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {copied ? "Copied!" : "Copy to Clipboard"}
+                  Export Full Letter .txt
                 </button>
               </div>
             </div>
@@ -7914,14 +7974,22 @@ function App() {
               );
             })()}
 
-            {sections.map(({ label: secLabel, content }, idx) => (
-              <ReviewSection
-                key={secLabel}
-                label={secLabel}
-                content={content}
-                isLast={idx === sections.length - 1}
-              />
-            ))}
+            {/* UNF panel — same note-builder as the main cockpit and URFormEmbed
+                (src/utils/unfNote.js), replacing the old section-by-section
+                review display so this surface can't drift from the others. */}
+            {ruling && reviewMetrics && (
+              <div style={{ padding: "0 28px 20px" }}>
+                <UNFNoteBox
+                  hpi={hpi}
+                  clinicalSummary={clinicalSummary}
+                  poc={reviewMetrics.poc}
+                  requestedVisits={reviewMetrics.requestedVisits}
+                  determinationLine={ruling.determinationLine}
+                  approvedVisits={ruling.visitsApproved}
+                  exportFileName={`UNF_${reviewMetrics.primaryDiagnosisCode || "note"}.txt`}
+                />
+              </div>
+            )}
           </div>
         )}
 
