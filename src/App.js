@@ -2806,7 +2806,22 @@ function ReviewerShell({ user, token, onLogout }) {
     setExitError("");
   };
 
-  const handleOpenSearchCase = (sub) => {
+  // ISSUE 4 FIX — a case opened from Search was never claimed server-side, so
+  // assigned_reviewer_id in the DB never matched this reviewer and Hold/Release
+  // always failed with "Case not found or not assigned to you." This claims the
+  // case (self-assigns) before opening it, refusing to steal one actively assigned
+  // to someone else. Throws on failure so CaseSearchView's button can show why.
+  const handleOpenSearchCase = async (sub) => {
+    if (sub.assigned_reviewer_id != null && sub.assigned_reviewer_id !== user.id) {
+      throw new Error("This case is currently assigned to another reviewer.");
+    }
+    if (sub.assigned_reviewer_id !== user.id) {
+      await axios.patch(
+        `${API_BASE}/v1/submissions/${sub.submission_id}/assign`,
+        { reviewerId: user.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
     const diags = Array.isArray(sub.diagnosis_codes) ? sub.diagnosis_codes : [];
     const storedMetrics = sub.extracted_metrics || {};
     setAssignedCase({
@@ -3321,7 +3336,14 @@ function CaseSearchView({ token, onOpenCase }) {
                       {r.completeness_score != null ? r.completeness_score + "%" : "—"}
                     </span>
                     {onOpenCase ? (
-                      <button onClick={() => onOpenCase(r)} style={{ padding: "5px 12px", borderRadius: 6, background: "#1a3a5c", color: "#fff", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap" }}>
+                      <button
+                        onClick={async () => {
+                          setError("");
+                          try { await onOpenCase(r); }
+                          catch (e) { setError(e.response?.data?.error || e.message || "Failed to open case for review."); }
+                        }}
+                        style={{ padding: "5px 12px", borderRadius: 6, background: "#1a3a5c", color: "#fff", fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif", whiteSpace: "nowrap" }}
+                      >
                         Review
                       </button>
                     ) : <span />}
