@@ -1093,7 +1093,9 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
   const asmn = kase.contract.assessment;
   const cpg  = kase.contract.cpgInfo;
   const dc   = detColors(rec.determination);
-  const cs   = confidenceStyle(rec.confidence);
+  // Demo cleanup — confidence label removed from the chip display (see below);
+  // rec.confidence itself is untouched, still present on the contract/ruling.
+  // confidenceStyle() is left defined, just unused here, in case this comes back.
 
   return (
     <div>
@@ -1129,9 +1131,6 @@ function RecommendationZone({ kase, engineState, selectedPlan }) {
                 {rec.frequency}x/wk × {rec.durationWeeks} wks
               </span>
             )}
-            <span style={{ fontSize: 11, fontWeight: 700, color: cs.color, fontFamily: FONTS.body }}>
-              {cs.label} confidence
-            </span>
           </div>
           {rec.autoApprovalEligible && (
             <div style={{
@@ -1319,7 +1318,7 @@ function ActionBtn({ kbd, label, color, bg, border, onClick, disabled, compact }
 // A reviewer reads the generated note, edits it in place if needed, copies it,
 // and pastes it directly into BBI. Nothing here writes back to BBI; the paste
 // is manual. Edits are local UI state only and never touch kase.contract.
-function UNFNotePanel({ kase }) {
+function UNFNotePanel({ kase, onReleaseCase }) {
   const rec = kase.contract.recommendation;
   const ext = kase.contract.extraction || {};
   const isSubsequent = kase.reviewType === "subsequent";
@@ -1418,6 +1417,21 @@ function UNFNotePanel({ kase }) {
         }}>
           Export .txt
         </button>
+        {/* Demo cleanup — Return to Queue restored as a small secondary action here
+            (outline style, no fill) after the determination-actions footer it used
+            to live in was removed. Same onReleaseCase callback as before -- opens
+            App.js's existing exit modal (reason prompt) and existing
+            PATCH /v1/submissions/:id/release flow, unchanged. Hold and the
+            determination buttons are intentionally not restored. */}
+        {kase.isLive && onReleaseCase && (
+          <button onClick={onReleaseCase} style={{
+            padding: "9px 14px", borderRadius: 7, border: "1px solid #fca5a5",
+            background: "transparent", color: "#dc2626", fontSize: 12, fontWeight: 600,
+            cursor: "pointer", fontFamily: FONTS.body, whiteSpace: "nowrap",
+          }}>
+            Return to Queue
+          </button>
+        )}
       </div>
       <textarea
         value={noteText}
@@ -1522,7 +1536,7 @@ function DeterminationZone({ kase, queue, cursor, total, decisions, auditState, 
         {/* UNF panel — primary content. Always visible once the engine has a
             contract (before AND after a decision is recorded), since copying
             the note into BBI isn't tied to which button the reviewer clicked. */}
-        {kase.contract && <UNFNotePanel kase={kase} />}
+        {kase.contract && <UNFNotePanel kase={kase} onReleaseCase={onReleaseCase} />}
 
         {/* Approve / Partial Denial / Full Denial / Pend / Hold / Return to Queue
             removed from this panel -- the right column is note-only now (copy/adjust
@@ -2137,18 +2151,14 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
       if (key === "v") { setShowDocs(s => !s); return; }
       if (!hideQueueNav && key === "j" && cursor > 0)                { handleNavigate(cursor - 1); return; }
       if (!hideQueueNav && key === "k" && cursor < queue.length - 1) { handleNavigate(cursor + 1); return; }
-      if (!kase.contract || decisions[kase.caseId]) return;
-      if (key === "a" && actionState === "idle") { handleAction("approve"); return; }
-      if (key === "p" && actionState === "idle") { handleAction("partial"); return; }
-      if (key === "n" && actionState === "idle") { handleAction("pend");    return; }
-      if (key === "d") {
-        if (actionState === "idle")        { setActionState("deny_confirm"); return; }
-        if (actionState === "deny_confirm") { handleDenyConfirm(); return; }
-      }
+      // Demo cleanup — A/P/D/N determination shortcuts disabled along with the
+      // buttons/hint chips themselves. With no determination UI in this panel, a
+      // stray keypress during a demo must not silently change actionState. J/K/V
+      // above are untouched.
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [cursor, kase, queue.length, decisions, actionState, handleAction, handleDenyConfirm, handleNavigate]);
+  }, [cursor, hideQueueNav, queue.length, handleNavigate]);
 
   const decided      = !!decisions[kase.caseId];
   const decidedCount = Object.keys(decisions).length;
@@ -2269,14 +2279,9 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
           <KbdChip k="J" label="prev" />
           <KbdChip k="K" label="next" />
           <KbdChip k="V" label="docs" />
-          {!decided && kase.contract && (
-            <>
-              <KbdChip k="A" label="approve" />
-              <KbdChip k="P" label="partial" />
-              <KbdChip k="D" label="deny" />
-              <KbdChip k="N" label="pend" />
-            </>
-          )}
+          {/* Demo cleanup — A/P/D/N hint chips removed along with the determination
+              buttons themselves (the corresponding keyboard handlers are disabled
+              below, so these would have been misleading if left showing). */}
           {user && (
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: FONTS.body, borderLeft: "1px solid rgba(255,255,255,0.15)", paddingLeft: 14 }}>
               {user.name || user.email}
