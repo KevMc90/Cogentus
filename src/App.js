@@ -2764,6 +2764,7 @@ function ReviewerShell({ user, token, onLogout }) {
           rmiSentAt:      sub.rmi_sent_at     || null,
           rmiRespondedAt: sub.rmi_responded_at || null,
           documents:      sub.document_list || [],
+          requestedVisits: sub.requested_visits || null,
           metrics: {
             // Base fields always from submission form
             diagnosisCodes:       diags,
@@ -2774,9 +2775,15 @@ function ReviewerShell({ user, token, onLogout }) {
             documentationQuality: {},
             // Spread stored Claude extraction on top — populates ROM, MMT, pain, goals etc.
             ...storedMetrics,
-            // Keep form diags as authoritative if extraction didn't find them
+            // Keep form-submitted values as authoritative — they're what actually got
+            // persisted to submissions.* after /v1/submit-with-docs's own merge (explicit
+            // provider input wins there too), so re-assert them here or the raw Claude
+            // extraction spread above silently overwrites them. requestedVisits doing this
+            // wrong is what showed a stale/extracted visit count (and a wrong determination
+            // computed from it) instead of what the provider actually requested.
             diagnosisCodes: (storedMetrics.diagnosisCodes?.length ? storedMetrics.diagnosisCodes : diags),
             primaryDiagnosisCode: storedMetrics.primaryDiagnosisCode || diags[0] || null,
+            requestedVisits: sub.requested_visits || 0,
           },
           planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
         });
@@ -2840,6 +2847,7 @@ function ReviewerShell({ user, token, onLogout }) {
       rmiSentAt:      sub.rmi_sent_at    || null,
       rmiRespondedAt: sub.rmi_responded_at || null,
       documents:      sub.document_list  || [],
+      requestedVisits: sub.requested_visits || null,
       metrics: {
         diagnosisCodes:       diags,
         requestedVisits:      sub.requested_visits || 0,
@@ -2848,8 +2856,11 @@ function ReviewerShell({ user, token, onLogout }) {
         sopIndicators: [],
         documentationQuality: {},
         ...storedMetrics,
+        // Re-assert form-submitted values over the raw extraction spread above — same
+        // fix as handleGetCase; see the comment there.
         diagnosisCodes: (storedMetrics.diagnosisCodes?.length ? storedMetrics.diagnosisCodes : diags),
         primaryDiagnosisCode: storedMetrics.primaryDiagnosisCode || diags[0] || null,
+        requestedVisits: sub.requested_visits || 0,
       },
       planRuleSet: sub.plan_id ? { planId: sub.plan_id } : null,
     });

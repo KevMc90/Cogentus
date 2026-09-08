@@ -1987,6 +1987,12 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
         caseId:           liveCaseId,
         discipline:       liveCase.discipline,
         reviewType:       liveCase.reviewType,
+        // Explicit override, same as discipline/reviewType above — /v1/evaluate's own
+        // merge (requestedVisits ?? extractedMetrics.requestedVisits ?? 0) prefers this
+        // over whatever's in extractedMetrics, so a stale/mismatched value there (e.g.
+        // from the object-spread bug fixed in App.js's handleGetCase/handleOpenSearchCase)
+        // can't silently override the actually-submitted visit count again.
+        requestedVisits:  liveCase.requestedVisits ?? undefined,
         extractedMetrics: liveCase.metrics,
         planRuleSet,
       }),
@@ -2358,9 +2364,12 @@ export default function Cockpit({ user, onBack, liveCase, hideQueueNav, onCaseDo
               isSubmission:    true,
               providerName:    sub.provider_name     || null,
               diagnosisCodes:  sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags,
-              requestedVisits: sm.requestedVisits    || sub.requested_visits || null,
+              // Persisted submissions.requested_visits is authoritative (it's already the
+              // merged provider-input-wins value /v1/submit-with-docs computed) — the raw
+              // Claude extraction (sm.requestedVisits) must not take precedence over it.
+              requestedVisits: sub.requested_visits || sm.requestedVisits || null,
               providerNotes:   sub.provider_notes    || null,
-              metrics:         { diagnosisCodes: diags, requestedVisits: sub.requested_visits||0, functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null },
+              metrics:         { diagnosisCodes: diags, requestedVisits: sub.requested_visits||0, functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null, requestedVisits: sub.requested_visits || 0 },
             };
             setSubmissionCases(prev => {
               if (prev.some(c => c.caseId === entry.caseId)) return prev;
