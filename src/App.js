@@ -3066,7 +3066,11 @@ function ReviewerShell({ user, token, onLogout }) {
       {assignedCase && (
         <div style={{ display: cockpitVisible ? "flex" : "none", flex: 1, flexDirection: "column", overflow: "hidden" }}>
           <EpisodeContextBar memberId={assignedCase.memberId} discipline={assignedCase.discipline} token={token} />
-          <StateRulesBar state={assignedCase.memberState} discipline={assignedCase.discipline} token={token} />
+          {/* Demo cleanup — plan-rules strip (StateRulesBar) removed from the cockpit
+              route. Not shared with any other view (this was its only render call),
+              so the component definition itself is left intact rather than deleted —
+              see StateRulesView below for the standalone settings-page use of the
+              same /v1/state-rules data. */}
           <div style={{ flex: 1, overflow: "hidden" }}>
             <Cockpit
               user={user}
