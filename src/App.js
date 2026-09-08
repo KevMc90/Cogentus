@@ -6123,27 +6123,43 @@ function AssignCaseModal({ submissionId, token, onClose, onAssigned }) {
   );
 }
 
+const CASE_PAGE_SIZE = 50;
+
 function MasterQueueView({ token, onReviewCase }) {
   const [submissions, setSubmissions] = useState([]);
+  const [total, setTotal]             = useState(0);
+  const [page, setPage]               = useState(0); // 0-indexed
   const [loading, setLoading]         = useState(true);
   const [statusFilter, setStatusFilter]     = useState("all");
   const [discFilter, setDiscFilter]         = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [assignTarget, setAssignTarget]     = useState(null);
+  const [deleteTarget, setDeleteTarget]     = useState(null);
 
+  // "View all cases" fix — GET /v1/submissions previously had a hard, invisible
+  // 50-row cap with no way to see anything past it (older completed cases
+  // included). Now paginated: `total` (under the current filters) drives the
+  // Prev/Next controls below the table instead of silently truncating.
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (statusFilter   !== "all") params.set("status", statusFilter);
       if (discFilter     !== "all") params.set("discipline", discFilter);
+      params.set("limit",  String(CASE_PAGE_SIZE));
+      params.set("offset", String(page * CASE_PAGE_SIZE));
       const r = await axios.get(`${API_BASE}/v1/submissions?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setSubmissions(r.data.submissions || []);
+      setTotal(r.data.total ?? (r.data.submissions || []).length);
     } catch {}
     setLoading(false);
-  }, [token, statusFilter, discFilter]);
+  }, [token, statusFilter, discFilter, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Filter changes always jump back to page 0 -- old cases matching a fresh
+  // filter shouldn't stay hidden behind a stale page number.
+  useEffect(() => { setPage(0); }, [statusFilter, discFilter]);
 
   const statusBadge = (s) => {
     if (s === "approved")       return { bg: "#dcfce7", text: "#15803d" };
@@ -6174,13 +6190,28 @@ function MasterQueueView({ token, onReviewCase }) {
           onAssigned={() => { setAssignTarget(null); load(); }}
         />
       )}
+      {deleteTarget && (
+        <DeleteCaseModal
+          submission={deleteTarget}
+          token={token}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => { setDeleteTarget(null); load(); }}
+        />
+      )}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selS}>
           <option value="all">All Statuses</option>
           <option value="submitted">Submitted</option>
           <option value="pending_review">Pending Review</option>
           <option value="under_review">Under Review</option>
+          <option value="on_hold">On Hold</option>
+          <option value="pending_md_review">Pending MD Review</option>
+          <option value="info_requested">Info Requested</option>
+          <option value="rmi_pending">RMI Pending</option>
+          <option value="rmi_requested">RMI Requested</option>
+          <option value="rmi_responded">RMI Responded</option>
           <option value="approved">Approved</option>
+          <option value="partial_denial">Partial Denial</option>
           <option value="denied">Denied</option>
         </select>
         <select value={discFilter} onChange={e => setDiscFilter(e.target.value)} style={selS}>
@@ -6196,7 +6227,9 @@ function MasterQueueView({ token, onReviewCase }) {
           <option value="standard">Standard</option>
         </select>
         <button onClick={load} style={{ padding: "7px 16px", borderRadius: 7, background: "#1a3a5c", color: "#fff", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>Refresh</button>
-        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>{visible.length} case{visible.length !== 1 ? "s" : ""}</span>
+        <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>
+          {total > 0 ? `${page * CASE_PAGE_SIZE + 1}–${Math.min((page + 1) * CASE_PAGE_SIZE, total)} of ${total}` : "0 cases"}
+        </span>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
@@ -6242,7 +6275,11 @@ function MasterQueueView({ token, onReviewCase }) {
                     memberId: s.member_id || "—", dob: s.dob || "—",
                     discipline: s.discipline || "PT", reviewType: s.review_type || "initial",
                     submittedAt: s.submitted_at, documents: s.document_list || [],
-                    metrics: { diagnosisCodes: diags, requestedVisits: s.requested_visits||0, therapyType: s.discipline||"PT", functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null },
+                    requestedVisits: s.requested_visits || null,
+                    // Same fix as handleGetCase/handleOpenSearchCase in ReviewerShell: the raw
+                    // Claude extraction (sm) must not overwrite the already-merged, persisted
+                    // requestedVisits when spread in below.
+                    metrics: { diagnosisCodes: diags, requestedVisits: s.requested_visits||0, therapyType: s.discipline||"PT", functionalLimitations:[], sopIndicators:[], documentationQuality:{}, ...sm, diagnosisCodes: sm.diagnosisCodes?.length ? sm.diagnosisCodes : diags, primaryDiagnosisCode: sm.primaryDiagnosisCode || diags[0] || null, requestedVisits: s.requested_visits || 0 },
                     planRuleSet: s.plan_id ? { planId: s.plan_id } : null,
                   }); }} style={{ padding: "4px 9px", borderRadius: 5, background: "#0d1b2a", color: "#fff", fontSize: 10, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
                     Review
@@ -6251,10 +6288,114 @@ function MasterQueueView({ token, onReviewCase }) {
                 <button onClick={() => setAssignTarget(s)} style={{ padding: "4px 9px", borderRadius: 5, background: "#fff", color: "#374151", fontSize: 10, fontWeight: 600, border: "1px solid #e2e8f0", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
                   Assign
                 </button>
+                <button onClick={() => setDeleteTarget(s)} style={{ padding: "4px 9px", borderRadius: 5, background: "#fff", color: "#dc2626", fontSize: 10, fontWeight: 600, border: "1px solid #fca5a5", cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}>
+                  Delete
+                </button>
               </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Pagination — replaces the old hard 50-row cap with real paging so
+          older completed cases are actually reachable, not silently hidden. */}
+      {total > CASE_PAGE_SIZE && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 16 }}>
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", color: page === 0 ? "#cbd5e1" : "#374151", fontSize: 12, fontWeight: 600, cursor: page === 0 ? "not-allowed" : "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >
+            ← Prev
+          </button>
+          <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "'DM Sans', sans-serif" }}>
+            Page {page + 1} of {Math.max(1, Math.ceil(total / CASE_PAGE_SIZE))}
+          </span>
+          <button
+            onClick={() => setPage(p => ((p + 1) * CASE_PAGE_SIZE < total ? p + 1 : p))}
+            disabled={(page + 1) * CASE_PAGE_SIZE >= total}
+            style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", color: (page + 1) * CASE_PAGE_SIZE >= total ? "#cbd5e1" : "#374151", fontSize: 12, fontWeight: 600, cursor: (page + 1) * CASE_PAGE_SIZE >= total ? "not-allowed" : "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DeleteCaseModal: master-only, permanent hard delete of a case ───────────
+// Requires typing DELETE to confirm, given how irreversible this is (removes
+// the submission row, its Supabase Storage documents, and related
+// notifications/p2p_requests/appeals rows -- see DELETE /v1/submissions/:id
+// in index.js for exactly what it does and does NOT touch, i.e. audit_events).
+function DeleteCaseModal({ submission, token, onClose, onDeleted }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting]       = useState(false);
+  const [error, setError]             = useState("");
+
+  const canDelete = confirmText.trim().toUpperCase() === "DELETE";
+
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    setDeleting(true); setError("");
+    try {
+      await axios.delete(`${API_BASE}/v1/submissions/${submission.submission_id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onDeleted();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to delete case.");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: "24px 28px", width: 440, boxShadow: "0 8px 32px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#991b1b", marginBottom: 8, fontFamily: "'Fraunces', Georgia, serif" }}>
+          Permanently Delete Case
+        </div>
+        <div style={{ fontSize: 13, color: "#374151", marginBottom: 4, fontFamily: "'Public Sans', sans-serif" }}>
+          <strong>{submission.member_name || "Unknown Member"}</strong> · {submission.submission_id?.substring(0, 12)}…
+        </div>
+        <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 16, lineHeight: 1.5, fontFamily: "'Public Sans', sans-serif" }}>
+          This permanently removes the case, its uploaded documents, and related
+          appeals/P2P/notification records. This cannot be undone. Audit log
+          entries for this case are retained for compliance and are not affected.
+        </div>
+        <label style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>
+          Type DELETE to confirm
+        </label>
+        <input
+          autoFocus
+          value={confirmText}
+          onChange={e => setConfirmText(e.target.value)}
+          placeholder="DELETE"
+          style={{ width: "100%", padding: "9px 12px", borderRadius: 7, border: "1.5px solid #fca5a5", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+        />
+        {error && <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 12 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleDelete}
+            disabled={!canDelete || deleting}
+            style={{
+              flex: 1, padding: "10px 0", borderRadius: 7, border: "none",
+              background: !canDelete || deleting ? "#fca5a5" : "#dc2626", color: "#fff",
+              fontSize: 13, fontWeight: 700, cursor: !canDelete || deleting ? "not-allowed" : "pointer",
+              fontFamily: "'Public Sans', sans-serif",
+            }}
+          >
+            {deleting ? "Deleting…" : "Delete Permanently"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            style={{ padding: "10px 20px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", color: "#374151", fontSize: 13, cursor: "pointer", fontFamily: "'Public Sans', sans-serif" }}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
